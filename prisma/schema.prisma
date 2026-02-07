@@ -1,0 +1,266 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  TRAENER
+  SPILLER
+  BOEDEKASSEFORMAND
+}
+
+enum SignupStatus {
+  IN
+  OUT
+  UNKNOWN
+}
+
+enum EventSource {
+  MANUAL
+  SERIES
+  ICAL
+}
+
+enum FineStatus {
+  UNPAID
+  PAID_PENDING
+  PAID_APPROVED
+  FORESLAET
+  AFVIST
+}
+
+enum FineTrigger {
+  MISSED_DEADLINE
+}
+
+enum Recurrence {
+  DAILY
+  WEEKLY
+  MONTHLY
+  YEARLY
+}
+
+model User {
+  id           String        @id @default(cuid())
+  name         String
+  email        String?       @unique
+  phone        String?       @unique
+  image        String?
+  facebookId   String?       @unique
+  passwordHash String?
+  createdAt    DateTime      @default(now())
+  accounts     Account[]
+  sessions     Session[]
+  memberships  Membership[]
+  signups      Signup[]
+  createdSeries EventSeries[]
+  createdEvents Event[]
+  createdFineRules FineRule[]
+  createdFineTemplates FineTemplate[]
+  fines        Fine[]        @relation("FineRecipient")
+  createdFines Fine[]        @relation("FineCreator")
+  approvedFines Fine[]       @relation("FineApprover")
+  markedPaidFines Fine[]     @relation("FineMarker")
+}
+
+model Team {
+  id          String        @id @default(cuid())
+  name        String
+  slug        String        @unique
+  themePreset String        @default("atlantic")
+  createdAt   DateTime      @default(now())
+  memberships Membership[]
+  eventSeries EventSeries[]
+  events      Event[]
+  fineRules   FineRule[]
+  fineTemplates FineTemplate[]
+  fines       Fine[]
+  icalFeeds   IcalFeed[]
+}
+
+model Membership {
+  id        String   @id @default(cuid())
+  userId    String
+  teamId    String
+  role      Role
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+  team Team @relation(fields: [teamId], references: [id])
+
+  @@unique([userId, teamId])
+  @@index([teamId, role])
+}
+
+model EventSeries {
+  id                       String   @id @default(cuid())
+  teamId                   String
+  title                    String
+  location                 String
+  startDate                DateTime
+  recurrence               Recurrence
+  interval                 Int      @default(1)
+  endDate                  DateTime?
+  signupDeadlineHoursBefore Int      @default(24)
+  createdById              String
+  createdAt                DateTime @default(now())
+
+  team Team @relation(fields: [teamId], references: [id])
+  createdBy User @relation(fields: [createdById], references: [id])
+  events Event[]
+}
+
+model Event {
+  id             String       @id @default(cuid())
+  teamId         String
+  seriesId       String?
+  title          String
+  date           DateTime
+  location       String
+  signupDeadline DateTime
+  source         EventSource  @default(MANUAL)
+  externalUid    String?
+  feedId         String?
+  createdById    String?
+  createdAt      DateTime     @default(now())
+
+  team Team @relation(fields: [teamId], references: [id])
+  series EventSeries? @relation(fields: [seriesId], references: [id])
+  feed IcalFeed? @relation(fields: [feedId], references: [id])
+  createdBy User? @relation(fields: [createdById], references: [id])
+  signups Signup[]
+  fines Fine[]
+
+  @@index([teamId, date])
+  @@index([externalUid])
+}
+
+model Signup {
+  id        String       @id @default(cuid())
+  eventId   String
+  userId    String
+  status    SignupStatus @default(UNKNOWN)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  event Event @relation(fields: [eventId], references: [id])
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([eventId, userId])
+}
+
+model FineRule {
+  id        String      @id @default(cuid())
+  teamId    String
+  name      String
+  amount    Int
+  trigger   FineTrigger @default(MISSED_DEADLINE)
+  isActive  Boolean     @default(true)
+  createdById String?
+  createdAt DateTime    @default(now())
+
+  team Team @relation(fields: [teamId], references: [id])
+  createdBy User? @relation(fields: [createdById], references: [id])
+}
+
+model Fine {
+  id            String     @id @default(cuid())
+  teamId        String
+  userId        String
+  eventId       String?
+  templateId    String?
+  amount        Int
+  reason        String
+  status        FineStatus @default(UNPAID)
+  createdById   String?
+  createdByLabel String?
+  createdAt     DateTime   @default(now())
+  markedPaidAt  DateTime?
+  markedPaidById String?
+  approvedAt    DateTime?
+  approvedById  String?
+  rejectedAt    DateTime?
+  rejectedById  String?
+
+  team Team @relation(fields: [teamId], references: [id])
+  user User @relation("FineRecipient", fields: [userId], references: [id])
+  event Event? @relation(fields: [eventId], references: [id])
+  template FineTemplate? @relation(fields: [templateId], references: [id])
+  createdBy User? @relation("FineCreator", fields: [createdById], references: [id])
+  markedPaidBy User? @relation("FineMarker", fields: [markedPaidById], references: [id])
+  approvedBy User? @relation("FineApprover", fields: [approvedById], references: [id])
+
+  @@index([teamId, status])
+  @@index([userId, status])
+}
+
+model FineTemplate {
+  id          String   @id @default(cuid())
+  teamId      String
+  title       String
+  amount      Int
+  description String?
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  team Team @relation(fields: [teamId], references: [id])
+  createdBy User? @relation(fields: [createdById], references: [id])
+  fines Fine[]
+
+  @@index([teamId])
+}
+
+model IcalFeed {
+  id             String   @id @default(cuid())
+  teamId         String
+  name           String
+  url            String   @unique
+  lastImportedAt DateTime?
+  createdAt      DateTime @default(now())
+
+  team Team @relation(fields: [teamId], references: [id])
+  events Event[]
+
+  @@index([teamId])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}

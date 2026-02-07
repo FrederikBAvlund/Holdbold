@@ -1,0 +1,52 @@
+{
+  "name": "holdbold",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:studio": "prisma studio",
+    "prisma:seed": "prisma db seed"
+  },
+  "prisma": {
+    "seed": "node prisma/seed.mjs"
+  },
+  "dependencies": {
+    "@next-auth/prisma-adapter": "latest",
+    "@prisma/client": "6.10.0",
+    "tailwindcss": "3.4.17",
+    "bcryptjs": "latest",
+    "next": "latest",
+    "next-auth": "4.24.7",
+    "@fullcalendar/react": "5.11.5",
+    "@fullcalendar/daygrid": "5.11.5",
+    "@fullcalendar/timegrid": "5.11.5",
+    "@fullcalendar/interaction": "5.11.5",
+    "@fullcalendar/core": "5.11.5",
+    "@radix-ui/react-popover": "1.1.4",
+    "cmdk": "1.0.0",
+    "clsx": "2.1.1",
+    "tailwind-merge": "2.6.0",
+    "node-ical": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "zod": "latest"
+  },
+  "devDependencies": {
+    "@types/node": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "autoprefixer": "latest",
+    "eslint": "latest",
+    "eslint-config-next": "latest",
+    "postcss": "latest",
+    "prisma": "6.10.0",
+    "tailwindcss": "3.4.17",
+    "typescript": "latest"
+  }
+}

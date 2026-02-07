@@ -1,0 +1,162 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  --color-ink: #0f172a;
+  --color-clay: #cbd5e1;
+  --color-moss: #0f766e;
+  --color-ember: #d97706;
+  --color-fog: #f8fafc;
+  --gradient-start: #f8fafc;
+  --gradient-mid: #eef2f7;
+  --gradient-end: #e2e8f0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
+  background: radial-gradient(circle at 20% 20%, var(--gradient-start) 0%, var(--gradient-mid) 45%, var(--gradient-end) 100%);
+  color: var(--color-ink);
+}
+
+main {
+  min-height: 100vh;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+@layer components {
+  .card {
+    @apply rounded-3xl bg-white/90 p-6 shadow-[0_24px_60px_-40px_rgba(15,23,42,0.45)] backdrop-blur;
+  }
+
+  .card-soft {
+    @apply rounded-3xl bg-white/80 p-5 shadow-[0_18px_50px_-40px_rgba(15,23,42,0.35)] backdrop-blur;
+  }
+
+  .btn-primary {
+    @apply rounded-full bg-ink px-5 py-3 text-sm font-semibold uppercase tracking-[0.2em] text-fog shadow-[0_12px_32px_-20px_rgba(15,23,42,0.5)];
+  }
+
+  .btn-ghost {
+    @apply rounded-full border px-4 py-2 text-sm font-semibold transition;
+    border-color: color-mix(in srgb, var(--color-ink) 20%, transparent);
+    color: color-mix(in srgb, var(--color-ink) 80%, transparent);
+  }
+
+  .btn-ghost:hover {
+    border-color: color-mix(in srgb, var(--color-ink) 40%, transparent);
+    color: var(--color-ink);
+  }
+
+  .input {
+    @apply w-full rounded-2xl border bg-white/80 px-3 py-2 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.7)];
+    border-color: color-mix(in srgb, var(--color-ink) 10%, transparent);
+    color: var(--color-ink);
+  }
+
+  .label {
+    @apply text-xs font-semibold uppercase tracking-[0.2em];
+    color: color-mix(in srgb, var(--color-ink) 50%, transparent);
+  }
+}
+
+/* Theme presets */
+:root[data-theme="sandstone"] {
+  --color-ink: #1f2937;
+  --color-clay: #e7ddcf;
+  --color-moss: #7a6b5a;
+  --color-ember: #c46b3c;
+  --color-fog: #fbf7f2;
+  --gradient-start: #fbf7f2;
+  --gradient-mid: #f0e6db;
+  --gradient-end: #e6d7c7;
+}
+
+:root[data-theme="atlantic"] {
+  --color-ink: #0f172a;
+  --color-clay: #cbd5e1;
+  --color-moss: #0f766e;
+  --color-ember: #d97706;
+  --color-fog: #f8fafc;
+  --gradient-start: #f8fafc;
+  --gradient-mid: #eef2f7;
+  --gradient-end: #e2e8f0;
+}
+
+:root[data-theme="midnight"] {
+  --color-ink: #0b1020;
+  --color-clay: #c7d2fe;
+  --color-moss: #2563eb;
+  --color-ember: #f59e0b;
+  --color-fog: #f1f5f9;
+  --gradient-start: #f1f5f9;
+  --gradient-mid: #e2e8f0;
+  --gradient-end: #cbd5f5;
+}
+
+:root[data-theme="forest"] {
+  --color-ink: #102a1f;
+  --color-clay: #cfe4d9;
+  --color-moss: #1f7a5f;
+  --color-ember: #b45309;
+  --color-fog: #f5fbf8;
+  --gradient-start: #f5fbf8;
+  --gradient-mid: #e4f2ea;
+  --gradient-end: #d1e7dd;
+}
+
+:root[data-theme="mono"] {
+  --color-ink: #111827;
+  --color-clay: #d1d5db;
+  --color-moss: #374151;
+  --color-ember: #ef4444;
+  --color-fog: #f9fafb;
+  --gradient-start: #f9fafb;
+  --gradient-mid: #f1f5f9;
+  --gradient-end: #e5e7eb;
+}
+
+/* FullCalendar tweaks */
+.fc {
+  font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
+  color: var(--color-ink);
+}
+.fc .fc-toolbar-title {
+  font-weight: 600;
+}
+.fc .fc-button {
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--color-ink) 20%, transparent);
+  color: var(--color-ink);
+  border-radius: 999px;
+  padding: 0.4rem 0.8rem;
+  box-shadow: none;
+}
+.fc .fc-button-primary:not(:disabled).fc-button-active,
+.fc .fc-button-primary:not(:disabled):active {
+  background: var(--color-ink);
+  color: var(--color-fog);
+  border-color: var(--color-ink);
+}
+.fc .fc-daygrid-day-frame {
+  border-radius: 14px;
+}
+.fc .fc-daygrid-event {
+  border-radius: 10px;
+  padding: 2px 6px;
+}
