@@ -13,7 +13,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
   const fine = await prisma.fine.update({
     where: { id: params.id },
     data: {
-      status: "PAID_APPROVED",
+      status: "UNPAID",
       approvedAt: new Date(),
       approvedById: body.approvedById
     }

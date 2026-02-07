@@ -54,14 +54,7 @@ export async function POST(request: Request) {
   let reason = body.reason ?? "";
   let templateId: string | undefined = body.templateId;
 
-  let status: "UNPAID" | "FORESLAET" = "UNPAID";
-  if (body.createdById) {
-    const membership = await prisma.membership.findFirst({
-      where: { teamId: body.teamId, userId: body.createdById }
-    });
-    const role = membership?.role ?? "SPILLER";
-    status = role === "BOEDEKASSEFORMAND" || role === "ADMIN" ? "UNPAID" : "FORESLAET";
-  }
+  let status: "FORESLAET" = "FORESLAET";
 
   if (body.templateId) {
     const template = await prisma.fineTemplate.findFirst({
@@ -88,6 +81,40 @@ export async function POST(request: Request) {
       createdByLabel: body.createdByLabel ?? (body.createdById ? null : "System")
     }
   });
+
+  const notifications = [
+    {
+      userId: body.userId,
+      teamId: body.teamId,
+      type: "FINE" as const,
+      title: "Ny bøde",
+      body: `${reason} · ${amount} kr`,
+      link: "/dashboard/boder"
+    }
+  ];
+
+  if (status === "FORESLAET" || (!body.createdById && body.createdByLabel === "System")) {
+    const managers = await prisma.membership.findMany({
+      where: { teamId: body.teamId, role: { in: ["ADMIN", "BOEDEKASSEFORMAND"] } },
+      select: { userId: true }
+    });
+
+    const managerNotifications = managers
+      .filter((manager) => manager.userId !== body.userId)
+      .map((manager) => ({
+        userId: manager.userId,
+        teamId: body.teamId,
+        type: status === "FORESLAET" ? ("FINE_PROPOSED" as const) : ("FINE_SYSTEM" as const),
+        title: status === "FORESLAET" ? "Foreslået bøde" : "Automatisk bøde",
+        body: `${reason} · ${amount} kr`,
+        link: "/dashboard/boder"
+      }));
+    notifications.push(...managerNotifications);
+  }
+
+  if (notifications.length > 0) {
+    await prisma.notification.createMany({ data: notifications });
+  }
 
   return NextResponse.json({ fine });
 }

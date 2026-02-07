@@ -51,18 +51,46 @@ export async function POST(request: Request) {
     });
     if (existingFine) continue;
 
-    await prisma.fine.create({
+    const fine = await prisma.fine.create({
       data: {
         teamId: body.teamId,
         userId: member.userId,
         eventId: event.id,
         amount: rule.amount,
         reason: rule.name,
-        status: "UNPAID",
+        status: "FORESLAET",
         createdById: body.createdById,
         createdByLabel: "System"
       }
     });
+
+    const managers = await prisma.membership.findMany({
+      where: { teamId: body.teamId, role: { in: ["ADMIN", "BOEDEKASSEFORMAND"] } },
+      select: { userId: true }
+    });
+
+    const notifications = [
+      {
+        userId: member.userId,
+        teamId: body.teamId,
+        type: "FINE_SYSTEM" as const,
+        title: "Automatisk bøde",
+        body: `${fine.reason} · ${fine.amount} kr`,
+        link: "/dashboard/boder"
+      },
+      ...managers
+        .filter((manager) => manager.userId !== member.userId)
+        .map((manager) => ({
+          userId: manager.userId,
+          teamId: body.teamId,
+          type: "FINE_SYSTEM" as const,
+          title: "Automatisk bøde",
+          body: `${fine.reason} · ${fine.amount} kr`,
+          link: "/dashboard/boder"
+        }))
+    ];
+
+    await prisma.notification.createMany({ data: notifications });
     created += 1;
   }
 

@@ -9,6 +9,8 @@
   --color-moss: #0f766e;
   --color-ember: #d97706;
   --color-fog: #f8fafc;
+  --color-button: #0f172a;
+  --color-button-text: #f8fafc;
   --gradient-start: #f8fafc;
   --gradient-mid: #eef2f7;
   --gradient-end: #e2e8f0;
@@ -23,10 +25,16 @@ body {
   height: 100%;
 }
 
+html {
+  background: radial-gradient(circle at 20% 20%, var(--gradient-start) 0%, var(--gradient-mid) 45%, var(--gradient-end) 100%);
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+}
+
 body {
   margin: 0;
   font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
-  background: radial-gradient(circle at 20% 20%, var(--gradient-start) 0%, var(--gradient-mid) 45%, var(--gradient-end) 100%);
+  background: transparent;
   color: var(--color-ink);
 }
 
@@ -39,6 +47,43 @@ a {
   text-decoration: none;
 }
 
+.toast-root {
+  position: fixed;
+  right: 1.5rem;
+  bottom: 5.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  z-index: 60;
+}
+
+.toast {
+  min-width: 220px;
+  max-width: 320px;
+  border-radius: 999px;
+  padding: 0.75rem 1.25rem;
+  font-weight: 600;
+  font-size: 0.875rem;
+  box-shadow: 0 16px 40px -24px rgba(15, 23, 42, 0.4);
+  background: var(--color-ink);
+  color: var(--color-fog);
+}
+
+.toast.success {
+  background: #16a34a;
+  color: white;
+}
+
+.toast.error {
+  background: #dc2626;
+  color: white;
+}
+
+.toast.info {
+  background: var(--color-ink);
+  color: var(--color-fog);
+}
+
 @layer components {
   .card {
     @apply rounded-3xl bg-white/90 p-6 shadow-[0_24px_60px_-40px_rgba(15,23,42,0.45)] backdrop-blur;
@@ -49,7 +94,9 @@ a {
   }
 
   .btn-primary {
-    @apply rounded-full bg-ink px-5 py-3 text-sm font-semibold uppercase tracking-[0.2em] text-fog shadow-[0_12px_32px_-20px_rgba(15,23,42,0.5)];
+    @apply rounded-full px-5 py-3 text-sm font-semibold uppercase tracking-[0.2em] shadow-[0_12px_32px_-20px_rgba(15,23,42,0.5)];
+    background: var(--color-button);
+    color: var(--color-button-text);
   }
 
   .btn-ghost {
@@ -131,6 +178,72 @@ a {
   --gradient-end: #e5e7eb;
 }
 
+:root[data-theme="crimson"] {
+  --color-ink: #2b0f12;
+  --color-clay: #f3d7da;
+  --color-moss: #b91c1c;
+  --color-ember: #dc2626;
+  --color-fog: #fff5f5;
+  --gradient-start: #fff5f5;
+  --gradient-mid: #fde8e8;
+  --gradient-end: #f8d4d4;
+}
+
+:root[data-theme="ocean"] {
+  --color-ink: #0b253a;
+  --color-clay: #d7e6f2;
+  --color-moss: #0ea5a3;
+  --color-ember: #0f6b8a;
+  --color-fog: #f4fbff;
+  --gradient-start: #f4fbff;
+  --gradient-mid: #e6f3fb;
+  --gradient-end: #d4e9f5;
+}
+
+:root[data-theme="lavender"] {
+  --color-ink: #231942;
+  --color-clay: #e9ddf5;
+  --color-moss: #7c3aed;
+  --color-ember: #a855f7;
+  --color-fog: #fbf8ff;
+  --gradient-start: #fbf8ff;
+  --gradient-mid: #f1e7ff;
+  --gradient-end: #e6d9ff;
+}
+
+:root[data-theme="sunset"] {
+  --color-ink: #2a1511;
+  --color-clay: #ffd2c0;
+  --color-moss: #f97316;
+  --color-ember: #ef4444;
+  --color-fog: #fff7f3;
+  --gradient-start: #fff7f3;
+  --gradient-mid: #ffe6dc;
+  --gradient-end: #ffd0c2;
+}
+
+:root[data-theme="citrus"] {
+  --color-ink: #1a2b12;
+  --color-clay: #e9f5c6;
+  --color-moss: #22c55e;
+  --color-ember: #eab308;
+  --color-fog: #f9ffe7;
+  --gradient-start: #f9ffe7;
+  --gradient-mid: #ecfbd0;
+  --gradient-end: #e0f5b8;
+}
+
+:root[data-theme="neon"] {
+  --color-ink: #0b1220;
+  --color-clay: #d8f7ff;
+  --color-moss: #06b6d4;
+  --color-ember: #ec4899;
+  --color-fog: #f0fbff;
+  --gradient-start: #f0fbff;
+  --gradient-mid: #e0f7ff;
+  --gradient-end: #d3f1ff;
+}
+
 /* FullCalendar tweaks */
 .fc {
   font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
@@ -159,4 +272,21 @@ a {
 .fc .fc-daygrid-event {
   border-radius: 10px;
   padding: 2px 6px;
+}
+.fc .fc-day-today {
+  background: color-mix(in srgb, var(--color-ember) 18%, transparent);
+}
+
+@media (max-width: 768px) {
+  .fc .fc-toolbar {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .fc .fc-toolbar-title {
+    font-size: 1.1rem;
+  }
+  .fc .fc-button {
+    padding: 0.25rem 0.6rem;
+    font-size: 0.75rem;
+  }
 }

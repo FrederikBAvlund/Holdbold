@@ -20,6 +20,12 @@ enum SignupStatus {
   UNKNOWN
 }
 
+enum EventLogType {
+  SIGNUP
+  CANCEL
+  REOPEN
+}
+
 enum EventSource {
   MANUAL
   SERIES
@@ -38,11 +44,24 @@ enum FineTrigger {
   MISSED_DEADLINE
 }
 
+enum FineTemplateStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
 enum Recurrence {
   DAILY
   WEEKLY
   MONTHLY
   YEARLY
+}
+
+enum NotificationType {
+  GENERAL
+  EVENT
+  FINE
+  FINE_PROPOSED
+  FINE_SYSTEM
 }
 
 model User {
@@ -59,13 +78,19 @@ model User {
   memberships  Membership[]
   signups      Signup[]
   createdSeries EventSeries[]
-  createdEvents Event[]
+  createdEvents Event[]      @relation("EventCreatedBy")
+  canceledEvents Event[]     @relation("EventCanceledBy")
   createdFineRules FineRule[]
   createdFineTemplates FineTemplate[]
+  approvedFineTemplates FineTemplate[] @relation("FineTemplateApprover")
+  rejectedFineTemplates FineTemplate[] @relation("FineTemplateRejecter")
   fines        Fine[]        @relation("FineRecipient")
   createdFines Fine[]        @relation("FineCreator")
   approvedFines Fine[]       @relation("FineApprover")
   markedPaidFines Fine[]     @relation("FineMarker")
+  signupLogs      SignupLog[]
+  notifications Notification[]
+  eventLogs EventLog[] @relation("EventLogActor")
 }
 
 model Team {
@@ -73,6 +98,7 @@ model Team {
   name        String
   slug        String        @unique
   themePreset String        @default("atlantic")
+  themeConfig Json?
   createdAt   DateTime      @default(now())
   memberships Membership[]
   eventSeries EventSeries[]
@@ -81,6 +107,7 @@ model Team {
   fineTemplates FineTemplate[]
   fines       Fine[]
   icalFeeds   IcalFeed[]
+  notifications Notification[]
 }
 
 model Membership {
@@ -127,17 +154,37 @@ model Event {
   externalUid    String?
   feedId         String?
   createdById    String?
+  canceledAt     DateTime?
+  canceledById   String?
   createdAt      DateTime     @default(now())
 
   team Team @relation(fields: [teamId], references: [id])
   series EventSeries? @relation(fields: [seriesId], references: [id])
   feed IcalFeed? @relation(fields: [feedId], references: [id])
-  createdBy User? @relation(fields: [createdById], references: [id])
+  createdBy User? @relation("EventCreatedBy", fields: [createdById], references: [id])
+  canceledBy User? @relation("EventCanceledBy", fields: [canceledById], references: [id])
   signups Signup[]
   fines Fine[]
+  signupLogs SignupLog[]
+  eventLogs EventLog[]
 
   @@index([teamId, date])
   @@index([externalUid])
+  @@index([canceledAt])
+}
+
+model EventLog {
+  id        String       @id @default(cuid())
+  eventId   String
+  actorId   String?
+  type      EventLogType @default(SIGNUP)
+  message   String
+  createdAt DateTime     @default(now())
+
+  event Event @relation(fields: [eventId], references: [id])
+  actor User? @relation("EventLogActor", fields: [actorId], references: [id])
+
+  @@index([eventId, createdAt])
 }
 
 model Signup {
@@ -145,13 +192,52 @@ model Signup {
   eventId   String
   userId    String
   status    SignupStatus @default(UNKNOWN)
+  reason    String?
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
 
   event Event @relation(fields: [eventId], references: [id])
   user User @relation(fields: [userId], references: [id])
+  logs SignupLog[]
 
   @@unique([eventId, userId])
+}
+
+model SignupLog {
+  id        String       @id @default(cuid())
+  eventId   String
+  userId    String
+  status    SignupStatus
+  reason    String?
+  deadlineAt DateTime?
+  createdAt DateTime     @default(now())
+
+  signupId String
+  signup   Signup @relation(fields: [signupId], references: [id])
+  event Event @relation(fields: [eventId], references: [id])
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([eventId, createdAt])
+  @@index([userId, createdAt])
+  @@index([signupId])
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  teamId    String?
+  type      NotificationType @default(GENERAL)
+  title     String
+  body      String?
+  link      String?
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+  team Team? @relation(fields: [teamId], references: [id])
+
+  @@index([userId, readAt])
+  @@index([teamId, createdAt])
 }
 
 model FineRule {
@@ -206,13 +292,21 @@ model FineTemplate {
   amount      Int
   description String?
   createdById String?
+  status      FineTemplateStatus @default(APPROVED)
+  approvedAt  DateTime?
+  approvedById String?
+  rejectedAt  DateTime?
+  rejectedById String?
   createdAt   DateTime @default(now())
 
   team Team @relation(fields: [teamId], references: [id])
   createdBy User? @relation(fields: [createdById], references: [id])
+  approvedBy User? @relation("FineTemplateApprover", fields: [approvedById], references: [id])
+  rejectedBy User? @relation("FineTemplateRejecter", fields: [rejectedById], references: [id])
   fines Fine[]
 
   @@index([teamId])
+  @@index([teamId, status])
 }
 
 model IcalFeed {

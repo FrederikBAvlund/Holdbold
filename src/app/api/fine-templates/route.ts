@@ -31,15 +31,43 @@ export async function POST(request: Request) {
   const json = await request.json();
   const body = createSchema.parse(json);
 
+  let status: "APPROVED" | "PENDING" = "APPROVED";
+  if (body.createdById) {
+    const membership = await prisma.membership.findFirst({
+      where: { teamId: body.teamId, userId: body.createdById }
+    });
+    const role = membership?.role ?? "SPILLER";
+    status = role === "BOEDEKASSEFORMAND" || role === "ADMIN" ? "APPROVED" : "PENDING";
+  }
+
   const template = await prisma.fineTemplate.create({
     data: {
       teamId: body.teamId,
       title: body.title,
       amount: body.amount,
       description: body.description,
-      createdById: body.createdById
+      createdById: body.createdById,
+      status
     }
   });
+
+  if (status === "PENDING") {
+    const managers = await prisma.membership.findMany({
+      where: { teamId: body.teamId, role: { in: ["ADMIN", "BOEDEKASSEFORMAND"] } },
+      select: { userId: true }
+    });
+    const notifications = managers.map((manager) => ({
+      userId: manager.userId,
+      teamId: body.teamId,
+      type: "FINE_PROPOSED" as const,
+      title: "Ny foreslået bødeskabelon",
+      body: `${template.title} · ${template.amount} kr`,
+      link: "/dashboard/boder"
+    }));
+    if (notifications.length > 0) {
+      await prisma.notification.createMany({ data: notifications });
+    }
+  }
 
   return NextResponse.json({ template });
 }

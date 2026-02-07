@@ -5,7 +5,8 @@ import { prisma } from "@/lib/prisma";
 const querySchema = z.object({
   teamId: z.string().min(1),
   start: z.string().datetime(),
-  end: z.string().datetime()
+  end: z.string().datetime(),
+  userId: z.string().optional()
 });
 
 function addDays(date: Date, days: number) {
@@ -46,7 +47,8 @@ export async function GET(request: Request) {
   const parsed = querySchema.parse({
     teamId: searchParams.get("teamId") ?? "",
     start: searchParams.get("start") ?? "",
-    end: searchParams.get("end") ?? ""
+    end: searchParams.get("end") ?? "",
+    userId: searchParams.get("userId") ?? undefined
   });
 
   const start = new Date(parsed.start);
@@ -56,6 +58,19 @@ export async function GET(request: Request) {
     where: {
       teamId: parsed.teamId,
       date: { gte: start, lte: end }
+    },
+    include: {
+      ...(parsed.userId
+        ? {
+            signups: {
+              where: { userId: parsed.userId },
+              take: 1
+            }
+          }
+        : {}),
+      canceledBy: {
+        select: { name: true }
+      }
     }
   });
 
@@ -65,12 +80,23 @@ export async function GET(request: Request) {
 
   const occurrences = [] as Array<{ id: string; title: string; date: Date; location: string; source: string; seriesId: string }>;
 
+  const eventKeys = new Set(
+    events
+      .filter((event) => event.seriesId)
+      .map((event) => `${event.seriesId}:${event.date.toISOString().slice(0, 10)}`)
+  );
+
   for (const series of seriesList) {
     const endLimit = series.endDate ? new Date(Math.min(series.endDate.getTime(), end.getTime())) : end;
     let cursor = new Date(series.startDate);
 
     while (cursor <= endLimit) {
       if (cursor >= start && cursor <= end) {
+        const key = `${series.id}:${cursor.toISOString().slice(0, 10)}`;
+        if (eventKeys.has(key)) {
+          cursor = nextOccurrence(cursor, series.recurrence, series.interval);
+          continue;
+        }
         occurrences.push({
           id: `series:${series.id}:${cursor.toISOString()}`,
           title: series.title,
@@ -92,7 +118,10 @@ export async function GET(request: Request) {
       date: event.date,
       location: event.location,
       source: event.source,
-      seriesId: event.seriesId
+      seriesId: event.seriesId,
+      signupStatus: event.signups?.[0]?.status ?? null,
+      canceledAt: event.canceledAt,
+      canceledByName: event.canceledBy?.name ?? null
     })),
     occurrences
   });

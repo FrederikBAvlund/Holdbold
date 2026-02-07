@@ -2,6 +2,8 @@ import "./globals.css";
 import type { Metadata } from "next";
 import { Playfair_Display, Source_Sans_3 } from "next/font/google";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import AuthSessionProvider from "@/components/SessionProvider";
+import ToastProvider from "@/components/ToastProvider";
 
 const display = Playfair_Display({
   subsets: ["latin"],
@@ -27,7 +29,9 @@ export default function RootLayout({
     <html lang="da" className={`${display.variable} ${sans.variable}`}>
       <body>
         <ThemeProvider />
-        {children}
+        <AuthSessionProvider>
+          <ToastProvider>{children}</ToastProvider>
+        </AuthSessionProvider>
       </body>
     </html>
   );

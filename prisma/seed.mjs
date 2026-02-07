@@ -66,6 +66,47 @@ async function main() {
     });
   }
 
+  const bulkPassword = playerPassword ?? "Test1234!";
+  const bulkHash = await bcrypt.hash(bulkPassword, 10);
+
+  for (let index = 1; index <= 20; index += 1) {
+    const email = `spiller${index}@holdbold.local`;
+    const user = await prisma.user.upsert({
+      where: { email },
+      create: {
+        name: `Spiller ${index}`,
+        email,
+        passwordHash: bulkHash
+      },
+      update: {}
+    });
+
+    await prisma.membership.upsert({
+      where: { userId_teamId: { userId: user.id, teamId: team.id } },
+      create: { userId: user.id, teamId: team.id, role: "SPILLER" },
+      update: { role: "SPILLER" }
+    });
+  }
+
+  for (let index = 1; index <= 2; index += 1) {
+    const email = `boedekasse${index}@holdbold.local`;
+    const user = await prisma.user.upsert({
+      where: { email },
+      create: {
+        name: `Bødekasse ${index}`,
+        email,
+        passwordHash: bulkHash
+      },
+      update: {}
+    });
+
+    await prisma.membership.upsert({
+      where: { userId_teamId: { userId: user.id, teamId: team.id } },
+      create: { userId: user.id, teamId: team.id, role: "BOEDEKASSEFORMAND" },
+      update: { role: "BOEDEKASSEFORMAND" }
+    });
+  }
+
   const fineRule = await prisma.fineRule.findFirst({
     where: { teamId: team.id }
   });

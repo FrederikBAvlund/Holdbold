@@ -45,5 +45,25 @@ export async function POST(request: Request) {
     }
   });
 
+  const members = await prisma.membership.findMany({
+    where: { teamId: body.teamId },
+    select: { userId: true }
+  });
+
+  const notifications = members
+    .filter((member) => member.userId !== body.createdById)
+    .map((member) => ({
+      userId: member.userId,
+      teamId: body.teamId,
+      type: "EVENT" as const,
+      title: `Ny begivenhed: ${event.title}`,
+      body: `${new Date(event.date).toLocaleString("da-DK")} · ${event.location}`,
+      link: "/dashboard/kalender"
+    }));
+
+  if (notifications.length > 0) {
+    await prisma.notification.createMany({ data: notifications });
+  }
+
   return NextResponse.json({ event });
 }
