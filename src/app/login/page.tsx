@@ -1,18 +1,54 @@
 "use client";
 
 import { signIn } from "next-auth/react";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const errorMessages = useMemo(
+    () =>
+      ({
+        CredentialsSignin: "Forkerte loginoplysninger. Prøv igen.",
+        AccessDenied: "Adgang nægtet.",
+        OAuthAccountNotLinked: "Denne konto er allerede knyttet til en anden loginmetode."
+      }) as Record<string, string>,
+    []
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const code = new URLSearchParams(window.location.search).get("error");
+    if (!code) {
+      setError(null);
+      return;
+    }
+    setError(errorMessages[code] ?? "Login mislykkedes. Prøv igen.");
+  }, [errorMessages]);
 
   async function handleCredentials(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setLoading(true);
+    setError(null);
     const formData = new FormData(event.currentTarget);
     const identifier = String(formData.get("identifier") ?? "");
     const password = String(formData.get("password") ?? "");
-    await signIn("credentials", { identifier, password, callbackUrl: "/dashboard" });
+    const result = await signIn("credentials", {
+      identifier,
+      password,
+      callbackUrl: "/dashboard",
+      redirect: false
+    });
+    if (result?.error) {
+      setError(errorMessages[result.error] ?? "Forkerte loginoplysninger. Prøv igen.");
+      setLoading(false);
+      return;
+    }
+    if (result?.url) {
+      window.location.href = result.url;
+      return;
+    }
     setLoading(false);
   }
 
@@ -25,10 +61,15 @@ export default function LoginPage() {
             Log ind
           </h1>
           <p className="mt-2 text-ink/70">Brug email eller telefon.</p>
+          {error ? (
+            <p className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700">
+              {error}
+            </p>
+          ) : null}
 
           <form onSubmit={handleCredentials} className="mt-6 space-y-4">
-            <input name="identifier" placeholder="Email eller telefon" className="input" />
-            <input name="password" type="password" placeholder="Adgangskode" className="input" />
+            <input name="identifier" placeholder="Email eller telefon" className="input" required />
+            <input name="password" type="password" placeholder="Adgangskode" className="input" required />
             <button className="btn-primary w-full" disabled={loading}>
               {loading ? "Logger ind..." : "Log ind"}
             </button>
