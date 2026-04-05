@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ToastProvider";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
@@ -78,7 +78,6 @@ const adminRoles = ["ADMIN", "TRAENER", "BOEDEKASSEFORMAND"];
 export default function KalenderPage() {
   const { pushToast } = useToast();
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { data: session, status: sessionStatus } = useSession();
   const [range, setRange] = useState<{ start: string; end: string } | null>(null);
   const lastRangeRef = useRef<{ start: string; end: string } | null>(null);
@@ -465,20 +464,23 @@ export default function KalenderPage() {
 
   useEffect(() => {
     if (!teamId || !userId) return;
-    const focusEvent = searchParams.get("focusEvent");
+    if (typeof window === "undefined") return;
+
+    const currentParams = new URLSearchParams(window.location.search);
+    const focusEvent = currentParams.get("focusEvent");
     if (!focusEvent) return;
-    const focusDate = searchParams.get("focusDate") ?? new Date().toISOString();
+    const focusDate = currentParams.get("focusDate") ?? new Date().toISOString();
     const focusKey = `${focusEvent}:${focusDate}`;
     if (handledFocusKeyRef.current === focusKey) return;
     handledFocusKeyRef.current = focusKey;
 
     const focusItem: CalendarEvent = {
       id: focusEvent,
-      title: searchParams.get("focusTitle") ?? "Begivenhed",
+      title: currentParams.get("focusTitle") ?? "Begivenhed",
       date: focusDate,
-      location: searchParams.get("focusLocation") ?? "",
-      source: searchParams.get("focusSource") ?? "MANUAL",
-      seriesId: searchParams.get("focusSeriesId"),
+      location: currentParams.get("focusLocation") ?? "",
+      source: currentParams.get("focusSource") ?? "MANUAL",
+      seriesId: currentParams.get("focusSeriesId"),
       meetingTime: null,
       signupDeadline: null,
       signupStatus: null,
@@ -488,7 +490,7 @@ export default function KalenderPage() {
 
     openEvent(focusItem);
 
-    const cleaned = new URLSearchParams(searchParams.toString());
+    const cleaned = new URLSearchParams(currentParams.toString());
     cleaned.delete("focusEvent");
     cleaned.delete("focusDate");
     cleaned.delete("focusTitle");
@@ -499,7 +501,7 @@ export default function KalenderPage() {
     router.replace(query ? `/dashboard/kalender?${query}` : "/dashboard/kalender", {
       scroll: false
     });
-  }, [router, searchParams, teamId, userId]);
+  }, [router, teamId, userId]);
 
   const isMatchEvent = selectedEvent?.source === "ICAL";
   const canViewMatchMeta = Boolean(isMatchEvent);

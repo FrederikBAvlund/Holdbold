@@ -1,14 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 
 export default function SignupPage() {
-  const searchParams = useSearchParams();
-  const slugFromLink = useMemo(() => {
-    const slug = searchParams.get("slug");
-    return slug ? slug.trim() : "";
-  }, [searchParams]);
+  const [slugFromLink, setSlugFromLink] = useState("");
   const slugLocked = slugFromLink.length > 0;
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [name, setName] = useState("");
@@ -20,9 +15,13 @@ export default function SignupPage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!slugLocked) return;
-    setTeamSlug(slugFromLink);
-  }, [slugFromLink, slugLocked]);
+    if (typeof window === "undefined") return;
+    const slug = new URLSearchParams(window.location.search).get("slug")?.trim() ?? "";
+    setSlugFromLink(slug);
+    if (slug) {
+      setTeamSlug(slug);
+    }
+  }, []);
   const [confirmPassword, setConfirmPassword] = useState("");
 
   async function handleSubmit(event: React.FormEvent) {
