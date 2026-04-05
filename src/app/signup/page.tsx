@@ -100,8 +100,11 @@ export default function SignupPage() {
               type="email"
               inputMode="email"
               autoComplete="email"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
               value={email}
-              onChange={(event) => setEmail(event.target.value)}
+              onChange={(event) => setEmail(event.target.value.toLowerCase())}
               className="input mt-2"
               placeholder="navn@klub.dk"
               required

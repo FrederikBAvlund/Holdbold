@@ -10,10 +10,10 @@ const createSchema = z.object({
   teamId: z.string().min(1),
   title: z.string().min(1),
   location: z.string().min(1),
-  startDate: z.string().min(1),
+  startDate: z.string().datetime(),
   recurrence: z.enum(["DAILY", "WEEKLY", "MONTHLY", "YEARLY"]),
   interval: z.number().int().positive().optional(),
-  endDate: z.string().optional(),
+  endDate: z.string().datetime().optional(),
   signupDeadlineHoursBefore: z.number().int().positive().optional(),
   createdById: z.string().min(1)
 });

@@ -63,7 +63,7 @@ export async function POST(request: Request) {
 
   const body = {
     ...parsed.data,
-    email: parsed.data.email || undefined,
+    email: parsed.data.email ? parsed.data.email.toLowerCase() : undefined,
     phone: parsed.data.phone || undefined
   };
 
@@ -83,7 +83,7 @@ export async function POST(request: Request) {
   const existingUser = await prisma.user.findFirst({
     where: {
       OR: [
-        ...(body.email ? [{ email: body.email }] : []),
+        ...(body.email ? [{ email: { equals: body.email, mode: "insensitive" as const } }] : []),
         ...(body.phone ? [{ phone: body.phone }] : [])
       ]
     }

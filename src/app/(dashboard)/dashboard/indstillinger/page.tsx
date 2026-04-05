@@ -427,7 +427,7 @@ export default function IndstillingerPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name: profileName,
-        email: profileEmail || null,
+        email: profileEmail ? profileEmail.toLowerCase() : null,
         phone: profilePhone || null,
         image: profileImage || null,
         currentPassword: currentPassword || undefined,
@@ -651,8 +651,11 @@ export default function IndstillingerPage() {
             <input
               id="profile-email"
               type="email"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
               value={profileEmail}
-              onChange={(event) => setProfileEmail(event.target.value)}
+              onChange={(event) => setProfileEmail(event.target.value.toLowerCase())}
               className="input"
             />
           </div>

@@ -27,12 +27,17 @@ export default function LoginPage() {
     setError(errorMessages[code] ?? "Login mislykkedes. Prøv igen.");
   }, [errorMessages]);
 
+  function normalizeIdentifier(value: string) {
+    const trimmed = value.trim();
+    return trimmed.includes("@") ? trimmed.toLowerCase() : trimmed;
+  }
+
   async function handleCredentials(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setLoading(true);
     setError(null);
     const formData = new FormData(event.currentTarget);
-    const identifier = String(formData.get("identifier") ?? "");
+    const identifier = normalizeIdentifier(String(formData.get("identifier") ?? ""));
     const password = String(formData.get("password") ?? "");
     const result = await signIn("credentials", {
       identifier,
@@ -68,7 +73,15 @@ export default function LoginPage() {
           ) : null}
 
           <form onSubmit={handleCredentials} className="mt-6 space-y-4">
-            <input name="identifier" placeholder="Email eller telefon" className="input" required />
+            <input
+              name="identifier"
+              placeholder="Email eller telefon"
+              className="input"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              required
+            />
             <input name="password" type="password" placeholder="Adgangskode" className="input" required />
             <button className="btn-primary w-full" disabled={loading}>
               {loading ? "Logger ind..." : "Log ind"}

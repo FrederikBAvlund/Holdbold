@@ -3,7 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 
 const updateSchema = z.object({
-  endDate: z.string().nullable().optional()
+  endDate: z.string().datetime().nullable().optional()
 });
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {

@@ -9,9 +9,9 @@ const listSchema = z.object({
 const createSchema = z.object({
   teamId: z.string().min(1),
   title: z.string().min(1),
-  date: z.string().min(1),
+  date: z.string().datetime(),
   location: z.string().min(1),
-  signupDeadline: z.string().min(1),
+  signupDeadline: z.string().datetime(),
   createdById: z.string().min(1)
 });
 

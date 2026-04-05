@@ -107,6 +107,9 @@ export async function PATCH(request: Request) {
     }
   }
 
+  const normalizedEmail =
+    data.email === undefined ? undefined : data.email === null ? null : data.email.trim().toLowerCase();
+
   try {
     const themeConfigValue =
       data.themeConfig === undefined
@@ -119,7 +122,7 @@ export async function PATCH(request: Request) {
       where: { id: session.user.id },
       data: {
         name: data.name ?? user.name,
-        email: data.email === undefined ? user.email : data.email,
+        email: normalizedEmail === undefined ? user.email : normalizedEmail,
         phone: data.phone === undefined ? user.phone : data.phone,
         image: data.image === undefined ? user.image : data.image,
         passwordHash: data.newPassword ? await bcrypt.hash(data.newPassword, 10) : user.passwordHash,
@@ -152,7 +155,7 @@ export async function PATCH(request: Request) {
           where: { id: session.user.id },
           data: {
             name: data.name ?? user.name,
-            email: data.email === undefined ? user.email : data.email,
+            email: normalizedEmail === undefined ? user.email : normalizedEmail,
             phone: data.phone === undefined ? user.phone : data.phone,
             image: data.image === undefined ? user.image : data.image,
             passwordHash: data.newPassword ? await bcrypt.hash(data.newPassword, 10) : user.passwordHash

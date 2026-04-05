@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 const bodySchema = z.object({
   teamId: z.string().min(1),
   seriesId: z.string().min(1),
-  date: z.string().min(1)
+  date: z.string().datetime()
 });
 
 export async function POST(request: Request) {

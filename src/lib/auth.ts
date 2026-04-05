@@ -33,9 +33,16 @@ export const authOptions: NextAuthOptions = {
 
               if (!identifier || !password) return null;
 
+              const normalizedIdentifier = identifier.includes("@")
+                ? identifier.toLowerCase()
+                : identifier;
+
               const user = await prisma.user.findFirst({
                 where: {
-                  OR: [{ email: identifier }, { phone: identifier }]
+                  OR: [
+                    { email: { equals: normalizedIdentifier, mode: "insensitive" } },
+                    { phone: normalizedIdentifier }
+                  ]
                 }
               });
 

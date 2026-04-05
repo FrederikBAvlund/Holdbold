@@ -105,6 +105,15 @@ export default function KalenderPage() {
   const [interval, setInterval] = useState(1);
   const [endDate, setEndDate] = useState("");
   const [deadlineHours, setDeadlineHours] = useState(24);
+  const toIsoFromLocalDateTime = (value: string) => {
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+  };
+  const toIsoEndOfLocalDay = (value: string) => {
+    if (!value) return null;
+    const parsed = new Date(`${value}T23:59:59`);
+    return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+  };
   const formatTimestamp = (value: string | Date) => {
     const date = typeof value === "string" ? new Date(value) : value;
     const pad = (num: number) => String(num).padStart(2, "0");
@@ -359,9 +368,14 @@ export default function KalenderPage() {
   async function handleCreateSeries(event: React.FormEvent) {
     event.preventDefault();
     if (!teamId || !userId) return;
+    const startIso = toIsoFromLocalDateTime(startDate);
+    if (!startIso) {
+      pushToast("Ugyldigt starttidspunkt", "error");
+      return;
+    }
 
     if (recurrence === "ONCE") {
-      const start = new Date(startDate);
+      const start = new Date(startIso);
       const deadline = new Date(start.getTime() - deadlineHours * 60 * 60 * 1000);
       await fetch("/api/events", {
         method: "POST",
@@ -376,6 +390,7 @@ export default function KalenderPage() {
         })
       });
     } else {
+      const endIso = toIsoEndOfLocalDay(endDate);
       await fetch("/api/event-series", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -383,10 +398,10 @@ export default function KalenderPage() {
           teamId,
           title,
           location,
-          startDate,
+          startDate: startIso,
           recurrence,
           interval,
-          endDate: endDate || undefined,
+          endDate: endIso ?? undefined,
           signupDeadlineHoursBefore: deadlineHours,
           createdById: userId
         })
@@ -648,10 +663,11 @@ export default function KalenderPage() {
   }
 
   async function updateSeriesEndDate(seriesId: string, newEndDate: string) {
+    const endIso = toIsoEndOfLocalDay(newEndDate);
     await fetch(`/api/event-series/${seriesId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ endDate: newEndDate || null })
+      body: JSON.stringify({ endDate: endIso })
     });
   }
 
