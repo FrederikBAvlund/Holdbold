@@ -115,6 +115,9 @@ async function main() {
   const playerEmail = process.env.SEED_PLAYER_EMAIL;
   const playerPhone = process.env.SEED_PLAYER_PHONE;
   const playerPassword = process.env.SEED_PLAYER_PASSWORD;
+  const includeSinglePlayer = process.env.SEED_INCLUDE_SINGLE_PLAYER === "true";
+  const includeDemoPlayers = process.env.SEED_INCLUDE_DEMO_PLAYERS === "true";
+  const includeDemoTreasurers = process.env.SEED_INCLUDE_DEMO_TREASURERS === "true";
 
   let adminUserId = null;
 
@@ -141,7 +144,7 @@ async function main() {
     });
   }
 
-  if ((playerEmail || playerPhone) && playerPassword) {
+  if (includeSinglePlayer && (playerEmail || playerPhone) && playerPassword) {
     const passwordHash = await bcrypt.hash(playerPassword, 10);
 
     const user = await prisma.user.upsert({
@@ -165,42 +168,46 @@ async function main() {
   const bulkPassword = playerPassword ?? "Test1234!";
   const bulkHash = await bcrypt.hash(bulkPassword, 10);
 
-  for (let index = 1; index <= 20; index += 1) {
-    const email = `spiller${index}@holdbold.local`;
-    const user = await prisma.user.upsert({
-      where: { email },
-      create: {
-        name: `Spiller ${index}`,
-        email,
-        passwordHash: bulkHash
-      },
-      update: {}
-    });
+  if (includeDemoPlayers) {
+    for (let index = 1; index <= 20; index += 1) {
+      const email = `spiller${index}@holdbold.local`;
+      const user = await prisma.user.upsert({
+        where: { email },
+        create: {
+          name: `Spiller ${index}`,
+          email,
+          passwordHash: bulkHash
+        },
+        update: {}
+      });
 
-    await prisma.membership.upsert({
-      where: { userId_teamId: { userId: user.id, teamId: team.id } },
-      create: { userId: user.id, teamId: team.id, role: "SPILLER", status: "ACTIVE" },
-      update: { role: "SPILLER", status: "ACTIVE" }
-    });
+      await prisma.membership.upsert({
+        where: { userId_teamId: { userId: user.id, teamId: team.id } },
+        create: { userId: user.id, teamId: team.id, role: "SPILLER", status: "ACTIVE" },
+        update: { role: "SPILLER", status: "ACTIVE" }
+      });
+    }
   }
 
-  for (let index = 1; index <= 2; index += 1) {
-    const email = `boedekasse${index}@holdbold.local`;
-    const user = await prisma.user.upsert({
-      where: { email },
-      create: {
-        name: `Bødekasse ${index}`,
-        email,
-        passwordHash: bulkHash
-      },
-      update: {}
-    });
+  if (includeDemoTreasurers) {
+    for (let index = 1; index <= 2; index += 1) {
+      const email = `boedekasse${index}@holdbold.local`;
+      const user = await prisma.user.upsert({
+        where: { email },
+        create: {
+          name: `Bødekasse ${index}`,
+          email,
+          passwordHash: bulkHash
+        },
+        update: {}
+      });
 
-    await prisma.membership.upsert({
-      where: { userId_teamId: { userId: user.id, teamId: team.id } },
-      create: { userId: user.id, teamId: team.id, role: "BOEDEKASSEFORMAND", status: "ACTIVE" },
-      update: { role: "BOEDEKASSEFORMAND", status: "ACTIVE" }
-    });
+      await prisma.membership.upsert({
+        where: { userId_teamId: { userId: user.id, teamId: team.id } },
+        create: { userId: user.id, teamId: team.id, role: "BOEDEKASSEFORMAND", status: "ACTIVE" },
+        update: { role: "BOEDEKASSEFORMAND", status: "ACTIVE" }
+      });
+    }
   }
 
   const fineRule = await prisma.fineRule.findFirst({
