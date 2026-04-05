@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import { getStoredTeamId, setStoredTeamId } from "@/components/appState";
 
 type CalendarEvent = {
@@ -9,6 +10,10 @@ type CalendarEvent = {
   title: string;
   date: string;
   location: string;
+  source?: string;
+  seriesId?: string | null;
+  meetingTime?: string | null;
+  signupDeadline?: string | null;
   signupStatus?: string | null;
 };
 
@@ -27,11 +32,12 @@ type Member = {
 type FineItem = { amount: number };
 
 export default function DashboardHome() {
+  const router = useRouter();
   const { data: session, status: sessionStatus } = useSession();
   const [teamId, setTeamId] = useState("");
   const [userId, setUserId] = useState("");
-  const [nextEvent, setNextEvent] = useState<CalendarEvent | null>(null);
-  const [counts, setCounts] = useState({ in: 0, out: 0, missing: 0 });
+  const [nextEvents, setNextEvents] = useState<CalendarEvent[]>([]);
+  const [eventCounts, setEventCounts] = useState<Record<string, { in: number; out: number; missing: number }>>({});
   const [memberCount, setMemberCount] = useState(0);
   const [totalFines, setTotalFines] = useState(0);
 
@@ -45,12 +51,15 @@ export default function DashboardHome() {
 
   useEffect(() => {
     async function loadDefaultTeam() {
-      if (teamId || !session?.user?.id) return;
+      if (!session?.user?.id) return;
       const response = await fetch("/api/me");
       if (!response.ok) return;
       const data = await response.json();
-      const firstTeam = data.memberships?.[0]?.team?.id;
-      if (firstTeam) {
+      const memberships = data.memberships ?? [];
+      const firstTeam = memberships[0]?.team?.id;
+      if (!firstTeam) return;
+      const isCurrentValid = memberships.some((membership: { team?: { id?: string } }) => membership.team?.id === teamId);
+      if (!teamId || !isCurrentValid) {
         setTeamId(firstTeam);
         setStoredTeamId(firstTeam);
       }
@@ -71,7 +80,7 @@ export default function DashboardHome() {
   }, [teamId]);
 
   useEffect(() => {
-    async function loadNextEvent() {
+    async function loadNextEvents() {
       if (!teamId || !userId) return;
       const now = new Date();
       const end = new Date(now);
@@ -97,36 +106,48 @@ export default function DashboardHome() {
           title: item.title,
           date: item.date,
           location: item.location,
+          source: "SERIES",
+          seriesId: item.seriesId,
+          meetingTime: null,
+          signupDeadline: null,
           signupStatus: null
         }))
       ]
         .filter((item) => new Date(item.date) >= now)
         .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-      const first = upcoming[0] ?? null;
-      setNextEvent(first);
+      const firstTwo = upcoming.slice(0, 2);
+      setNextEvents(firstTwo);
 
-      if (!first) {
-        setCounts({ in: 0, out: 0, missing: memberCount });
+      if (firstTwo.length === 0) {
+        setEventCounts({});
         return;
       }
 
-      if (first.id.startsWith("series:")) {
-        setCounts({ in: 0, out: 0, missing: memberCount });
-        return;
-      }
-
-      const signupsResponse = await fetch(`/api/events/${first.id}/signups`, { cache: "no-store" });
-      if (!signupsResponse.ok) return;
-      const signupsData = await signupsResponse.json();
-      const signups = signupsData.signups ?? [];
-      const inCount = signups.filter((signup: { status: string }) => signup.status === "IN").length;
-      const outCount = signups.filter((signup: { status: string }) => signup.status === "OUT").length;
-      const missingCount = Math.max(memberCount - inCount - outCount, 0);
-      setCounts({ in: inCount, out: outCount, missing: missingCount });
+      const nextCounts: Record<string, { in: number; out: number; missing: number }> = {};
+      await Promise.all(
+        firstTwo.map(async (eventItem) => {
+          if (eventItem.id.startsWith("series:")) {
+            nextCounts[eventItem.id] = { in: 0, out: 0, missing: memberCount };
+            return;
+          }
+          const signupsResponse = await fetch(`/api/events/${eventItem.id}/signups`, { cache: "no-store" });
+          if (!signupsResponse.ok) {
+            nextCounts[eventItem.id] = { in: 0, out: 0, missing: memberCount };
+            return;
+          }
+          const signupsData = await signupsResponse.json();
+          const signups = signupsData.signups ?? [];
+          const inCount = signups.filter((signup: { status: string }) => signup.status === "IN").length;
+          const outCount = signups.filter((signup: { status: string }) => signup.status === "OUT").length;
+          const missingCount = Math.max(memberCount - inCount - outCount, 0);
+          nextCounts[eventItem.id] = { in: inCount, out: outCount, missing: missingCount };
+        })
+      );
+      setEventCounts(nextCounts);
     }
 
-    loadNextEvent();
+    loadNextEvents();
   }, [teamId, userId, memberCount]);
 
   useEffect(() => {
@@ -141,14 +162,35 @@ export default function DashboardHome() {
     loadFines();
   }, [teamId, userId]);
 
-  const nextEventLabel = useMemo(() => {
-    if (!nextEvent) return "Ingen begivenheder endnu.";
-    const date = new Date(nextEvent.date);
+  const formatEventTimes = (eventItem: CalendarEvent) => {
+    const startDate = new Date(eventItem.date);
+    const meetingDate = eventItem.meetingTime
+      ? new Date(eventItem.meetingTime)
+      : null;
+    const deadlineDate = eventItem.signupDeadline ? new Date(eventItem.signupDeadline) : null;
     const pad = (num: number) => String(num).padStart(2, "0");
-    return `${pad(date.getHours())}:${pad(date.getMinutes())} ${pad(date.getDate())}.${pad(
-      date.getMonth() + 1
-    )}.${date.getFullYear()}`;
-  }, [nextEvent]);
+    const fmt = (date: Date) =>
+      `${pad(date.getHours())}:${pad(date.getMinutes())} ${pad(date.getDate())}.${pad(
+        date.getMonth() + 1
+      )}.${date.getFullYear()}`;
+
+    return {
+      start: fmt(startDate),
+      meeting: meetingDate ? fmt(meetingDate) : null,
+      deadline: deadlineDate ? fmt(deadlineDate) : "Ikke sat"
+    };
+  };
+
+  const openNextEvent = (eventItem: CalendarEvent) => {
+    const params = new URLSearchParams();
+    params.set("focusEvent", eventItem.id);
+    params.set("focusTitle", eventItem.title);
+    params.set("focusDate", eventItem.date);
+    params.set("focusLocation", eventItem.location);
+    if (eventItem.source) params.set("focusSource", eventItem.source);
+    if (eventItem.seriesId) params.set("focusSeriesId", eventItem.seriesId);
+    router.push(`/dashboard/kalender?${params.toString()}`);
+  };
 
   if (sessionStatus === "loading") {
     return (
@@ -193,31 +235,59 @@ export default function DashboardHome() {
       </header>
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="card-soft">
-          <h3 className="text-lg font-semibold text-ink">Næste begivenhed</h3>
-          {nextEvent ? (
-            <div className="mt-3 space-y-2 text-sm text-ink/70">
-              <div className="text-base font-semibold text-ink">{nextEvent.title}</div>
-              <div>{nextEventLabel}</div>
-              <div>{nextEvent.location}</div>
-              <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-ink/60">
-                <span className="rounded-full bg-green-100 px-3 py-1 text-green-700">Kommer: {counts.in}</span>
-                <span className="rounded-full bg-red-100 px-3 py-1 text-red-700">Kan ikke: {counts.out}</span>
-                <span className="rounded-full bg-amber-100 px-3 py-1 text-amber-700">
-                  Mangler svar: {counts.missing}
-                </span>
-              </div>
-              {nextEvent.signupStatus ? (
-                <div className="pt-2 text-xs font-semibold uppercase tracking-[0.2em] text-ink/60">
-                  {nextEvent.signupStatus === "IN" ? "Du kommer" : "Du kan ikke"}
-                </div>
-              ) : (
-                <div className="pt-2 text-xs font-semibold uppercase tracking-[0.2em] text-amber-700">
-                  Du mangler at svare
-                </div>
-              )}
+          <h3 className="text-lg font-semibold text-ink">Næste begivenheder</h3>
+          {nextEvents.length > 0 ? (
+            <div className="mt-3 space-y-12">
+              {nextEvents.map((eventItem) => {
+                const times = formatEventTimes(eventItem);
+                const counts = eventCounts[eventItem.id] ?? { in: 0, out: 0, missing: memberCount };
+                return (
+                  <button
+                    key={eventItem.id}
+                    type="button"
+                    onClick={() => openNextEvent(eventItem)}
+                    className="w-full space-y-2 rounded-2xl border border-transparent text-left text-sm text-ink/70 transition hover:border-ink/15 hover:bg-white/60"
+                  >
+                    <div className="text-base font-semibold text-ink">{eventItem.title}</div>
+                    <div className="grid gap-2 rounded-2xl border border-ink/10 bg-white/85 p-3">
+                      <div className="flex items-center justify-between gap-4">
+                        <span className="text-xs font-semibold uppercase tracking-[0.2em] text-ink/55">Start</span>
+                        <span className="font-semibold text-ink">{times.start}</span>
+                      </div>
+                      {times.meeting ? (
+                        <div className="flex items-center justify-between gap-4">
+                          <span className="text-xs font-semibold uppercase tracking-[0.2em] text-ink/55">Mødetid</span>
+                          <span className="font-semibold text-ink">{times.meeting}</span>
+                        </div>
+                      ) : null}
+                      <div className="flex items-center justify-between gap-4">
+                        <span className="text-xs font-semibold uppercase tracking-[0.2em] text-ink/55">Svarfrist</span>
+                        <span className="font-semibold text-ink">{times.deadline}</span>
+                      </div>
+                    </div>
+                    <div>{eventItem.location}</div>
+                    <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-ink/60">
+                      <span className="rounded-full bg-green-100 px-3 py-1 text-green-700">Kommer: {counts.in}</span>
+                      <span className="rounded-full bg-red-100 px-3 py-1 text-red-700">Kan ikke: {counts.out}</span>
+                      <span className="rounded-full bg-amber-100 px-3 py-1 text-amber-700">
+                        Mangler svar: {counts.missing}
+                      </span>
+                    </div>
+                    {eventItem.signupStatus ? (
+                      <div className="pt-2 text-xs font-semibold uppercase tracking-[0.2em] text-ink/60" style={{ color: eventItem.signupStatus === "IN" ? "green" : "red" }}>
+                        {eventItem.signupStatus === "IN" ? "Du kommer" : "Du kan ikke"}
+                      </div>
+                    ) : (
+                      <div className="pt-2 text-xs font-bold uppercase tracking-[0.2em] text-amber-500">
+                        Du mangler at svare
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           ) : (
-            <p className="mt-2 text-sm text-ink/70">{nextEventLabel}</p>
+            <p className="mt-2 text-sm text-ink/70">Ingen begivenheder endnu.</p>
           )}
         </div>
         <div className="card-soft">

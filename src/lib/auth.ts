@@ -41,6 +41,12 @@ export const authOptions: NextAuthOptions = {
               const valid = await bcrypt.compare(password, user.passwordHash);
               if (!valid) return null;
 
+              const hasActiveMembership = await prisma.membership.findFirst({
+                where: { userId: user.id, status: "ACTIVE" },
+                select: { id: true }
+              });
+              if (!hasActiveMembership) return null;
+
               return {
                 id: user.id,
                 name: user.name,
@@ -52,7 +58,14 @@ export const authOptions: NextAuthOptions = {
         ]
       : [])
   ],
-  session: { strategy: "jwt" },
+  session: {
+    strategy: "jwt",
+    maxAge: 60 * 60 * 24 * 90,
+    updateAge: 60 * 60 * 24
+  },
+  jwt: {
+    maxAge: 60 * 60 * 24 * 90
+  },
   callbacks: {
     async jwt({ token, user }) {
       if (user) {

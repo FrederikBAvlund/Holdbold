@@ -14,6 +14,11 @@ enum Role {
   BOEDEKASSEFORMAND
 }
 
+enum MembershipStatus {
+  PENDING
+  ACTIVE
+}
+
 enum SignupStatus {
   IN
   OUT
@@ -49,6 +54,13 @@ enum FineTemplateStatus {
   APPROVED
   REJECTED
 }
+
+enum FineCategory {
+  SOME
+  FAELLES
+  SPILLER
+  DIVERSE
+}
 enum Recurrence {
   DAILY
   WEEKLY
@@ -72,6 +84,8 @@ model User {
   image        String?
   facebookId   String?       @unique
   passwordHash String?
+  themePreset  String?
+  themeConfig  Json?
   createdAt    DateTime      @default(now())
   accounts     Account[]
   sessions     Session[]
@@ -91,6 +105,7 @@ model User {
   signupLogs      SignupLog[]
   notifications Notification[]
   eventLogs EventLog[] @relation("EventLogActor")
+  createdFineCollections FineCollection[] @relation("FineCollectionCreator")
 }
 
 model Team {
@@ -99,12 +114,14 @@ model Team {
   slug        String        @unique
   themePreset String        @default("atlantic")
   themeConfig Json?
+  mobilePayBox String?
   createdAt   DateTime      @default(now())
   memberships Membership[]
   eventSeries EventSeries[]
   events      Event[]
   fineRules   FineRule[]
   fineTemplates FineTemplate[]
+  fineCollections FineCollection[]
   fines       Fine[]
   icalFeeds   IcalFeed[]
   notifications Notification[]
@@ -115,6 +132,7 @@ model Membership {
   userId    String
   teamId    String
   role      Role
+  status    MembershipStatus @default(ACTIVE)
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id])
@@ -122,6 +140,8 @@ model Membership {
 
   @@unique([userId, teamId])
   @@index([teamId, role])
+  @@index([teamId, status])
+  @@index([userId, status])
 }
 
 model EventSeries {
@@ -149,6 +169,7 @@ model Event {
   title          String
   date           DateTime
   location       String
+  meetingTime    DateTime?
   signupDeadline DateTime
   source         EventSource  @default(MANUAL)
   externalUid    String?
@@ -290,6 +311,7 @@ model FineTemplate {
   teamId      String
   title       String
   amount      Int
+  category    FineCategory @default(DIVERSE)
   description String?
   createdById String?
   status      FineTemplateStatus @default(APPROVED)
@@ -304,16 +326,37 @@ model FineTemplate {
   approvedBy User? @relation("FineTemplateApprover", fields: [approvedById], references: [id])
   rejectedBy User? @relation("FineTemplateRejecter", fields: [rejectedById], references: [id])
   fines Fine[]
+  fineCollections FineCollection[]
 
   @@index([teamId])
   @@index([teamId, status])
+  @@index([teamId, category])
+}
+
+model FineCollection {
+  id           String   @id @default(cuid())
+  teamId       String
+  templateId   String
+  deadlineAt   DateTime
+  intervalHours Int     @default(24)
+  lastRunAt    DateTime?
+  isActive     Boolean  @default(true)
+  createdById  String
+  createdAt    DateTime @default(now())
+
+  team      Team        @relation(fields: [teamId], references: [id])
+  template  FineTemplate @relation(fields: [templateId], references: [id])
+  createdBy User        @relation("FineCollectionCreator", fields: [createdById], references: [id])
+
+  @@index([teamId, isActive])
+  @@index([deadlineAt])
 }
 
 model IcalFeed {
   id             String   @id @default(cuid())
   teamId         String
   name           String
-  url            String   @unique
+  url            String
   lastImportedAt DateTime?
   createdAt      DateTime @default(now())
 
@@ -321,6 +364,7 @@ model IcalFeed {
   events Event[]
 
   @@index([teamId])
+  @@unique([teamId, url])
 }
 
 model Account {

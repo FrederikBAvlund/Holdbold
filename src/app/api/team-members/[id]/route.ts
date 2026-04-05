@@ -5,7 +5,10 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 const updateSchema = z.object({
-  role: z.enum(["ADMIN", "TRAENER", "SPILLER", "BOEDEKASSEFORMAND"])
+  role: z.enum(["ADMIN", "TRAENER", "SPILLER", "BOEDEKASSEFORMAND"]).optional(),
+  status: z.enum(["PENDING", "ACTIVE"]).optional()
+}).refine((value) => value.role || value.status, {
+  message: "role eller status er påkrævet"
 });
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
@@ -26,7 +29,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   }
 
   const acting = await prisma.membership.findFirst({
-    where: { userId: session.user.id, teamId: membership.teamId }
+    where: { userId: session.user.id, teamId: membership.teamId, status: "ACTIVE" }
   });
   if (acting?.role !== "ADMIN") {
     return NextResponse.json({ error: "Ikke adgang" }, { status: 403 });
@@ -34,8 +37,24 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
   const updated = await prisma.membership.update({
     where: { id: params.id },
-    data: { role: body.role }
+    data: {
+      ...(body.role ? { role: body.role } : {}),
+      ...(body.status ? { status: body.status } : {})
+    }
   });
+
+  if (membership.status === "PENDING" && updated.status === "ACTIVE") {
+    await prisma.notification.create({
+      data: {
+        userId: membership.userId,
+        teamId: membership.teamId,
+        type: "GENERAL",
+        title: "Din adgang er godkendt",
+        body: "Du har nu adgang til holdet.",
+        link: "/dashboard"
+      }
+    });
+  }
 
   return NextResponse.json({ membership: updated });
 }
@@ -55,7 +74,7 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
   }
 
   const acting = await prisma.membership.findFirst({
-    where: { userId: session.user.id, teamId: membership.teamId }
+    where: { userId: session.user.id, teamId: membership.teamId, status: "ACTIVE" }
   });
   if (acting?.role !== "ADMIN") {
     return NextResponse.json({ error: "Ikke adgang" }, { status: 403 });

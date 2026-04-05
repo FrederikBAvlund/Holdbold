@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { getStoredTeamId, getStoredTheme, setStoredTheme } from "@/components/appState";
+import { getStoredTeamId, getStoredTheme, setStoredTeamId, setStoredTheme } from "@/components/appState";
 
 const DEFAULT_THEME = "atlantic";
 
@@ -18,7 +18,28 @@ type ThemeConfig = {
   gradientEnd?: string;
 };
 
+const THEME_CUSTOM_PROPS = [
+  "--color-ink",
+  "--color-clay",
+  "--color-moss",
+  "--color-ember",
+  "--color-fog",
+  "--color-button",
+  "--color-button-text",
+  "--gradient-start",
+  "--gradient-mid",
+  "--gradient-end"
+] as const;
+
+function clearThemeConfigOverrides() {
+  const root = document.documentElement;
+  for (const prop of THEME_CUSTOM_PROPS) {
+    root.style.removeProperty(prop);
+  }
+}
+
 function applyThemeConfig(config?: ThemeConfig | null) {
+  clearThemeConfigOverrides();
   if (!config) return;
   const root = document.documentElement;
   if (config.ink) root.style.setProperty("--color-ink", config.ink);
@@ -39,14 +60,36 @@ export function ThemeProvider() {
       const storedTheme = getStoredTheme();
       if (storedTheme) {
         document.documentElement.dataset.theme = storedTheme;
+        if (storedTheme !== "custom") {
+          clearThemeConfigOverrides();
+        }
       }
 
       let teamId = getStoredTeamId();
-      if (!teamId) {
-        const meResponse = await fetch("/api/me");
-        if (meResponse.ok) {
-          const meData = await meResponse.json();
-          teamId = meData.memberships?.[0]?.team?.id ?? "";
+      const meResponse = await fetch("/api/me");
+      if (meResponse.ok) {
+        const meData = await meResponse.json();
+        const userTheme = meData.user?.themePreset as string | null | undefined;
+        const userThemeConfig = meData.user?.themeConfig as ThemeConfig | null | undefined;
+        if (userTheme) {
+          document.documentElement.dataset.theme = userTheme;
+          setStoredTheme(userTheme);
+          if (userTheme === "custom") {
+            applyThemeConfig(userThemeConfig ?? null);
+          } else {
+            clearThemeConfigOverrides();
+          }
+          return;
+        }
+
+        const memberships = meData.memberships ?? [];
+        const firstTeam = memberships[0]?.team?.id ?? "";
+        const isCurrentValid = memberships.some((membership: { team?: { id?: string } }) => membership.team?.id === teamId);
+        if (!teamId || !isCurrentValid) {
+          teamId = firstTeam;
+          if (teamId) {
+            setStoredTeamId(teamId);
+          }
         }
       }
       if (!teamId) return;
@@ -59,6 +102,8 @@ export function ThemeProvider() {
       setStoredTheme(theme);
       if (theme === "custom") {
         applyThemeConfig(data.team?.themeConfig ?? null);
+      } else {
+        clearThemeConfigOverrides();
       }
     }
 
@@ -72,6 +117,9 @@ export function setTheme(theme: string) {
   if (typeof window === "undefined") return;
   document.documentElement.dataset.theme = theme;
   setStoredTheme(theme);
+  if (theme !== "custom") {
+    clearThemeConfigOverrides();
+  }
 }
 
 export function setCustomTheme(config: ThemeConfig) {

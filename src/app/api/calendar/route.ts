@@ -117,6 +117,8 @@ export async function GET(request: Request) {
       title: event.title,
       date: event.date,
       location: event.location,
+      meetingTime: event.meetingTime,
+      signupDeadline: event.signupDeadline,
       source: event.source,
       seriesId: event.seriesId,
       signupStatus: event.signups?.[0]?.status ?? null,

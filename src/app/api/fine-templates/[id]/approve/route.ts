@@ -35,5 +35,18 @@ export async function POST(_request: Request, { params }: { params: { id: string
     }
   });
 
+  if (template.createdById && template.createdById !== session.user.id) {
+    await prisma.notification.create({
+      data: {
+        userId: template.createdById,
+        teamId: template.teamId,
+        type: "FINE_PROPOSED",
+        title: "Bødeskabelon godkendt",
+        body: `${template.title} · ${template.amount} kr`,
+        link: "/dashboard/boder"
+      }
+    });
+  }
+
   return NextResponse.json({ template: updated });
 }

@@ -1,0 +1,44 @@
+<svg width="1200" height="320" viewBox="0 0 1200 320" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="24" y1="24" x2="296" y2="296" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0F172A"/>
+      <stop offset="1" stop-color="#1E293B"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="76" y1="68" x2="244" y2="244" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#F43F5E"/>
+      <stop offset="1" stop-color="#E11D48"/>
+    </linearGradient>
+    <filter id="shadow" x="16" y="16" width="288" height="288" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+      <feOffset dy="6"/>
+      <feGaussianBlur stdDeviation="6"/>
+      <feComposite in2="hardAlpha" operator="out"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 0.0588 0 0 0 0 0.0902 0 0 0 0 0.1647 0 0 0 0.25 0"/>
+      <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_1_1"/>
+      <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_1_1" result="shape"/>
+    </filter>
+  </defs>
+
+  <g filter="url(#shadow)">
+    <rect x="28" y="28" width="264" height="264" rx="60" fill="url(#bg)"/>
+  </g>
+
+  <rect x="64" y="56" width="192" height="208" rx="34" fill="#F8FAFC"/>
+  <rect x="64" y="56" width="192" height="44" rx="22" fill="url(#accent)"/>
+  <circle cx="106" cy="78" r="8" fill="#F8FAFC" fill-opacity="0.9"/>
+  <circle cx="132" cy="78" r="8" fill="#F8FAFC" fill-opacity="0.9"/>
+
+  <path d="M102 146C102 129.431 115.431 116 132 116H188C204.569 116 218 129.431 218 146V190C218 206.569 204.569 220 188 220H132C115.431 220 102 206.569 102 190V146Z" fill="#E2E8F0"/>
+  <path d="M100 210L130 176L152 196L188 154L220 182V190C220 207.673 205.673 222 188 222H132C114.327 222 100 207.673 100 190V210Z" fill="url(#accent)"/>
+  <path d="M126 174L144 193L194 144" stroke="#F8FAFC" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <text x="332" y="143" fill="#0F172A" font-family="system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="88" font-weight="800" letter-spacing="1">
+    HOLDBOLD
+  </text>
+  <text x="336" y="197" fill="#475569" font-family="system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="33" font-weight="600" letter-spacing="2.2">
+    TEAM ADMINISTRATION PLATFORM
+  </text>
+  <rect x="336" y="220" width="228" height="14" rx="7" fill="#E11D48"/>
+  <rect x="578" y="220" width="126" height="14" rx="7" fill="#0F172A" fill-opacity="0.22"/>
+</svg>

@@ -8,6 +8,8 @@ import { cn } from "@/lib/utils";
 export type ComboboxOption = {
   value: string;
   label: string;
+  rightLabel?: string;
+  searchLabel?: string;
 };
 
 type ComboboxProps = {
@@ -38,16 +40,23 @@ export function Combobox({
         <button
           type="button"
           className={cn(
-            "input flex items-center justify-between gap-2 text-left",
+            "input flex w-full max-w-full items-center justify-between gap-2 overflow-hidden text-left",
             !selected && "text-ink/40",
             className
           )}
         >
-          <span className="truncate">{selected ? selected.label : placeholder}</span>
-          <span className="text-xs">▾</span>
+          <span className="min-w-0 flex-1 truncate">{selected ? selected.label : placeholder}</span>
+          {selected?.rightLabel ? (
+            <span className="shrink-0 text-sm font-semibold text-ink/70 max-[380px]:hidden">{selected.rightLabel}</span>
+          ) : null}
+          <span className="shrink-0 text-xs">▾</span>
         </button>
       </PopoverTrigger>
-      <PopoverContent className="p-0">
+      <PopoverContent
+        className="w-[var(--radix-popover-trigger-width)] max-w-[calc(100vw-1.5rem)] p-0"
+        align="start"
+        sideOffset={6}
+      >
         <Command>
           <CommandInput placeholder={searchPlaceholder} />
           <CommandList>
@@ -55,12 +64,16 @@ export function Combobox({
             {options.map((option) => (
               <CommandItem
                 key={option.value}
+                value={option.searchLabel ?? `${option.label} ${option.rightLabel ?? ""}`}
                 onSelect={() => {
                   onChange(option.value);
                   setOpen(false);
                 }}
               >
-                <span className="truncate">{option.label}</span>
+                <span className="min-w-0 flex-1 truncate">{option.label}</span>
+                {option.rightLabel ? (
+                  <span className="shrink-0 text-xs font-semibold text-ink/65">{option.rightLabel}</span>
+                ) : null}
                 {value === option.value ? <span className="ml-auto text-xs">✓</span> : null}
               </CommandItem>
             ))}

@@ -9,7 +9,8 @@ const listSchema = z.object({
 const createSchema = z.object({
   teamId: z.string().min(1),
   title: z.string().min(1),
-  amount: z.number().int().positive(),
+  amount: z.number().int(),
+  category: z.enum(["SOME", "FAELLES", "SPILLER", "DIVERSE"]).optional(),
   description: z.string().optional(),
   createdById: z.string().min(1).optional()
 });
@@ -21,6 +22,11 @@ export async function GET(request: Request) {
 
   const templates = await prisma.fineTemplate.findMany({
     where: { teamId: parsed.teamId },
+    include: {
+      createdBy: true,
+      approvedBy: true,
+      rejectedBy: true
+    },
     orderBy: { createdAt: "desc" }
   });
 
@@ -45,6 +51,7 @@ export async function POST(request: Request) {
       teamId: body.teamId,
       title: body.title,
       amount: body.amount,
+      category: body.category ?? "DIVERSE",
       description: body.description,
       createdById: body.createdById,
       status

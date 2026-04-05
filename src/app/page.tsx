@@ -1,51 +1,46 @@
+import Image from "next/image";
+
 export default function Home() {
   return (
-    <main className="px-6 py-12 sm:px-10">
-      <div className="mx-auto flex min-h-[80vh] max-w-5xl flex-col justify-between gap-12">
-        <header className="space-y-6">
-          <p className="text-sm uppercase tracking-[0.3em] text-moss">
-            Holdbold / MVP
-          </p>
-          <h1 className="text-4xl font-semibold leading-tight text-ink sm:text-6xl" style={{ fontFamily: "var(--font-display)" }}>
-            Kalender, tilmelding og bødekasse
-            <span className="block text-ember">bygget til hold, der møder op.</span>
-          </h1>
-          <p className="max-w-2xl text-lg text-ink/80">
-            Den første version fokuserer på faste træninger, kampkalender, klare deadlines og et bødesystem med godkendelse.
-          </p>
-        </header>
+    <main className="px-4 py-10 sm:px-8">
+      <div className="mx-auto flex min-h-[86vh] w-full max-w-6xl items-center">
+        <section className="card relative w-full overflow-hidden p-7 sm:p-12">
+          <div className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-ember/20 blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-24 -left-8 h-64 w-64 rounded-full bg-sky/25 blur-3xl" />
 
-        <section className="card grid gap-4 sm:grid-cols-2">
-          <div className="space-y-3">
-            <h2 className="text-xl font-semibold text-ink">Roller i MVP</h2>
-            <ul className="text-ink/80">
-              <li>Admin</li>
-            <li>Træner</li>
-              <li>Spiller</li>
-              <li>Bødekasseformand</li>
-            </ul>
-          </div>
-          <div className="space-y-3">
-            <h2 className="text-xl font-semibold text-ink">Bødeflow</h2>
-            <ul className="text-ink/80">
-              <li>Automatisk bøde ved overskredet deadline</li>
-              <li>Manuelle bøder fra admin/træner</li>
-              <li>Foreslåede bøder fra spillere (kræver godkendelse)</li>
-            </ul>
+          <div className="relative flex flex-col gap-8">
+            <Image
+              src="/brand/holdbold-logo-ball.svg"
+              alt="Holdbold"
+              width={560}
+              height={150}
+              className="h-auto w-full max-w-[560px]"
+              priority
+            />
+
+            <div>
+              <h1
+                className="max-w-4xl text-4xl font-semibold leading-tight text-ink sm:text-6xl"
+                style={{ fontFamily: "var(--font-display)" }}
+              >
+                Alt til holdstyring samlet i en app.
+              </h1>
+              <p className="mt-5 max-w-3xl text-lg text-ink/75">
+                Holdbold giver overblik over kalender, tilmeldinger, notifikationer og bøder i et enkelt flow, der
+                fungerer pa både mobil og desktop.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3">
+              <a href="/login" className="btn-primary">
+                Log ind
+              </a>
+              <a href="/signup" className="btn-ghost">
+                Opret bruger
+              </a>
+            </div>
           </div>
         </section>
-
-        <div className="flex flex-wrap items-center gap-4">
-          <a
-            href="/login"
-            className="rounded-full bg-ink px-6 py-3 text-sm font-semibold uppercase tracking-[0.2em] text-fog"
-          >
-            Log ind
-          </a>
-          <p className="text-sm text-ink/70">
-            Admin importerer DBU-kalender via URL fra admin-området.
-          </p>
-        </div>
       </div>
     </main>
   );

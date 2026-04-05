@@ -2,10 +2,10 @@ import DashboardNav from "@/components/DashboardNav";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen pb-20 lg:pb-0">
-      <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-6 lg:flex-row">
+    <div className="min-h-screen pb-24 pt-2 lg:pb-10 lg:pt-4">
+      <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-6 px-3 sm:px-5 lg:flex-row lg:gap-7 lg:px-6">
         <DashboardNav />
-        <main className="flex-1 space-y-6">{children}</main>
+        <main className="min-w-0 flex-1 space-y-6">{children}</main>
       </div>
     </div>
   );

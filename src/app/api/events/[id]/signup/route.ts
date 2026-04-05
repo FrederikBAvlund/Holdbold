@@ -24,7 +24,12 @@ export async function GET(request: Request, { params }: { params: { id: string }
     }
   });
 
-  return NextResponse.json({ signup });
+  const event = await prisma.event.findUnique({
+    where: { id: params.id },
+    select: { id: true, date: true, source: true, meetingTime: true, signupDeadline: true }
+  });
+
+  return NextResponse.json({ signup, event });
 }
 
 export async function POST(request: Request, { params }: { params: { id: string } }) {
@@ -66,15 +71,6 @@ export async function POST(request: Request, { params }: { params: { id: string 
       status: body.status,
       reason: body.reason ?? null,
       deadlineAt: event?.signupDeadline ?? null
-    }
-  });
-
-  await prisma.eventLog.create({
-    data: {
-      eventId: params.id,
-      actorId: body.userId,
-      type: "SIGNUP",
-      message: body.status === "IN" ? "Tilmeldt" : "Frameldt"
     }
   });
 

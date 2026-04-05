@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useToast } from "@/components/ToastProvider";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
@@ -18,6 +19,8 @@ type CalendarEvent = {
   title: string;
   date: string;
   location: string;
+  meetingTime?: string | null;
+  signupDeadline?: string | null;
   source: string;
   seriesId?: string | null;
   signupStatus?: string | null;
@@ -46,7 +49,7 @@ type SignupLog = {
   reason?: string | null;
   deadlineAt?: string | null;
   createdAt: string;
-  user: { name: string | null };
+  user: { id: string; name: string | null };
 };
 
 type EventLog = {
@@ -63,20 +66,32 @@ type EventSignup = {
   user: { id: string; name: string | null };
 };
 
+type FineTemplate = {
+  id: string;
+  title: string;
+  amount: number;
+  status?: string;
+};
+
 const adminRoles = ["ADMIN", "TRAENER", "BOEDEKASSEFORMAND"];
 
 export default function KalenderPage() {
   const { pushToast } = useToast();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const { data: session, status: sessionStatus } = useSession();
   const [range, setRange] = useState<{ start: string; end: string } | null>(null);
   const lastRangeRef = useRef<{ start: string; end: string } | null>(null);
   const [isMobile, setIsMobile] = useState(false);
+  const [viewMode, setViewMode] = useState<"calendar" | "list">("calendar");
   const [teamId, setTeamId] = useState("");
   const [userId, setUserId] = useState("");
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [series, setSeries] = useState<SeriesItem[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [eventSignups, setEventSignups] = useState<EventSignup[]>([]);
+  const [fineTemplates, setFineTemplates] = useState<FineTemplate[]>([]);
+  const [selectedLateFineTemplateId, setSelectedLateFineTemplateId] = useState("");
 
   const [showModal, setShowModal] = useState(false);
   const [title, setTitle] = useState("");
@@ -130,7 +145,19 @@ export default function KalenderPage() {
 
   useEffect(() => {
     setTeamId(getStoredTeamId());
+    if (typeof window !== "undefined") {
+      const storedMode = window.localStorage.getItem("calendarViewMode");
+      if (storedMode === "list" || storedMode === "calendar") {
+        setViewMode(storedMode);
+      }
+    }
   }, []);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("calendarViewMode", viewMode);
+    }
+  }, [viewMode]);
 
   useEffect(() => {
     if (session?.user?.id) {
@@ -140,12 +167,15 @@ export default function KalenderPage() {
 
   useEffect(() => {
     async function loadDefaultTeam() {
-      if (teamId || !session?.user?.id) return;
+      if (!session?.user?.id) return;
       const response = await fetch("/api/me");
       if (!response.ok) return;
       const data = await response.json();
-      const firstTeam = data.memberships?.[0]?.team?.id;
-      if (firstTeam) {
+      const memberships = data.memberships ?? [];
+      const firstTeam = memberships[0]?.team?.id;
+      if (!firstTeam) return;
+      const isCurrentValid = memberships.some((membership: { team?: { id?: string } }) => membership.team?.id === teamId);
+      if (!teamId || !isCurrentValid) {
         setTeamId(firstTeam);
         setStoredTeamId(firstTeam);
       }
@@ -155,6 +185,9 @@ export default function KalenderPage() {
   }, [teamId, session?.user?.id]);
   const actingMember = members.find((member) => member.user.id === userId);
   const canManageEvents = actingMember ? adminRoles.includes(actingMember.role) : false;
+  const canAssignLateFine = actingMember
+    ? actingMember.role === "ADMIN" || actingMember.role === "BOEDEKASSEFORMAND"
+    : false;
 
   useEffect(() => {
     function update() {
@@ -201,6 +234,29 @@ export default function KalenderPage() {
     loadSeries();
   }, [teamId]);
 
+  useEffect(() => {
+    async function loadFineTemplates() {
+      if (!teamId || !canAssignLateFine) return;
+      const response = await fetch(`/api/fine-templates?teamId=${teamId}`, { cache: "no-store" });
+      if (!response.ok) return;
+      const data = await response.json();
+      const approved = (data.templates ?? []).filter(
+        (template: FineTemplate) => template.status === "APPROVED" || !template.status
+      );
+      setFineTemplates(approved);
+      if (!selectedLateFineTemplateId) {
+        const suggested = approved.find((template: FineTemplate) =>
+          template.title.toLowerCase().includes("for sen")
+        );
+        if (suggested) {
+          setSelectedLateFineTemplateId(suggested.id);
+        }
+      }
+    }
+
+    loadFineTemplates();
+  }, [teamId, canAssignLateFine, selectedLateFineTemplateId]);
+
   const calendarEvents = useMemo(() => {
     return events.map((eventItem) => ({
       id: eventItem.id,
@@ -224,6 +280,8 @@ export default function KalenderPage() {
           : "#f59e0b",
       extendedProps: {
         location: eventItem.location,
+        meetingTime: eventItem.meetingTime ?? null,
+        signupDeadline: eventItem.signupDeadline ?? null,
         source: eventItem.source,
         seriesId: eventItem.seriesId ?? null,
         signupStatus: eventItem.signupStatus ?? null,
@@ -233,13 +291,47 @@ export default function KalenderPage() {
     }));
   }, [events]);
 
+  const upcomingEvents = useMemo(() => {
+    const now = Date.now() - 5 * 60 * 1000;
+    return [...events]
+      .filter((eventItem) => new Date(eventItem.date).getTime() >= now)
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  }, [events]);
+
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [signupStatus, setSignupStatus] = useState<"IN" | "OUT" | "UNKNOWN">("UNKNOWN");
   const [eventIdForSignup, setEventIdForSignup] = useState<string | null>(null);
+  const [eventDeadlineAt, setEventDeadlineAt] = useState<string | null>(null);
+  const [editableMeetingAt, setEditableMeetingAt] = useState("");
+  const [editableDeadlineAt, setEditableDeadlineAt] = useState("");
+  const [savingMatchMeta, setSavingMatchMeta] = useState(false);
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [logs, setLogs] = useState<SignupLog[]>([]);
   const [eventLogs, setEventLogs] = useState<EventLog[]>([]);
+  const handledFocusKeyRef = useRef<string | null>(null);
+
+  const toDateTimeLocalValue = (value: string | null | undefined) => {
+    if (!value) return "";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+    const pad = (num: number) => String(num).padStart(2, "0");
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(
+      date.getHours()
+    )}:${pad(date.getMinutes())}`;
+  };
+
+  const splitLocalDateTime = (value: string) => {
+    if (!value || !value.includes("T")) {
+      return { date: "—", time: "--.--" };
+    }
+    const [datePart, timePart] = value.split("T");
+    const [year, month, day] = datePart.split("-");
+    const safeDate =
+      year && month && day ? `${day}.${month}.${year}` : "—";
+    const safeTime = (timePart?.slice(0, 5) ?? "--:--").replace(":", ".");
+    return { date: safeDate, time: safeTime };
+  };
 
   async function handleCreateSeries(event: React.FormEvent) {
     event.preventDefault();
@@ -290,6 +382,9 @@ export default function KalenderPage() {
     setSelectedEvent(eventItem);
     setSignupStatus("UNKNOWN");
     setEventIdForSignup(null);
+    setEventDeadlineAt(null);
+    setEditableMeetingAt("");
+    setEditableDeadlineAt("");
     setReason("");
     setError(null);
     setEventSignups([]);
@@ -316,6 +411,18 @@ export default function KalenderPage() {
     setEventIdForSignup(eventId);
     const statusResponse = await fetch(`/api/events/${eventId}/signup?userId=${userId}`);
     const statusData = await statusResponse.json();
+    if (statusData.event?.signupDeadline) {
+      setEventDeadlineAt(statusData.event.signupDeadline);
+    }
+    const fallbackMeetingIso = statusData.event?.date
+      ? new Date(new Date(statusData.event.date).getTime() - 60 * 60 * 1000).toISOString()
+      : null;
+    const meetingValue = statusData.event?.meetingTime ?? fallbackMeetingIso;
+    setEditableDeadlineAt(toDateTimeLocalValue(statusData.event?.signupDeadline ?? null));
+    setEditableMeetingAt(toDateTimeLocalValue(meetingValue));
+    if (statusData.event?.source) {
+      setSelectedEvent((prev) => (prev ? { ...prev, source: statusData.event.source } : prev));
+    }
     if (statusData.signup?.status) {
       setSignupStatus(statusData.signup.status);
       setReason(statusData.signup.reason ?? "");
@@ -326,14 +433,111 @@ export default function KalenderPage() {
     const signupsData = await signupsResponse.json();
     setEventSignups(signupsData.signups ?? []);
 
-    if (canManageEvents) {
-      const logResponse = await fetch(`/api/events/${eventId}/signup/logs`, { cache: "no-store" });
-      const logData = await logResponse.json();
-      setLogs(logData.logs ?? []);
-      setEventLogs(logData.eventLogs ?? []);
-    } else {
-      setLogs([]);
-      setEventLogs([]);
+    const logResponse = await fetch(`/api/events/${eventId}/signup/logs`, { cache: "no-store" });
+    const logData = await logResponse.json();
+    setLogs(logData.logs ?? []);
+    setEventLogs(canManageEvents ? (logData.eventLogs ?? []) : []);
+  }
+
+  useEffect(() => {
+    if (!teamId || !userId) return;
+    const focusEvent = searchParams.get("focusEvent");
+    if (!focusEvent) return;
+    const focusDate = searchParams.get("focusDate") ?? new Date().toISOString();
+    const focusKey = `${focusEvent}:${focusDate}`;
+    if (handledFocusKeyRef.current === focusKey) return;
+    handledFocusKeyRef.current = focusKey;
+
+    const focusItem: CalendarEvent = {
+      id: focusEvent,
+      title: searchParams.get("focusTitle") ?? "Begivenhed",
+      date: focusDate,
+      location: searchParams.get("focusLocation") ?? "",
+      source: searchParams.get("focusSource") ?? "MANUAL",
+      seriesId: searchParams.get("focusSeriesId"),
+      meetingTime: null,
+      signupDeadline: null,
+      signupStatus: null,
+      canceledAt: null,
+      canceledByName: null
+    };
+
+    openEvent(focusItem);
+
+    const cleaned = new URLSearchParams(searchParams.toString());
+    cleaned.delete("focusEvent");
+    cleaned.delete("focusDate");
+    cleaned.delete("focusTitle");
+    cleaned.delete("focusLocation");
+    cleaned.delete("focusSource");
+    cleaned.delete("focusSeriesId");
+    const query = cleaned.toString();
+    router.replace(query ? `/dashboard/kalender?${query}` : "/dashboard/kalender", {
+      scroll: false
+    });
+  }, [router, searchParams, teamId, userId]);
+
+  const isMatchEvent = selectedEvent?.source === "ICAL";
+  const canViewMatchMeta = Boolean(isMatchEvent);
+  const canEditMatchMeta = Boolean(isMatchEvent && canAssignLateFine && eventIdForSignup);
+  const isDeadlinePassed = Boolean(
+    eventDeadlineAt && new Date(eventDeadlineAt).getTime() <= Date.now()
+  );
+
+  async function saveMatchMeta() {
+    if (!canEditMatchMeta || !eventIdForSignup) return;
+    const meetingValue = editableMeetingAt.trim();
+    const deadlineValue = editableDeadlineAt.trim();
+    const meetingDate = meetingValue ? new Date(meetingValue) : null;
+    const deadlineDate = deadlineValue ? new Date(deadlineValue) : null;
+
+    if (meetingDate && Number.isNaN(meetingDate.getTime())) {
+      pushToast("Ugyldig mødetid", "error");
+      return;
+    }
+    if (deadlineDate && Number.isNaN(deadlineDate.getTime())) {
+      pushToast("Ugyldig deadline", "error");
+      return;
+    }
+
+    const payload: { meetingTime?: string | null; signupDeadline?: string } = {};
+    payload.meetingTime = meetingDate ? meetingDate.toISOString() : null;
+    if (!isDeadlinePassed && deadlineDate) {
+      payload.signupDeadline = deadlineDate.toISOString();
+    }
+
+    setSavingMatchMeta(true);
+    try {
+      const response = await fetch(`/api/events/${eventIdForSignup}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        pushToast(data.error ?? "Kunne ikke gemme kampdetaljer", "error");
+        return;
+      }
+
+      const nextMeeting = data.event?.meetingTime ?? null;
+      const nextDeadline = data.event?.signupDeadline ?? eventDeadlineAt;
+      setEventDeadlineAt(nextDeadline);
+      setEditableMeetingAt(toDateTimeLocalValue(nextMeeting));
+      setEditableDeadlineAt(toDateTimeLocalValue(nextDeadline));
+      setEvents((prev) =>
+        prev.map((item) =>
+          item.id === eventIdForSignup || item.id === selectedEvent?.id
+            ? {
+                ...item,
+                meetingTime: nextMeeting,
+                signupDeadline: nextDeadline
+              }
+            : item
+        )
+      );
+      pushToast("Kampdetaljer opdateret", "success");
+    } finally {
+      setSavingMatchMeta(false);
     }
   }
 
@@ -368,11 +572,11 @@ export default function KalenderPage() {
     const signupsResponse = await fetch(`/api/events/${eventIdForSignup}/signups`, { cache: "no-store" });
     const signupsData = await signupsResponse.json();
     setEventSignups(signupsData.signups ?? []);
-    if (canManageEvents && eventIdForSignup) {
+    if (eventIdForSignup) {
       const logResponse = await fetch(`/api/events/${eventIdForSignup}/signup/logs`, { cache: "no-store" });
       const logData = await logResponse.json();
       setLogs(logData.logs ?? []);
-      setEventLogs(logData.eventLogs ?? []);
+      setEventLogs(canManageEvents ? (logData.eventLogs ?? []) : []);
     }
     pushToast(status === "IN" ? "Du er tilmeldt" : "Du er frameldt", "success");
   }
@@ -444,6 +648,104 @@ export default function KalenderPage() {
     return grouped;
   }, [members, signupMap]);
 
+  const activeDeadlineAt = useMemo(() => {
+    if (eventDeadlineAt) return eventDeadlineAt;
+    const fromLogs = logs.find((entry) => entry.deadlineAt)?.deadlineAt;
+    return fromLogs ?? null;
+  }, [eventDeadlineAt, logs]);
+
+  const lateGroups = useMemo(() => {
+    const deadlineMs = activeDeadlineAt ? new Date(activeDeadlineAt).getTime() : null;
+    if (!deadlineMs) {
+      return { lateResponses: [] as Member[], missingAfterDeadline: [] as Member[] };
+    }
+
+    const latestLogByUser = new Map<string, SignupLog>();
+    for (const log of logs) {
+      if (!latestLogByUser.has(log.user.id)) {
+        latestLogByUser.set(log.user.id, log);
+      }
+    }
+
+    const lateResponses: Member[] = [];
+    const missingAfterDeadline: Member[] = [];
+    const now = Date.now();
+
+    for (const member of members) {
+      const status = signupMap.get(member.user.id);
+      const latestLog = latestLogByUser.get(member.user.id);
+      const latestAt = latestLog ? new Date(latestLog.createdAt).getTime() : null;
+
+      if ((status === "IN" || status === "OUT") && latestAt && latestAt > deadlineMs) {
+        lateResponses.push(member);
+        continue;
+      }
+
+      if ((!status || status === "UNKNOWN") && now > deadlineMs) {
+        missingAfterDeadline.push(member);
+      }
+    }
+
+    return { lateResponses, missingAfterDeadline };
+  }, [activeDeadlineAt, logs, members, signupMap]);
+
+  const lateFineCandidates = useMemo(() => {
+    return Array.from(
+      new Set([...lateGroups.lateResponses, ...lateGroups.missingAfterDeadline].map((member) => member.user.id))
+    );
+  }, [lateGroups]);
+
+  async function assignLateSignupFine() {
+    if (!canAssignLateFine || !teamId || !userId || !eventIdForSignup) return;
+    if (!selectedLateFineTemplateId) {
+      pushToast("Vælg en bødeskabelon først", "error");
+      return;
+    }
+    if (lateFineCandidates.length === 0) {
+      pushToast("Ingen spillere at give bøde til", "info");
+      return;
+    }
+
+    const responses = await Promise.all(
+      lateFineCandidates.map((targetUserId) =>
+        fetch("/api/fines", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            teamId,
+            userId: targetUserId,
+            templateId: selectedLateFineTemplateId,
+            createdById: userId,
+            eventId: eventIdForSignup
+          })
+        })
+      )
+    );
+
+    const failed = responses.find((response) => !response.ok);
+    if (failed) {
+      const data = await failed.json().catch(() => ({}));
+      pushToast(data.error ?? "Kunne ikke oprette bøder", "error");
+      return;
+    }
+
+    pushToast("Bøder oprettet for spillere efter deadline", "success");
+  }
+
+  function showListView() {
+    setViewMode("list");
+    const start = new Date();
+    const end = new Date();
+    end.setDate(end.getDate() + 180);
+    const next = { start: start.toISOString(), end: end.toISOString() };
+    lastRangeRef.current = next;
+    setRange(next);
+  }
+
+  function showCalendarView() {
+    setViewMode("calendar");
+  }
+
   if (sessionStatus === "loading") {
     return (
       <section className="card">
@@ -479,72 +781,155 @@ export default function KalenderPage() {
             <h2 className="text-2xl font-semibold text-ink">Kalender</h2>
             <p className="mt-2 text-ink/70">Overblik over kampe og træning.</p>
           </div>
-          {canManageEvents ? (
-            <button className="btn-primary" onClick={() => setShowModal(true)}>
-              Opret begivenhed
-            </button>
-          ) : null}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="inline-flex rounded-full border border-ink/15 bg-white/80 p-1">
+              <button
+                type="button"
+                className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+                  viewMode === "calendar" ? "bg-ink text-fog" : "text-ink/75 hover:text-ink"
+                }`}
+                onClick={showCalendarView}
+              >
+                Kalender
+              </button>
+              <button
+                type="button"
+                className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+                  viewMode === "list" ? "bg-ink text-fog" : "text-ink/75 hover:text-ink"
+                }`}
+                onClick={showListView}
+              >
+                Liste
+              </button>
+            </div>
+            {canManageEvents ? (
+              <button className="btn-primary" onClick={() => setShowModal(true)}>
+                Opret begivenhed
+              </button>
+            ) : null}
+          </div>
         </div>
       </header>
 
       <div className="card">
-        <div className="rounded-2xl border border-ink/10 bg-white/90 p-3">
-          <FullCalendar
-            plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-            initialView={isMobile ? "dayGridWeek" : "dayGridMonth"}
-            locales={[daLocale]}
-            locale="da"
-            headerToolbar={
-              isMobile
-                ? { left: "prev,next", center: "title", right: "dayGridWeek,dayGridMonth" }
-                : { left: "prev,next today", center: "title", right: "dayGridMonth,timeGridWeek,dayGridDay" }
-            }
-            buttonText={{
-              today: "I dag",
-              month: "Måned",
-              week: "Uge",
-              day: "Dag"
-            }}
-            height="auto"
-            aspectRatio={isMobile ? 0.9 : 1.35}
-            datesSet={(arg) => {
-              const next = { start: arg.start.toISOString(), end: arg.end.toISOString() };
-              const last = lastRangeRef.current;
-              if (last && last.start === next.start && last.end === next.end) return;
-              lastRangeRef.current = next;
-              setRange(next);
-            }}
-            events={calendarEvents}
-            eventClick={(info) => {
-                const eventItem: CalendarEvent = {
-                  id: info.event.id,
-                  title: info.event.title,
-                  date: info.event.start?.toISOString() ?? new Date().toISOString(),
-                  location: String(info.event.extendedProps.location ?? ""),
-                  source: String(info.event.extendedProps.source ?? "MANUAL"),
-                  seriesId: info.event.extendedProps.seriesId ?? null,
-                  signupStatus: info.event.extendedProps.signupStatus ?? null,
-                  canceledAt: info.event.extendedProps.canceledAt ?? null,
-                  canceledByName: info.event.extendedProps.canceledByName ?? null
-                };
-                openEvent(eventItem);
+        {viewMode === "calendar" ? (
+          <div className="rounded-2xl border border-ink/10 bg-white/90 p-3">
+            <FullCalendar
+              plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+              initialView={isMobile ? "dayGridWeek" : "dayGridMonth"}
+              locales={[daLocale]}
+              locale="da"
+              headerToolbar={
+                isMobile
+                  ? { left: "prev,next", center: "title", right: "dayGridWeek,dayGridMonth" }
+                  : { left: "prev,next today", center: "title", right: "dayGridMonth,timeGridWeek,dayGridDay" }
+              }
+              buttonText={{
+                today: "I dag",
+                month: "Måned",
+                week: "Uge",
+                day: "Dag"
               }}
-            eventContent={(arg) => {
-              const canceled = arg.event.extendedProps.canceledAt;
-              const color = arg.event.backgroundColor || "#94a3b8";
-              return (
-                <div className={`flex items-center gap-2 ${canceled ? "line-through opacity-60" : ""}`}>
-                  <span
-                    className="inline-block h-2 w-2 rounded-full"
-                    style={{ backgroundColor: color }}
-                  />
-                  {arg.timeText ? `${arg.timeText} ` : ""}
-                  {arg.event.title}
-                </div>
-              );
-            }}
-          />
-        </div>
+              height="auto"
+              aspectRatio={isMobile ? 0.9 : 1.35}
+              datesSet={(arg) => {
+                const next = { start: arg.start.toISOString(), end: arg.end.toISOString() };
+                const last = lastRangeRef.current;
+                if (last && last.start === next.start && last.end === next.end) return;
+                lastRangeRef.current = next;
+                setRange(next);
+              }}
+              events={calendarEvents}
+              eventClick={(info) => {
+                  const eventItem: CalendarEvent = {
+                    id: info.event.id,
+                    title: info.event.title,
+                    date: info.event.start?.toISOString() ?? new Date().toISOString(),
+                    location: String(info.event.extendedProps.location ?? ""),
+                    meetingTime: info.event.extendedProps.meetingTime ?? null,
+                    signupDeadline: info.event.extendedProps.signupDeadline ?? null,
+                    source: String(info.event.extendedProps.source ?? "MANUAL"),
+                    seriesId: info.event.extendedProps.seriesId ?? null,
+                    signupStatus: info.event.extendedProps.signupStatus ?? null,
+                    canceledAt: info.event.extendedProps.canceledAt ?? null,
+                    canceledByName: info.event.extendedProps.canceledByName ?? null
+                  };
+                  openEvent(eventItem);
+                }}
+              eventContent={(arg) => {
+                const canceled = arg.event.extendedProps.canceledAt;
+                const color = arg.event.backgroundColor || "#94a3b8";
+                return (
+                  <div className={`flex items-center gap-2 ${canceled ? "line-through opacity-60" : ""}`}>
+                    <span
+                      className="inline-block h-2 w-2 rounded-full"
+                      style={{ backgroundColor: color }}
+                    />
+                    {arg.timeText ? `${arg.timeText} ` : ""}
+                    {arg.event.title}
+                  </div>
+                );
+              }}
+            />
+          </div>
+        ) : (
+          <div className="overflow-hidden rounded-2xl border border-ink/10 bg-white/95">
+            {upcomingEvents.length === 0 ? (
+              <p className="p-4 text-sm text-ink/60">Ingen kommende begivenheder.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-left text-sm">
+                  <thead className="bg-ink/5 text-xs uppercase tracking-[0.14em] text-ink/60">
+                    <tr>
+                      <th className="px-4 py-3">Dato</th>
+                      <th className="px-4 py-3">Tid</th>
+                      <th className="px-4 py-3">Begivenhed</th>
+                      <th className="px-4 py-3">Sted</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {upcomingEvents.map((eventItem) => {
+                      const date = new Date(eventItem.date);
+                      const statusLabel = eventItem.canceledAt
+                        ? "Aflyst"
+                        : eventItem.signupStatus === "IN"
+                        ? "Jeg kommer"
+                        : eventItem.signupStatus === "OUT"
+                        ? "Jeg kan ikke"
+                        : "Mangler svar";
+                      const rowToneClass = eventItem.canceledAt
+                        ? "border-l-4 border-l-ink/35 bg-ink/5"
+                        : eventItem.signupStatus === "IN"
+                        ? "border-l-4 border-l-green-500 bg-green-50/60"
+                        : eventItem.signupStatus === "OUT"
+                        ? "border-l-4 border-l-red-500 bg-red-50/60"
+                        : "border-l-4 border-l-amber-500 bg-amber-50/60";
+
+                      return (
+                        <tr
+                          key={eventItem.id}
+                          className={`cursor-pointer border-t border-ink/10 transition-colors hover:bg-ink/5 ${rowToneClass}`}
+                          aria-label={`${eventItem.title} - ${statusLabel}`}
+                          title={statusLabel}
+                          onClick={() => openEvent(eventItem)}
+                        >
+                          <td className="px-4 py-3 text-ink/80">{date.toLocaleDateString("da-DK")}</td>
+                          <td className="px-4 py-3 text-ink/80">
+                            {date.toLocaleTimeString("da-DK", { hour: "2-digit", minute: "2-digit" })}
+                          </td>
+                          <td className={`px-4 py-3 font-semibold text-ink ${eventItem.canceledAt ? "line-through opacity-70" : ""}`}>
+                            {eventItem.title}
+                          </td>
+                          <td className="px-4 py-3 text-ink/70">{eventItem.location || "—"}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {canManageEvents ? (
@@ -582,8 +967,8 @@ export default function KalenderPage() {
       ) : null}
 
       {showModal ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 px-4">
-          <div className="card max-w-lg w-full">
+        <div className="modal-backdrop" onClick={() => setShowModal(false)}>
+          <div className="modal-panel max-w-lg" onClick={(event) => event.stopPropagation()}>
             <div className="flex items-start justify-between">
               <div>
                 <h3 className="text-lg font-semibold text-ink">Opret gentagen begivenhed</h3>
@@ -696,8 +1081,8 @@ export default function KalenderPage() {
       ) : null}
 
       {selectedEvent ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 px-4">
-          <div className="card max-w-lg w-full">
+        <div className="modal-backdrop" onClick={() => setSelectedEvent(null)}>
+          <div className="modal-panel max-w-lg" onClick={(event) => event.stopPropagation()}>
             <div className="flex items-start justify-between">
               <div>
                 <h3 className={`text-lg font-semibold text-ink ${selectedEvent.canceledAt ? "line-through" : ""}`}>
@@ -727,6 +1112,70 @@ export default function KalenderPage() {
                     Aflys begivenhed
                   </button>
                 )
+              ) : null}
+              {canViewMatchMeta ? (
+                <div className="rounded-2xl border border-ink/10 bg-white/90 p-4">
+                  <p className="label">Kampdetaljer</p>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <label className="label" htmlFor="meeting-time">Mødetid</label>
+                      {canEditMatchMeta ? (
+                        <input
+                          id="meeting-time"
+                          type="datetime-local"
+                          className="input"
+                          value={editableMeetingAt}
+                          onChange={(event) => setEditableMeetingAt(event.target.value)}
+                        />
+                      ) : (
+                        <div className="input flex items-center justify-between gap-3">
+                          <span className="text-ink/75">{splitLocalDateTime(editableMeetingAt).date}</span>
+                          <span className="rounded-full bg-ember/15 px-3 py-1 text-sm font-bold text-ember">
+                            {splitLocalDateTime(editableMeetingAt).time}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <label className="label" htmlFor="deadline-time">Svarfrist</label>
+                      {canEditMatchMeta ? (
+                        <input
+                          id="deadline-time"
+                          type="datetime-local"
+                          className="input"
+                          value={editableDeadlineAt}
+                          onChange={(event) => setEditableDeadlineAt(event.target.value)}
+                          readOnly={isDeadlinePassed}
+                          disabled={isDeadlinePassed}
+                        />
+                      ) : (
+                        <div className="input flex items-center justify-between gap-3">
+                          <span className="text-ink/75">{splitLocalDateTime(editableDeadlineAt).date}</span>
+                          <span className="rounded-full bg-amber-100 px-3 py-1 text-sm font-semibold text-amber-800">
+                            {splitLocalDateTime(editableDeadlineAt).time}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  {!canEditMatchMeta ? (
+                    <p className="mt-2 text-xs text-ink/60">
+                      Kun admin og bødekasseformand kan ændre disse værdier.
+                    </p>
+                  ) : null}
+                  {isDeadlinePassed ? (
+                    <p className="mt-2 text-xs font-semibold text-amber-700">
+                      Deadline er passeret og kan ikke længere ændres.
+                    </p>
+                  ) : null}
+                  {canEditMatchMeta ? (
+                    <div className="mt-3 flex items-center justify-end">
+                      <button className="btn-primary" type="button" onClick={saveMatchMeta} disabled={savingMatchMeta}>
+                        {savingMatchMeta ? "Gemmer..." : "Gem kampdetaljer"}
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
               ) : null}
               <div className="flex gap-2">
                 <button
@@ -810,6 +1259,84 @@ export default function KalenderPage() {
                   </div>
                 </div>
               </div>
+              {(lateGroups.lateResponses.length > 0 || lateGroups.missingAfterDeadline.length > 0) &&
+              activeDeadlineAt ? (
+                <div className="mt-4 rounded-2xl border border-red-200 bg-red-50/70 p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="label text-red-700">Efter deadline</p>
+                      <p className="mt-1 text-xs text-red-700/80">
+                        Deadline: {formatTimestamp(activeDeadlineAt)}
+                      </p>
+                    </div>
+                    {canAssignLateFine ? (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <select
+                          className="input min-w-[220px]"
+                          value={selectedLateFineTemplateId}
+                          onChange={(event) => setSelectedLateFineTemplateId(event.target.value)}
+                        >
+                          <option value="">Vælg bødeskabelon</option>
+                          {fineTemplates.map((template) => (
+                            <option key={template.id} value={template.id}>
+                              {template.title} ({template.amount} kr)
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          className="btn-primary"
+                          type="button"
+                          onClick={assignLateSignupFine}
+                          disabled={!selectedLateFineTemplateId || lateFineCandidates.length === 0}
+                        >
+                          Giv bøde til {lateFineCandidates.length}
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
+                  {!canAssignLateFine ? (
+                    <p className="mt-2 text-xs text-ink/60">
+                      Kun bødeformand/admin kan tildele bøder herfra.
+                    </p>
+                  ) : fineTemplates.length === 0 ? (
+                    <p className="mt-2 text-xs text-ink/60">
+                      Ingen godkendte bødeskabeloner fundet endnu.
+                    </p>
+                  ) : null}
+                  <div className="mt-3 grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-sm font-semibold text-ink">
+                        <span className="flex items-center gap-2">
+                          <span className="h-2.5 w-2.5 rounded-full bg-red-600" />
+                          Svar efter deadline
+                        </span>
+                        <span className="text-ink/60">{lateGroups.lateResponses.length}</span>
+                      </div>
+                      <div className="space-y-1 text-sm text-ink/75">
+                        {lateGroups.lateResponses.length === 0 ? <div>Ingen</div> : null}
+                        {lateGroups.lateResponses.map((member) => (
+                          <div key={`late-${member.user.id}`}>{member.user.name ?? "Ukendt"}</div>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-sm font-semibold text-ink">
+                        <span className="flex items-center gap-2">
+                          <span className="h-2.5 w-2.5 rounded-full bg-amber-500" />
+                          Mangler svar efter deadline
+                        </span>
+                        <span className="text-ink/60">{lateGroups.missingAfterDeadline.length}</span>
+                      </div>
+                      <div className="space-y-1 text-sm text-ink/75">
+                        {lateGroups.missingAfterDeadline.length === 0 ? <div>Ingen</div> : null}
+                        {lateGroups.missingAfterDeadline.map((member) => (
+                          <div key={`missing-${member.user.id}`}>{member.user.name ?? "Ukendt"}</div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
               {canManageEvents && (logs.length > 0 || eventLogs.length > 0) ? (
                 <div className="mt-4 rounded-2xl border border-ink/10 bg-white/90 p-4">
                   <p className="label">Historik</p>
@@ -824,20 +1351,22 @@ export default function KalenderPage() {
                         reason: log.reason,
                         deadlineAt: log.deadlineAt
                       })),
-                      ...eventLogs.map((entry) => ({
-                        id: `event-${entry.id}`,
-                        createdAt: entry.createdAt,
-                        type: entry.type,
-                        message: entry.message,
-                        name: entry.actor?.name ?? "System"
-                      }))
+                      ...eventLogs
+                        .filter((entry) => entry.type !== "SIGNUP")
+                        .map((entry) => ({
+                          id: `event-${entry.id}`,
+                          createdAt: entry.createdAt,
+                          type: entry.type,
+                          message: entry.message,
+                          name: entry.actor?.name ?? "System"
+                        }))
                     ]
                       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
                       .map((entry) => (
                         <div key={entry.id} className="flex items-start gap-2 text-sm text-ink/70">
                           <span
                             className={`mt-1 inline-block h-2.5 w-2.5 rounded-full ${
-                              entry.type === "SIGNUP"
+                              "status" in entry
                                 ? entry.status === "IN"
                                   ? "bg-green-600"
                                   : entry.status === "OUT"

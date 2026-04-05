@@ -14,6 +14,7 @@ type Membership = {
 type TeamMember = {
   id: string;
   role: string;
+  status: "PENDING" | "ACTIVE";
   user: {
     id: string;
     name: string;
@@ -23,11 +24,23 @@ type TeamMember = {
   };
 };
 
+type IcalFeed = {
+  id: string;
+  name: string;
+  url: string;
+  lastImportedAt?: string | null;
+};
+
 const roleLabels: Record<string, string> = {
   ADMIN: "Admin",
   TRAENER: "Træner",
   SPILLER: "Spiller",
   BOEDEKASSEFORMAND: "Bødekasseformand"
+};
+
+const statusLabels: Record<string, string> = {
+  ACTIVE: "Aktiv",
+  PENDING: "Afventer"
 };
 
 const presets = [
@@ -36,6 +49,7 @@ const presets = [
   { id: "forest", label: "Forest" },
   { id: "midnight", label: "Midnight" },
   { id: "mono", label: "Mono" },
+  { id: "bk", label: "BK" },
   { id: "crimson", label: "Crimson" },
   { id: "ocean", label: "Ocean" },
   { id: "lavender", label: "Lavender" },
@@ -49,12 +63,16 @@ export default function IndstillingerPage() {
   const { pushToast } = useToast();
   const { data: session, status: sessionStatus } = useSession();
   const [active, setActive] = useState("atlantic");
+  const [hasUserTheme, setHasUserTheme] = useState(false);
   const [teamId, setTeamId] = useState("");
   const [memberships, setMemberships] = useState<Membership[]>([]);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null);
   const [memberRole, setMemberRole] = useState("SPILLER");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [mobilePayBox, setMobilePayBox] = useState("");
+  const [savingMobilePayBox, setSavingMobilePayBox] = useState(false);
+  const [savingTeamTheme, setSavingTeamTheme] = useState(false);
   const [customTheme, setCustomThemeState] = useState({
     ink: "#0f172a",
     clay: "#cbd5e1",
@@ -75,13 +93,18 @@ export default function IndstillingerPage() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [icalUrl, setIcalUrl] = useState("");
+  const [icalImporting, setIcalImporting] = useState(false);
+  const [xlsxImporting, setXlsxImporting] = useState(false);
+  const [xlsxFile, setXlsxFile] = useState<File | null>(null);
+  const [icalFeeds, setIcalFeeds] = useState<IcalFeed[]>([]);
 
   useEffect(() => {
     setTeamId(getStoredTeamId());
   }, []);
 
   useEffect(() => {
-    async function loadMemberships() {
+    async function loadMembershipsAndTheme() {
       if (!session?.user?.id) return;
       const response = await fetch("/api/me");
       if (!response.ok) return;
@@ -94,36 +117,57 @@ export default function IndstillingerPage() {
         setProfilePhone(data.user.phone ?? "");
         setProfileImage(data.user.image ?? "");
       }
-      if (!teamId && list.length > 0) {
-        setTeamId(list[0].team.id);
-        setStoredTeamId(list[0].team.id);
-      }
-    }
 
-    async function loadTeam() {
-      if (!teamId) return;
-      const response = await fetch(`/api/team/${teamId}`);
-      if (!response.ok) return;
-      const data = await response.json();
-      const theme = data.team?.themePreset ?? "atlantic";
-      setActive(theme);
-      if (theme === "custom") {
-        const config = data.team?.themeConfig ?? customTheme;
-        setCustomThemeState((prev) => ({ ...prev, ...config }));
-        setCustomTheme(config ?? customTheme);
+      let resolvedTeamId = teamId;
+      if (list.length > 0) {
+        const isCurrentValid = list.some((membership: Membership) => membership.team.id === teamId);
+        if (!teamId || !isCurrentValid) {
+          resolvedTeamId = list[0].team.id;
+          setTeamId(resolvedTeamId);
+          setStoredTeamId(resolvedTeamId);
+        }
+      }
+
+      const userTheme = data.user?.themePreset ?? null;
+      const userHasTheme = Boolean(userTheme);
+      if (userHasTheme) {
+        setHasUserTheme(true);
+        setActive(userTheme);
+        if (userTheme === "custom") {
+          const config = data.user?.themeConfig ?? customTheme;
+          setCustomThemeState((prev) => ({ ...prev, ...config }));
+          setCustomTheme(config ?? customTheme);
+        } else {
+          setTheme(userTheme);
+        }
       } else {
-        setTheme(theme);
+        setHasUserTheme(false);
+      }
+      if (!resolvedTeamId) return;
+      const teamResponse = await fetch(`/api/team/${resolvedTeamId}`);
+      if (!teamResponse.ok) return;
+      const teamData = await teamResponse.json();
+      setMobilePayBox(teamData.team?.mobilePayBox ?? "");
+      if (!userHasTheme) {
+        const teamTheme = teamData.team?.themePreset ?? "atlantic";
+        setActive(teamTheme);
+        if (teamTheme === "custom") {
+          const config = teamData.team?.themeConfig ?? customTheme;
+          setCustomThemeState((prev) => ({ ...prev, ...config }));
+          setCustomTheme(config ?? customTheme);
+        } else {
+          setTheme(teamTheme);
+        }
       }
     }
 
-    loadMemberships();
-    loadTeam();
+    loadMembershipsAndTheme();
   }, [session?.user?.id, teamId]);
 
   useEffect(() => {
     async function loadTeamMembers() {
       if (!teamId) return;
-      const response = await fetch(`/api/team-members?teamId=${teamId}`);
+      const response = await fetch(`/api/team-members?teamId=${teamId}&includePending=true`);
       if (!response.ok) return;
       const data = await response.json();
       setTeamMembers(data.members ?? []);
@@ -132,29 +176,74 @@ export default function IndstillingerPage() {
     loadTeamMembers();
   }, [teamId]);
 
+  useEffect(() => {
+    async function loadIcalFeeds() {
+      if (!teamId) return;
+      const response = await fetch(`/api/ical/import?teamId=${teamId}`, { cache: "no-store" });
+      if (!response.ok) {
+        setIcalFeeds([]);
+        return;
+      }
+      const data = await response.json();
+      setIcalFeeds(data.feeds ?? []);
+    }
+
+    loadIcalFeeds();
+  }, [teamId]);
+
   function handleTheme(theme: string) {
     setActive(theme);
-    if (!teamId) return;
+    setHasUserTheme(true);
     if (theme === "custom") {
       setCustomTheme(customTheme);
     } else {
       setTheme(theme);
     }
-    fetch(`/api/team/${teamId}`, {
+    fetch("/api/me", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ themePreset: theme })
+      body: JSON.stringify({
+        themePreset: theme,
+        ...(theme === "custom" ? { themeConfig: customTheme } : {})
+      })
     }).catch(() => undefined);
   }
 
   async function handleSaveCustomTheme() {
-    if (!teamId) return;
+    setHasUserTheme(true);
     setCustomTheme(customTheme);
-    await fetch(`/api/team/${teamId}`, {
+    await fetch("/api/me", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ themePreset: "custom", themeConfig: customTheme })
     });
+  }
+
+  async function handleUseTeamTheme() {
+    const response = await fetch("/api/me", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ themePreset: null, themeConfig: null })
+    });
+    if (!response.ok) {
+      pushToast("Kunne ikke skifte til holdets tema", "error");
+      return;
+    }
+    setHasUserTheme(false);
+    if (!teamId) return;
+    const teamResponse = await fetch(`/api/team/${teamId}`);
+    if (!teamResponse.ok) return;
+    const data = await teamResponse.json();
+    setMobilePayBox(data.team?.mobilePayBox ?? "");
+    const theme = data.team?.themePreset ?? "atlantic";
+    setActive(theme);
+    if (theme === "custom") {
+      const config = data.team?.themeConfig ?? customTheme;
+      setCustomThemeState((prev) => ({ ...prev, ...config }));
+      setCustomTheme(config ?? customTheme);
+    } else {
+      setTheme(theme);
+    }
   }
 
   useEffect(() => {
@@ -164,24 +253,97 @@ export default function IndstillingerPage() {
   }, [active, customTheme]);
 
   useEffect(() => {
-    if (active !== "custom" || !teamId) return;
+    if (active !== "custom" || !hasUserTheme) return;
     const timeout = setTimeout(() => {
-      fetch(`/api/team/${teamId}`, {
+      fetch("/api/me", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ themePreset: "custom", themeConfig: customTheme })
       }).catch(() => undefined);
     }, 400);
     return () => clearTimeout(timeout);
-  }, [active, teamId, customTheme]);
+  }, [active, customTheme, hasUserTheme]);
 
   function handleTeamChange(value: string) {
     setTeamId(value);
     setStoredTeamId(value);
   }
 
+  async function handleSaveMobilePayBox() {
+    if (!teamId) return;
+    setSavingMobilePayBox(true);
+    try {
+      const response = await fetch(`/api/team/${teamId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mobilePayBox: mobilePayBox.trim() || null })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        pushToast(data.error ?? "Kunne ikke gemme MobilePay box", "error");
+        return;
+      }
+      pushToast("MobilePay box gemt", "success");
+    } finally {
+      setSavingMobilePayBox(false);
+    }
+  }
+
+  async function handleSaveTeamTheme() {
+    if (!teamId || !isAdmin) return;
+    setSavingTeamTheme(true);
+    try {
+      const response = await fetch(`/api/team/${teamId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          themePreset: active,
+          ...(active === "custom" ? { themeConfig: customTheme } : { themeConfig: null })
+        })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        pushToast(data.error ?? "Kunne ikke gemme holdets tema", "error");
+        return;
+      }
+      pushToast("Holdets standardtema er opdateret", "success");
+    } finally {
+      setSavingTeamTheme(false);
+    }
+  }
+
   const currentMembership = memberships.find((item) => item.team.id === teamId);
   const isAdmin = currentMembership?.role === "ADMIN";
+  const inviteSlug = currentMembership?.team.slug ?? "";
+  const passwordValidationMessage =
+    newPassword && newPassword.length < 6
+      ? "Ny adgangskode skal være mindst 6 tegn."
+      : newPassword && newPassword !== confirmPassword
+      ? "Adgangskoderne matcher ikke."
+      : null;
+
+  async function handleCopySignupLink() {
+    if (!inviteSlug) return;
+    const origin = window.location.origin;
+    const inviteUrl = `${origin}/signup?slug=${encodeURIComponent(inviteSlug)}`;
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(inviteUrl);
+      } else {
+        const temp = document.createElement("textarea");
+        temp.value = inviteUrl;
+        temp.style.position = "fixed";
+        temp.style.opacity = "0";
+        document.body.appendChild(temp);
+        temp.select();
+        document.execCommand("copy");
+        document.body.removeChild(temp);
+      }
+      pushToast("Invitationslink kopieret", "success");
+    } catch {
+      pushToast("Kunne ikke kopiere linket", "error");
+    }
+  }
 
   async function handleUpdateRole() {
     if (!selectedMember) return;
@@ -198,6 +360,37 @@ export default function IndstillingerPage() {
     setTeamMembers((prev) => prev.map((m) => (m.id === selectedMember.id ? { ...m, role: data.membership.role } : m)));
     setSelectedMember((prev) => (prev ? { ...prev, role: data.membership.role } : prev));
     pushToast("Rolle opdateret", "success");
+  }
+
+  async function handleApproveMember() {
+    if (!selectedMember) return;
+    const response = await fetch(`/api/team-members/${selectedMember.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ role: memberRole, status: "ACTIVE" })
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      pushToast(data.error ?? "Kunne ikke godkende medlem", "error");
+      return;
+    }
+    setTeamMembers((prev) =>
+      prev.map((m) =>
+        m.id === selectedMember.id
+          ? { ...m, role: data.membership.role, status: data.membership.status }
+          : m
+      )
+    );
+    setSelectedMember((prev) =>
+      prev
+        ? {
+            ...prev,
+            role: data.membership.role,
+            status: data.membership.status
+          }
+        : prev
+    );
+    pushToast("Medlem godkendt", "success");
   }
 
   async function handleDeleteMember() {
@@ -220,6 +413,10 @@ export default function IndstillingerPage() {
 
   async function handleProfileSave(event: React.FormEvent) {
     event.preventDefault();
+    if (newPassword && newPassword.length < 6) {
+      pushToast("Ny adgangskode skal være mindst 6 tegn.", "error");
+      return;
+    }
     if (newPassword && newPassword !== confirmPassword) {
       pushToast("Adgangskoderne matcher ikke.", "error");
       return;
@@ -269,6 +466,104 @@ export default function IndstillingerPage() {
       pushToast("Profilbillede opdateret.", "success");
     } finally {
       setUploading(false);
+    }
+  }
+
+  async function handleIcalImport(event: React.FormEvent) {
+    event.preventDefault();
+    if (!teamId) {
+      pushToast("Vælg et hold først", "error");
+      return;
+    }
+    if (!icalUrl.trim()) {
+      pushToast("Indsæt iCal URL", "error");
+      return;
+    }
+
+    setIcalImporting(true);
+    try {
+      const response = await fetch("/api/ical/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          teamId,
+          url: icalUrl
+        })
+      });
+      const raw = await response.text();
+      let data: { error?: string; details?: string; created?: number; updated?: number } = {};
+      try {
+        data = JSON.parse(raw);
+      } catch {
+        data = {};
+      }
+      if (!response.ok) {
+        pushToast(data.error ?? `Import fejlede (${response.status})`, "error");
+        if (!data.error) {
+          console.error("iCal import non-JSON response", raw.slice(0, 500));
+        } else if (data.details) {
+          console.error("iCal import details", data.details);
+        }
+        return;
+      }
+      pushToast(`Importeret: ${data.created} oprettet, ${data.updated} opdateret`, "success");
+
+      const feedsResponse = await fetch(`/api/ical/import?teamId=${teamId}`, { cache: "no-store" });
+      if (feedsResponse.ok) {
+        const feedsData = await feedsResponse.json();
+        setIcalFeeds(feedsData.feeds ?? []);
+      }
+    } finally {
+      setIcalImporting(false);
+    }
+  }
+
+  async function handleXlsxImport(event: React.FormEvent) {
+    event.preventDefault();
+    if (!teamId) {
+      pushToast("Vælg et hold først", "error");
+      return;
+    }
+    if (!xlsxFile) {
+      pushToast("Vælg en Excel-fil (.xlsx)", "error");
+      return;
+    }
+
+    setXlsxImporting(true);
+    try {
+      const formData = new FormData();
+      formData.append("teamId", teamId);
+      formData.append("file", xlsxFile);
+
+      const response = await fetch("/api/ical/import-xlsx", {
+        method: "POST",
+        body: formData
+      });
+      const raw = await response.text();
+      let data: { error?: string; created?: number; updated?: number } = {};
+      try {
+        data = JSON.parse(raw);
+      } catch {
+        data = {};
+      }
+      if (!response.ok) {
+        pushToast(data.error ?? `Excel-import fejlede (${response.status})`, "error");
+        if (!data.error) {
+          console.error("Excel import non-JSON response", raw.slice(0, 500));
+        }
+        return;
+      }
+
+      pushToast(`Excel importeret: ${data.created} oprettet, ${data.updated} opdateret`, "success");
+      setXlsxFile(null);
+
+      const feedsResponse = await fetch(`/api/ical/import?teamId=${teamId}`, { cache: "no-store" });
+      if (feedsResponse.ok) {
+        const feedsData = await feedsResponse.json();
+        setIcalFeeds(feedsData.feeds ?? []);
+      }
+    } finally {
+      setXlsxImporting(false);
     }
   }
 
@@ -399,6 +694,9 @@ export default function IndstillingerPage() {
               onChange={(event) => setConfirmPassword(event.target.value)}
               className="input"
             />
+            {passwordValidationMessage ? (
+              <p className="text-xs font-semibold text-red-600">{passwordValidationMessage}</p>
+            ) : null}
           </div>
           <div className="flex items-end gap-3">
             <button type="submit" className="btn-primary">
@@ -421,6 +719,52 @@ export default function IndstillingerPage() {
                 </option>
               ))}
             </select>
+            {isAdmin ? (
+              <div className="space-y-2">
+                <label className="label">Invitationslink til spillere</label>
+                <div className="flex flex-wrap gap-2">
+                  <input
+                    className="input flex-1"
+                    value={inviteSlug ? `/signup?slug=${inviteSlug}` : ""}
+                    readOnly
+                    placeholder="Vælg et hold"
+                  />
+                  <button
+                    type="button"
+                    className="btn-ghost"
+                    onClick={handleCopySignupLink}
+                    disabled={!inviteSlug}
+                  >
+                    Kopiér link
+                  </button>
+                </div>
+                <p className="text-xs text-ink/60">
+                  Spillere får holdslug udfyldt automatisk og kan ikke ændre den.
+                </p>
+              </div>
+            ) : null}
+            {isAdmin ? (
+              <div className="space-y-2">
+                <label className="label" htmlFor="mobilepay-box">MobilePay box nummer</label>
+                <div className="flex flex-wrap gap-2">
+                  <input
+                    id="mobilepay-box"
+                    className="input flex-1"
+                    placeholder="Fx 1234AB"
+                    value={mobilePayBox}
+                    onChange={(event) => setMobilePayBox(event.target.value)}
+                  />
+                  <button
+                    type="button"
+                    className="btn-ghost"
+                    onClick={handleSaveMobilePayBox}
+                    disabled={savingMobilePayBox || !teamId}
+                  >
+                    {savingMobilePayBox ? "Gemmer..." : "Gem box"}
+                  </button>
+                </div>
+              </div>
+            ) : null}
           </div>
           <div className="mt-6 space-y-3">
             <p className="label">Spillere</p>
@@ -450,7 +794,9 @@ export default function IndstillingerPage() {
                       </div>
                     </div>
                     <span className="rounded-full bg-ink/10 px-3 py-1 text-xs font-semibold text-ink/70">
-                      {roleLabels[member.role] ?? member.role}
+                      {member.status === "PENDING"
+                        ? "Afventer godkendelse"
+                        : roleLabels[member.role] ?? member.role}
                     </span>
                   </button>
                 ))
@@ -462,6 +808,9 @@ export default function IndstillingerPage() {
         <div className="card-soft">
           <h3 className="text-lg font-semibold text-ink">Tema</h3>
           <p className="mt-2 text-sm text-ink/70">Vælg en farveprofil for dashboardet.</p>
+          <p className="mt-1 text-xs text-ink/60">
+            {hasUserTheme ? "Du bruger dit personlige tema." : "Du bruger holdets standardtema."}
+          </p>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             {presets.map((preset) => (
               <button
@@ -475,6 +824,25 @@ export default function IndstillingerPage() {
               </button>
             ))}
           </div>
+          {hasUserTheme ? (
+            <div className="mt-4">
+              <button type="button" className="btn-ghost" onClick={handleUseTeamTheme}>
+                Brug holdets standardtema
+              </button>
+            </div>
+          ) : null}
+          {isAdmin ? (
+            <div className="mt-3">
+              <button
+                type="button"
+                className="btn-ghost"
+                onClick={handleSaveTeamTheme}
+                disabled={savingTeamTheme || !teamId}
+              >
+                {savingTeamTheme ? "Gemmer..." : "Sæt som holdets standardtema"}
+              </button>
+            </div>
+          ) : null}
           {active === "custom" ? (
             <div className="mt-6 space-y-4">
               <div className="grid gap-3 sm:grid-cols-2">
@@ -511,14 +879,73 @@ export default function IndstillingerPage() {
         </div>
       </div>
 
-      <div className="card-soft">
+      <div className="card-soft" hidden={!isAdmin}>
         <h3 className="text-lg font-semibold text-ink">Integrationer</h3>
-        <p className="mt-2 text-sm text-ink/70">iCal-import konfigureres her.</p>
+        <p className="mt-2 text-sm text-ink/70">Indsæt iCal-link eller upload et Excel-kampprogram.</p>
+        <form className="mt-4 grid gap-3" onSubmit={handleIcalImport}>
+          <div className="space-y-2">
+            <label className="label" htmlFor="ical-url">iCal URL</label>
+            <input
+              id="ical-url"
+              className="input"
+              value={icalUrl}
+              onChange={(event) => setIcalUrl(event.target.value)}
+              placeholder="webcal://ical.dbu.dk/Match.ashx?..."
+              disabled={!isAdmin || !teamId}
+              required
+            />
+          </div>
+          <div className="flex items-end gap-3">
+            <button type="submit" className="btn-primary" disabled={!isAdmin || !teamId || icalImporting}>
+              {icalImporting ? "Importerer..." : "Importer kampe"}
+            </button>
+            {!isAdmin ? <span className="text-sm text-ink/60">Kun admin kan importere.</span> : null}
+          </div>
+        </form>
+        <form className="mt-4 grid gap-3" onSubmit={handleXlsxImport}>
+          <div className="space-y-2">
+            <label className="label" htmlFor="xlsx-file">Excel (.xlsx)</label>
+            <input
+              id="xlsx-file"
+              type="file"
+              accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              className="input file:mr-4 file:rounded-full file:border-0 file:bg-ink file:px-4 file:py-2 file:text-xs file:font-semibold file:uppercase file:tracking-[0.2em] file:text-fog"
+              disabled={!isAdmin || !teamId || xlsxImporting}
+              onChange={(event) => setXlsxFile(event.target.files?.[0] ?? null)}
+            />
+          </div>
+          <div className="flex items-end gap-3">
+            <button
+              type="submit"
+              className="btn-ghost"
+              disabled={!isAdmin || !teamId || xlsxImporting || !xlsxFile}
+            >
+              {xlsxImporting ? "Uploader..." : "Upload kampprogram"}
+            </button>
+          </div>
+        </form>
+        <div className="mt-6 space-y-2">
+          <p className="label">Importerede feeds</p>
+          {icalFeeds.length === 0 ? (
+            <p className="text-sm text-ink/60">Ingen iCal feeds endnu.</p>
+          ) : (
+            icalFeeds.map((feed) => (
+              <div key={feed.id} className="rounded-2xl border border-ink/10 bg-white/80 px-4 py-3">
+                <div className="text-sm font-semibold text-ink">{feed.name}</div>
+                <div className="truncate text-xs text-ink/60">{feed.url}</div>
+                <div className="mt-1 text-xs text-ink/50">
+                  Sidst importeret:{" "}
+                  {feed.lastImportedAt ? new Date(feed.lastImportedAt).toLocaleString("da-DK") : "Aldrig"}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
       </div>
 
       {selectedMember ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 px-4">
-          <div className="card max-w-lg w-full">
+        <div className="modal-backdrop" onClick={() => setSelectedMember(null)}>
+          <div className="modal-panel max-w-lg" onClick={(event) => event.stopPropagation()}>
             <div className="flex items-start justify-between">
               <div>
                 <h3 className="text-lg font-semibold text-ink">{selectedMember.user.name}</h3>
@@ -532,6 +959,7 @@ export default function IndstillingerPage() {
               <div>Email: {selectedMember.user.email ?? "—"}</div>
               <div>Telefon: {selectedMember.user.phone ?? "—"}</div>
               <div>Rolle: {roleLabels[selectedMember.role] ?? selectedMember.role}</div>
+              <div>Status: {statusLabels[selectedMember.status] ?? selectedMember.status}</div>
             </div>
             {isAdmin ? (
               <div className="mt-4 space-y-3">
@@ -545,9 +973,15 @@ export default function IndstillingerPage() {
                   </select>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <button className="btn-primary" onClick={handleUpdateRole}>
-                    Opdater rolle
-                  </button>
+                  {selectedMember.status === "PENDING" ? (
+                    <button className="btn-primary" onClick={handleApproveMember}>
+                      Godkend medlem
+                    </button>
+                  ) : (
+                    <button className="btn-primary" onClick={handleUpdateRole}>
+                      Opdater rolle
+                    </button>
+                  )}
                   <button className="btn-ghost" onClick={confirmDeleteMember}>
                     Slet bruger
                   </button>
@@ -559,8 +993,8 @@ export default function IndstillingerPage() {
       ) : null}
 
       {showDeleteConfirm && selectedMember ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 px-4">
-          <div className="card max-w-md w-full">
+        <div className="modal-backdrop" onClick={() => setShowDeleteConfirm(false)}>
+          <div className="modal-panel max-w-md" onClick={(event) => event.stopPropagation()}>
             <div className="flex items-start justify-between">
               <div>
                 <h3 className="text-lg font-semibold text-ink">Slet bruger</h3>
