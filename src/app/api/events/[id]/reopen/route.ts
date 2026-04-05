@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { createNotifications } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 
 export async function POST(_request: Request, { params }: { params: { id: string } }) {
@@ -59,7 +60,7 @@ export async function POST(_request: Request, { params }: { params: { id: string
     }));
 
   if (notifications.length > 0) {
-    await prisma.notification.createMany({ data: notifications });
+    await createNotifications(notifications);
   }
 
   return NextResponse.json({ event: updated });

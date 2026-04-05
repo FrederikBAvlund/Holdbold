@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { createNotifications } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 
 const bodySchema = z.object({
@@ -90,7 +91,7 @@ export async function POST(request: Request) {
         }))
     ];
 
-    await prisma.notification.createMany({ data: notifications });
+    await createNotifications(notifications);
     created += 1;
   }
 

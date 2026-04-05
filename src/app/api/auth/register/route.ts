@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
+import { createNotifications } from "@/lib/notifications";
 
 const bodySchema = z.object({
   name: z.string().trim().min(1, "Navn er paakraevet"),
@@ -129,8 +130,8 @@ export async function POST(request: Request) {
   });
 
   if (admins.length > 0) {
-    await prisma.notification.createMany({
-      data: admins.map((admin) => ({
+    await createNotifications(
+      admins.map((admin) => ({
         userId: admin.userId,
         teamId: team.id,
         type: "GENERAL",
@@ -138,7 +139,7 @@ export async function POST(request: Request) {
         body: `${body.name} har oprettet sig med slug ${team.slug}`,
         link: "/dashboard/indstillinger"
       }))
-    });
+    );
   }
 
   return NextResponse.json({

@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { createNotifications } from "@/lib/notifications";
 
 const HOURS_TO_MS = 60 * 60 * 1000;
 
@@ -92,8 +93,6 @@ export async function processDueFineCollections(teamId: string) {
       link: "/dashboard/boder"
     }));
 
-    await prisma.notification.createMany({
-      data: [...recipientNotifications, ...managerNotifications]
-    });
+    await createNotifications([...recipientNotifications, ...managerNotifications]);
   }
 }

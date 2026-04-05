@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { z } from "zod";
 import { authOptions } from "@/lib/auth";
 import { processDueFineCollections } from "@/lib/fineCollections";
+import { createNotifications } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 
 const listSchema = z.object({
@@ -177,7 +178,7 @@ export async function POST(request: Request) {
   }
 
   if (notifications.length > 0) {
-    await prisma.notification.createMany({ data: notifications });
+    await createNotifications(notifications);
   }
 
   return NextResponse.json({ fine });

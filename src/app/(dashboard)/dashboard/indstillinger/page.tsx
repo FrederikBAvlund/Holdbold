@@ -5,6 +5,7 @@ import { signOut, useSession } from "next-auth/react";
 import { setCustomTheme, setTheme } from "@/components/ThemeProvider";
 import { getStoredTeamId, setStoredTeamId } from "@/components/appState";
 import { useToast } from "@/components/ToastProvider";
+import PushSettings from "@/components/PushSettings";
 
 type Membership = {
   role: string;
@@ -708,6 +709,8 @@ export default function IndstillingerPage() {
           </div>
         </form>
       </div>
+
+      <PushSettings />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="card-soft">

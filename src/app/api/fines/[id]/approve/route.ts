@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { createNotifications } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 
 export async function POST(_request: Request, { params }: { params: { id: string } }) {
@@ -43,8 +44,8 @@ export async function POST(_request: Request, { params }: { params: { id: string
     notificationTargets.add(fineToApprove.createdById);
   }
   if (notificationTargets.size > 0) {
-    await prisma.notification.createMany({
-      data: Array.from(notificationTargets).map((userId) => ({
+    await createNotifications(
+      Array.from(notificationTargets).map((userId) => ({
         userId,
         teamId: fineToApprove.teamId,
         type: "FINE" as const,
@@ -52,7 +53,7 @@ export async function POST(_request: Request, { params }: { params: { id: string
         body: `${fineToApprove.reason} · ${fineToApprove.amount} kr`,
         link: "/dashboard/boder"
       }))
-    });
+    );
   }
 
   return NextResponse.json({ fine });

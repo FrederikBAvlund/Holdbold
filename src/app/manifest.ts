@@ -12,10 +12,16 @@ export default function manifest(): MetadataRoute.Manifest {
     lang: "da",
     icons: [
       {
-        src: "/brand/holdbold-mark-ball.svg",
-        sizes: "any",
-        type: "image/svg+xml",
-        purpose: "maskable"
+        src: "/icon",
+        sizes: "512x512",
+        type: "image/png",
+        purpose: "any"
+      },
+      {
+        src: "/apple-icon",
+        sizes: "180x180",
+        type: "image/png",
+        purpose: "any"
       }
     ]
   };

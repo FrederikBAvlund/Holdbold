@@ -24,8 +24,9 @@ export const metadata: Metadata = {
   applicationName: "Holdbold",
   manifest: "/manifest.webmanifest",
   icons: {
-    icon: "/brand/holdbold-mark-ball.svg",
-    apple: "/brand/holdbold-mark-ball.svg"
+    icon: [{ url: "/icon", type: "image/png" }],
+    apple: [{ url: "/apple-icon", type: "image/png", sizes: "180x180" }],
+    shortcut: [{ url: "/icon", type: "image/png" }]
   },
   appleWebApp: {
     capable: true,

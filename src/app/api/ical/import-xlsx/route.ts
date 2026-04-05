@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import * as XLSX from "xlsx";
 import { authOptions } from "@/lib/auth";
+import { createNotifications } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 
 type Row = Record<string, unknown>;
@@ -191,9 +192,9 @@ export async function POST(request: Request) {
         title: "Kampkalender opdateret",
         body: `${created} nye kampe importeret fra Excel`,
         link: "/dashboard/kalender"
-      }));
+    }));
     if (notifications.length > 0) {
-      await prisma.notification.createMany({ data: notifications });
+      await createNotifications(notifications);
     }
   }
 
