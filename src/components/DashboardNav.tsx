@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 
@@ -83,6 +83,9 @@ export default function DashboardNav() {
   const { data: session } = useSession();
   const [unreadCount, setUnreadCount] = useState(0);
   const pathname = usePathname();
+  const sessionUserId = session?.user?.id;
+  const lastUnreadLoadRef = useRef<{ key: string; at: number } | null>(null);
+  const unreadInFlightRef = useRef<Promise<void> | null>(null);
 
   const initials = useMemo(() => {
     const source = session?.user?.name?.trim() ?? "";
@@ -94,24 +97,55 @@ export default function DashboardNav() {
       .join("");
   }, [session?.user?.name]);
 
-  useEffect(() => {
-    let timer: NodeJS.Timeout | null = null;
+  const loadCount = useCallback(async (reason = "default") => {
+    if (!sessionUserId) return;
+    const key = `${sessionUserId}:${reason}`;
+    const now = Date.now();
+    const last = lastUnreadLoadRef.current;
+    if (last?.key === key && now - last.at < 1200) return;
+    if (unreadInFlightRef.current) return unreadInFlightRef.current;
+    lastUnreadLoadRef.current = { key, at: now };
 
-    async function loadCount() {
-      if (!session?.user?.id) return;
-      const response = await fetch("/api/notifications/unread-count", { cache: "no-store" });
-      if (!response.ok) return;
-      const data = await response.json();
-      setUnreadCount(data.count ?? 0);
+    unreadInFlightRef.current = (async () => {
+      try {
+        const response = await fetch("/api/notifications/unread-count", { cache: "no-store" });
+        if (!response.ok) return;
+        const data = await response.json();
+        setUnreadCount(data.count ?? 0);
+      } finally {
+        unreadInFlightRef.current = null;
+      }
+    })();
+
+    return unreadInFlightRef.current;
+  }, [sessionUserId]);
+
+  useEffect(() => {
+    if (!sessionUserId) return;
+    loadCount(`route:${pathname}`);
+  }, [sessionUserId, pathname, loadCount]);
+
+  useEffect(() => {
+    if (!sessionUserId) return;
+
+    function onFocus() {
+      loadCount("focus");
     }
 
-    loadCount();
-    timer = setInterval(loadCount, 30000);
+    function onVisibilityChange() {
+      if (!document.hidden) {
+        loadCount("visibility");
+      }
+    }
+
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibilityChange);
 
     return () => {
-      if (timer) clearInterval(timer);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
     };
-  }, [session?.user?.id]);
+  }, [sessionUserId, loadCount]);
 
   useEffect(() => {
     function onUnreadUpdate(event: Event) {

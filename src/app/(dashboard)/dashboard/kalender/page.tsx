@@ -82,6 +82,11 @@ export default function KalenderPage() {
   const { data: session, status: sessionStatus } = useSession();
   const [range, setRange] = useState<{ start: string; end: string } | null>(null);
   const lastRangeRef = useRef<{ start: string; end: string } | null>(null);
+  const defaultTeamLoadedForUserRef = useRef<string | null>(null);
+  const loadedMembersKeyRef = useRef<string | null>(null);
+  const loadedCalendarKeyRef = useRef<string | null>(null);
+  const loadedSeriesKeyRef = useRef<string | null>(null);
+  const loadedFineTemplatesKeyRef = useRef<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [viewMode, setViewMode] = useState<"calendar" | "list">("calendar");
   const [teamId, setTeamId] = useState("");
@@ -167,22 +172,32 @@ export default function KalenderPage() {
 
   useEffect(() => {
     async function loadDefaultTeam() {
-      if (!session?.user?.id) return;
+      const sessionUserId = session?.user?.id;
+      if (!sessionUserId) {
+        defaultTeamLoadedForUserRef.current = null;
+        return;
+      }
+      if (defaultTeamLoadedForUserRef.current === sessionUserId) return;
+      defaultTeamLoadedForUserRef.current = sessionUserId;
+
       const response = await fetch("/api/me");
       if (!response.ok) return;
       const data = await response.json();
       const memberships = data.memberships ?? [];
       const firstTeam = memberships[0]?.team?.id;
       if (!firstTeam) return;
-      const isCurrentValid = memberships.some((membership: { team?: { id?: string } }) => membership.team?.id === teamId);
-      if (!teamId || !isCurrentValid) {
+      const currentTeamId = teamId || getStoredTeamId();
+      const isCurrentValid = memberships.some(
+        (membership: { team?: { id?: string } }) => membership.team?.id === currentTeamId
+      );
+      if (!currentTeamId || !isCurrentValid) {
         setTeamId(firstTeam);
         setStoredTeamId(firstTeam);
       }
     }
 
     loadDefaultTeam();
-  }, [teamId, session?.user?.id]);
+  }, [session?.user?.id, teamId]);
   const actingMember = members.find((member) => member.user.id === userId);
   const canManageEvents = actingMember ? adminRoles.includes(actingMember.role) : false;
   const canAssignLateFine = actingMember
@@ -201,6 +216,8 @@ export default function KalenderPage() {
   useEffect(() => {
     async function loadMembers() {
       if (!teamId) return;
+      if (loadedMembersKeyRef.current === teamId) return;
+      loadedMembersKeyRef.current = teamId;
       const response = await fetch(`/api/team-members?teamId=${teamId}`);
       const data = await response.json();
       setMembers(data.members ?? []);
@@ -211,7 +228,10 @@ export default function KalenderPage() {
 
   useEffect(() => {
     async function loadCalendar() {
-      if (!teamId || !range) return;
+      if (!teamId || !range || !userId) return;
+      const key = `${teamId}:${userId}:${range.start}:${range.end}`;
+      if (loadedCalendarKeyRef.current === key) return;
+      loadedCalendarKeyRef.current = key;
       const response = await fetch(
         `/api/calendar?teamId=${teamId}&start=${range.start}&end=${range.end}&userId=${userId}`
       );
@@ -226,6 +246,8 @@ export default function KalenderPage() {
   useEffect(() => {
     async function loadSeries() {
       if (!teamId) return;
+      if (loadedSeriesKeyRef.current === teamId) return;
+      loadedSeriesKeyRef.current = teamId;
       const response = await fetch(`/api/event-series?teamId=${teamId}`);
       const data = await response.json();
       setSeries(data.series ?? []);
@@ -237,6 +259,9 @@ export default function KalenderPage() {
   useEffect(() => {
     async function loadFineTemplates() {
       if (!teamId || !canAssignLateFine) return;
+      const key = `${teamId}:${canAssignLateFine ? "1" : "0"}`;
+      if (loadedFineTemplatesKeyRef.current === key) return;
+      loadedFineTemplatesKeyRef.current = key;
       const response = await fetch(`/api/fine-templates?teamId=${teamId}`, { cache: "no-store" });
       if (!response.ok) return;
       const data = await response.json();
@@ -244,18 +269,17 @@ export default function KalenderPage() {
         (template: FineTemplate) => template.status === "APPROVED" || !template.status
       );
       setFineTemplates(approved);
-      if (!selectedLateFineTemplateId) {
+      setSelectedLateFineTemplateId((prev) => {
+        if (prev) return prev;
         const suggested = approved.find((template: FineTemplate) =>
           template.title.toLowerCase().includes("for sen")
         );
-        if (suggested) {
-          setSelectedLateFineTemplateId(suggested.id);
-        }
-      }
+        return suggested?.id ?? "";
+      });
     }
 
     loadFineTemplates();
-  }, [teamId, canAssignLateFine, selectedLateFineTemplateId]);
+  }, [teamId, canAssignLateFine]);
 
   const calendarEvents = useMemo(() => {
     return events.map((eventItem) => ({

@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
 import { getStoredTeamId, setStoredTeamId } from "@/components/appState";
 import { Combobox } from "@/components/ui/combobox";
@@ -186,6 +186,14 @@ export default function BoderPage() {
   const { data: session, status: sessionStatus } = useSession();
   const [teamId, setTeamId] = useState("");
   const [userId, setUserId] = useState("");
+  const defaultTeamLoadedForUserRef = useRef<string | null>(null);
+  const loadedMembersKeyRef = useRef<string | null>(null);
+  const loadedTemplatesKeyRef = useRef<string | null>(null);
+  const loadedMyFinesKeyRef = useRef<string | null>(null);
+  const loadedTeamFinesKeyRef = useRef<string | null>(null);
+  const loadedTeamInfoKeyRef = useRef<string | null>(null);
+  const loadedPendingPaymentsKeyRef = useRef<string | null>(null);
+  const loadedCollectionsKeyRef = useRef<string | null>(null);
 
   const [members, setMembers] = useState<Member[]>([]);
   const [templates, setTemplates] = useState<FineTemplate[]>([]);
@@ -235,22 +243,32 @@ export default function BoderPage() {
 
   useEffect(() => {
     async function loadDefaultTeam() {
-      if (!session?.user?.id) return;
+      const sessionUserId = session?.user?.id;
+      if (!sessionUserId) {
+        defaultTeamLoadedForUserRef.current = null;
+        return;
+      }
+      if (defaultTeamLoadedForUserRef.current === sessionUserId) return;
+      defaultTeamLoadedForUserRef.current = sessionUserId;
+
       const response = await fetch("/api/me");
       if (!response.ok) return;
       const data = await response.json();
       const memberships = data.memberships ?? [];
       const firstTeam = memberships[0]?.team?.id;
       if (!firstTeam) return;
-      const isCurrentValid = memberships.some((membership: { team?: { id?: string } }) => membership.team?.id === teamId);
-      if (!teamId || !isCurrentValid) {
+      const currentTeamId = teamId || getStoredTeamId();
+      const isCurrentValid = memberships.some(
+        (membership: { team?: { id?: string } }) => membership.team?.id === currentTeamId
+      );
+      if (!currentTeamId || !isCurrentValid) {
         setTeamId(firstTeam);
         setStoredTeamId(firstTeam);
       }
     }
 
     loadDefaultTeam();
-  }, [teamId, session?.user?.id]);
+  }, [session?.user?.id, teamId]);
   const actingMember = members.find((member) => member.user.id === userId);
   const canManageFines = actingMember ? fineRoles.includes(actingMember.role) : false;
   const isAdmin = actingMember?.role === "ADMIN";
@@ -258,6 +276,8 @@ export default function BoderPage() {
   useEffect(() => {
     async function loadMembers() {
       if (!teamId) return;
+      if (loadedMembersKeyRef.current === teamId) return;
+      loadedMembersKeyRef.current = teamId;
       const response = await fetch(`/api/team-members?teamId=${teamId}`);
       const data = await response.json();
       setMembers(data.members ?? []);
@@ -269,6 +289,8 @@ export default function BoderPage() {
   useEffect(() => {
     async function loadTemplates() {
       if (!teamId) return;
+      if (loadedTemplatesKeyRef.current === teamId) return;
+      loadedTemplatesKeyRef.current = teamId;
       const response = await fetch(`/api/fine-templates?teamId=${teamId}`);
       const data = await response.json();
       setTemplates(data.templates ?? []);
@@ -280,6 +302,9 @@ export default function BoderPage() {
   useEffect(() => {
     async function loadFines() {
       if (!teamId || !userId) return;
+      const key = `${teamId}:${userId}`;
+      if (loadedMyFinesKeyRef.current === key) return;
+      loadedMyFinesKeyRef.current = key;
       const response = await fetch(`/api/fines?teamId=${teamId}&userId=${userId}`);
       const data = await response.json();
       setFines(data.fines ?? []);
@@ -291,6 +316,8 @@ export default function BoderPage() {
   useEffect(() => {
     async function loadTeamFines() {
       if (!teamId) return;
+      if (loadedTeamFinesKeyRef.current === teamId) return;
+      loadedTeamFinesKeyRef.current = teamId;
       const response = await fetch(`/api/fines?teamId=${teamId}`);
       const data = await response.json();
       setTeamFines(data.fines ?? []);
@@ -302,6 +329,8 @@ export default function BoderPage() {
   useEffect(() => {
     async function loadTeamInfo() {
       if (!teamId) return;
+      if (loadedTeamInfoKeyRef.current === teamId) return;
+      loadedTeamInfoKeyRef.current = teamId;
       const response = await fetch(`/api/team/${teamId}`, { cache: "no-store" });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) return;
@@ -317,6 +346,9 @@ export default function BoderPage() {
         setPendingPayments([]);
         return;
       }
+      const key = `${teamId}:${isAdmin ? "1" : "0"}`;
+      if (loadedPendingPaymentsKeyRef.current === key) return;
+      loadedPendingPaymentsKeyRef.current = key;
       const response = await fetch(`/api/fines/payments/pending?teamId=${teamId}`, { cache: "no-store" });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
@@ -335,6 +367,9 @@ export default function BoderPage() {
         setCollections([]);
         return;
       }
+      const key = `${teamId}:${canManageFines ? "1" : "0"}`;
+      if (loadedCollectionsKeyRef.current === key) return;
+      loadedCollectionsKeyRef.current = key;
       const response = await fetch(`/api/fines/collections?teamId=${teamId}`, { cache: "no-store" });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {

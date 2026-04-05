@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { getStoredTeamId, setStoredTeamId } from "@/components/appState";
@@ -40,6 +40,10 @@ export default function DashboardHome() {
   const [eventCounts, setEventCounts] = useState<Record<string, { in: number; out: number; missing: number }>>({});
   const [memberCount, setMemberCount] = useState(0);
   const [totalFines, setTotalFines] = useState(0);
+  const defaultTeamLoadedForUserRef = useRef<string | null>(null);
+  const loadedMembersKeyRef = useRef<string | null>(null);
+  const loadedNextEventsKeyRef = useRef<string | null>(null);
+  const loadedFinesKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     setTeamId(getStoredTeamId());
@@ -51,26 +55,38 @@ export default function DashboardHome() {
 
   useEffect(() => {
     async function loadDefaultTeam() {
-      if (!session?.user?.id) return;
+      const sessionUserId = session?.user?.id;
+      if (!sessionUserId) {
+        defaultTeamLoadedForUserRef.current = null;
+        return;
+      }
+      if (defaultTeamLoadedForUserRef.current === sessionUserId) return;
+      defaultTeamLoadedForUserRef.current = sessionUserId;
+
       const response = await fetch("/api/me");
       if (!response.ok) return;
       const data = await response.json();
       const memberships = data.memberships ?? [];
       const firstTeam = memberships[0]?.team?.id;
       if (!firstTeam) return;
-      const isCurrentValid = memberships.some((membership: { team?: { id?: string } }) => membership.team?.id === teamId);
-      if (!teamId || !isCurrentValid) {
+      const currentTeamId = teamId || getStoredTeamId();
+      const isCurrentValid = memberships.some(
+        (membership: { team?: { id?: string } }) => membership.team?.id === currentTeamId
+      );
+      if (!currentTeamId || !isCurrentValid) {
         setTeamId(firstTeam);
         setStoredTeamId(firstTeam);
       }
     }
 
     loadDefaultTeam();
-  }, [teamId, session?.user?.id]);
+  }, [session?.user?.id, teamId]);
 
   useEffect(() => {
     async function loadMembers() {
       if (!teamId) return;
+      if (loadedMembersKeyRef.current === teamId) return;
+      loadedMembersKeyRef.current = teamId;
       const response = await fetch(`/api/team-members?teamId=${teamId}`);
       const data = await response.json();
       setMemberCount((data.members ?? []).length);
@@ -82,6 +98,10 @@ export default function DashboardHome() {
   useEffect(() => {
     async function loadNextEvents() {
       if (!teamId || !userId) return;
+      const key = `${teamId}:${userId}`;
+      if (loadedNextEventsKeyRef.current === key) return;
+      loadedNextEventsKeyRef.current = key;
+
       const now = new Date();
       const end = new Date(now);
       end.setDate(end.getDate() + 90);
@@ -148,11 +168,28 @@ export default function DashboardHome() {
     }
 
     loadNextEvents();
-  }, [teamId, userId, memberCount]);
+  }, [teamId, userId]);
+
+  useEffect(() => {
+    if (memberCount <= 0) return;
+    setEventCounts((prev) => {
+      let changed = false;
+      const next: Record<string, { in: number; out: number; missing: number }> = {};
+      for (const [eventId, counts] of Object.entries(prev)) {
+        const missing = Math.max(memberCount - counts.in - counts.out, 0);
+        if (missing !== counts.missing) changed = true;
+        next[eventId] = { ...counts, missing };
+      }
+      return changed ? next : prev;
+    });
+  }, [memberCount]);
 
   useEffect(() => {
     async function loadFines() {
       if (!teamId || !userId) return;
+      const key = `${teamId}:${userId}`;
+      if (loadedFinesKeyRef.current === key) return;
+      loadedFinesKeyRef.current = key;
       const response = await fetch(`/api/fines?teamId=${teamId}&userId=${userId}`);
       const data = await response.json();
       const list: FineItem[] = data.fines ?? [];

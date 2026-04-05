@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 
@@ -26,10 +26,18 @@ export default function NotifikationerPage() {
   const { data: session, status: sessionStatus } = useSession();
   const [items, setItems] = useState<NotificationItem[]>([]);
   const router = useRouter();
+  const loadedForUserRef = useRef<string | null>(null);
 
   useEffect(() => {
     async function loadNotifications() {
-      if (!session?.user?.id) return;
+      const sessionUserId = session?.user?.id;
+      if (!sessionUserId) {
+        loadedForUserRef.current = null;
+        return;
+      }
+      if (loadedForUserRef.current === sessionUserId) return;
+      loadedForUserRef.current = sessionUserId;
+
       const response = await fetch("/api/notifications", { cache: "no-store" });
       if (!response.ok) return;
       const data = await response.json();
