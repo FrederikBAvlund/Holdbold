@@ -12,6 +12,7 @@ enum Role {
   ADMIN
   TRAENER
   SPILLER
+  SOME
   BOEDEKASSEFORMAND
 }
 
@@ -94,6 +95,8 @@ model User {
   createdSeries EventSeries[]
   createdEvents Event[]      @relation("EventCreatedBy")
   canceledEvents Event[]     @relation("EventCanceledBy")
+  eventsWithThingDuty Event[] @relation("EventThingCarrier")
+  eventsWithBeerDuty Event[]  @relation("EventBeerCarrier")
   createdFineRules FineRule[]
   createdFineTemplates FineTemplate[]
   approvedFineTemplates FineTemplate[] @relation("FineTemplateApprover")
@@ -178,6 +181,8 @@ model Event {
   createdById    String?
   canceledAt     DateTime?
   canceledById   String?
+  thingCarrierId String?
+  beerCarrierId  String?
   createdAt      DateTime     @default(now())
 
   team Team @relation(fields: [teamId], references: [id])
@@ -185,6 +190,8 @@ model Event {
   feed IcalFeed? @relation(fields: [feedId], references: [id])
   createdBy User? @relation("EventCreatedBy", fields: [createdById], references: [id])
   canceledBy User? @relation("EventCanceledBy", fields: [canceledById], references: [id])
+  thingCarrier User? @relation("EventThingCarrier", fields: [thingCarrierId], references: [id])
+  beerCarrier User? @relation("EventBeerCarrier", fields: [beerCarrierId], references: [id])
   signups Signup[]
   fines Fine[]
   signupLogs SignupLog[]
@@ -193,6 +200,8 @@ model Event {
   @@index([teamId, date])
   @@index([externalUid])
   @@index([canceledAt])
+  @@index([thingCarrierId])
+  @@index([beerCarrierId])
 }
 
 model EventLog {

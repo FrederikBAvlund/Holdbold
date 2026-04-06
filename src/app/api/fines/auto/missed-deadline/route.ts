@@ -36,7 +36,7 @@ export async function POST(request: Request) {
   }
 
   const members = await prisma.membership.findMany({
-    where: { teamId: body.teamId, role: "SPILLER" },
+    where: { teamId: body.teamId, status: "ACTIVE", role: { not: "SOME" } },
     include: { user: true }
   });
 

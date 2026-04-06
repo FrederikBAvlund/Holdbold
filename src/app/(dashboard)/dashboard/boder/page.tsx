@@ -88,6 +88,7 @@ const roleLabel: Record<string, string> = {
   ADMIN: "Admin",
   TRAENER: "Træner",
   SPILLER: "Spiller",
+  SOME: "SoMe",
   BOEDEKASSEFORMAND: "Bødekasse"
 };
 

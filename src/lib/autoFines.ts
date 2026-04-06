@@ -4,7 +4,7 @@ import { createNotifications } from "@/lib/notifications";
 const MISSED_SIGNUP_TEMPLATE_TITLE = "Ikke skrive sig til/fra på opslag";
 const MISSED_SIGNUP_TEMPLATE_AMOUNT = 20;
 
-async function getOrCreateMissedSignupTemplate(teamId: string) {
+export async function getOrCreateMissedSignupTemplate(teamId: string) {
   const existing = await prisma.fineTemplate.findFirst({
     where: {
       teamId,
@@ -51,8 +51,8 @@ export async function processMissedSignupFines(teamId: string) {
   const [template, players, managers, dueEvents] = await Promise.all([
     getOrCreateMissedSignupTemplate(teamId),
     prisma.membership.findMany({
-      where: { teamId, status: "ACTIVE", role: "SPILLER" },
-      select: { userId: true }
+      where: { teamId, status: "ACTIVE", role: { not: "SOME" } },
+      select: { userId: true, role: true }
     }),
     prisma.membership.findMany({
       where: { teamId, status: "ACTIVE", role: { in: ["ADMIN", "BOEDEKASSEFORMAND"] } },
@@ -100,6 +100,7 @@ export async function processMissedSignupFines(teamId: string) {
     }
 
     const candidateUserIds = players
+      .filter((member) => member.role !== "SOME")
       .map((member) => member.userId)
       .filter((targetUserId) => {
         const status = statusByUser.get(targetUserId);

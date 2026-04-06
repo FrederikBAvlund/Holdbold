@@ -6,7 +6,7 @@ import { createNotifications } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 
 const updateSchema = z.object({
-  role: z.enum(["ADMIN", "TRAENER", "SPILLER", "BOEDEKASSEFORMAND"]).optional(),
+  role: z.enum(["ADMIN", "TRAENER", "SPILLER", "SOME", "BOEDEKASSEFORMAND"]).optional(),
   status: z.enum(["PENDING", "ACTIVE"]).optional()
 }).refine((value) => value.role || value.status, {
   message: "role eller status er påkrævet"

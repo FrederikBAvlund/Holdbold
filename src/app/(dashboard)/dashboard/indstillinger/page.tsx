@@ -36,6 +36,7 @@ const roleLabels: Record<string, string> = {
   ADMIN: "Admin",
   TRAENER: "Træner",
   SPILLER: "Spiller",
+  SOME: "SoMe",
   BOEDEKASSEFORMAND: "Bødekasseformand"
 };
 
@@ -1088,6 +1089,7 @@ export default function IndstillingerPage() {
                     <option value="ADMIN">Admin</option>
                     <option value="TRAENER">Træner</option>
                     <option value="SPILLER">Spiller</option>
+                    <option value="SOME">SoMe</option>
                     <option value="BOEDEKASSEFORMAND">Bødekasseformand</option>
                   </select>
                 </div>

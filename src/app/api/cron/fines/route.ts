@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { processDueFineCollections } from "@/lib/fineCollections";
 import { processMissedSignupFines } from "@/lib/autoFines";
 import { processUpcomingSignupDeadlineReminders } from "@/lib/deadlineReminders";
+import { processEventDutyReminders } from "@/lib/eventDutyReminders";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +31,8 @@ export async function GET(request: Request) {
     teamsProcessed: 0,
     collectionSuggestionsCreated: 0,
     missedSignupSuggestionsCreated: 0,
-    signupDeadlineRemindersSent: 0
+    signupDeadlineRemindersSent: 0,
+    eventDutyRemindersSent: 0
   };
 
   for (const team of teams) {
@@ -60,6 +62,9 @@ export async function GET(request: Request) {
 
     const reminderResult = await processUpcomingSignupDeadlineReminders(team.id);
     result.signupDeadlineRemindersSent += reminderResult.notificationsCreated;
+
+    const dutyReminderResult = await processEventDutyReminders(team.id);
+    result.eventDutyRemindersSent += dutyReminderResult.notificationsCreated;
   }
 
   return NextResponse.json({

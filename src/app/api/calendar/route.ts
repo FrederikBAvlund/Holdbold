@@ -101,7 +101,16 @@ export async function GET(request: Request) {
     where: { teamId: parsed.teamId }
   });
 
-  const occurrences = [] as Array<{ id: string; title: string; date: Date; location: string; source: string; seriesId: string }>;
+  const occurrences = [] as Array<{
+    id: string;
+    title: string;
+    date: Date;
+    location: string;
+    source: string;
+    seriesId: string;
+    thingCarrierId: null;
+    beerCarrierId: null;
+  }>;
 
   const eventKeys = new Set(
     events
@@ -126,7 +135,9 @@ export async function GET(request: Request) {
           date: new Date(cursor),
           location: series.location,
           source: "SERIES",
-          seriesId: series.id
+          seriesId: series.id,
+          thingCarrierId: null,
+          beerCarrierId: null
         });
       }
       cursor = nextOccurrence(cursor, series.recurrence, series.interval);
@@ -144,6 +155,8 @@ export async function GET(request: Request) {
       signupDeadline: event.signupDeadline,
       source: event.source,
       seriesId: event.seriesId,
+      thingCarrierId: event.thingCarrierId,
+      beerCarrierId: event.beerCarrierId,
       signupStatus: event.signups?.[0]?.status ?? null,
       canceledAt: event.canceledAt,
       canceledByName: event.canceledBy?.name ?? null

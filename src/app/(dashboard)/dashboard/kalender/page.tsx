@@ -23,6 +23,8 @@ type CalendarEvent = {
   signupDeadline?: string | null;
   source: string;
   seriesId?: string | null;
+  thingCarrierId?: string | null;
+  beerCarrierId?: string | null;
   signupStatus?: string | null;
   canceledAt?: string | null;
   canceledByName?: string | null;
@@ -72,6 +74,8 @@ type CachedEventDetails = {
   eventDeadlineAt: string | null;
   editableMeetingAt: string;
   editableDeadlineAt: string;
+  editableThingCarrierId: string;
+  editableBeerCarrierId: string;
   eventSignups: EventSignup[];
   logs: SignupLog[];
   eventLogs: EventLog[];
@@ -351,6 +355,8 @@ export default function KalenderPage() {
         signupDeadline: eventItem.signupDeadline ?? null,
         source: eventItem.source,
         seriesId: eventItem.seriesId ?? null,
+        thingCarrierId: eventItem.thingCarrierId ?? null,
+        beerCarrierId: eventItem.beerCarrierId ?? null,
         signupStatus: eventItem.signupStatus ?? null,
         canceledAt: eventItem.canceledAt ?? null,
         canceledByName: eventItem.canceledByName ?? null
@@ -371,6 +377,8 @@ export default function KalenderPage() {
   const [eventDeadlineAt, setEventDeadlineAt] = useState<string | null>(null);
   const [editableMeetingAt, setEditableMeetingAt] = useState("");
   const [editableDeadlineAt, setEditableDeadlineAt] = useState("");
+  const [editableThingCarrierId, setEditableThingCarrierId] = useState("");
+  const [editableBeerCarrierId, setEditableBeerCarrierId] = useState("");
   const [savingMatchMeta, setSavingMatchMeta] = useState(false);
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -477,6 +485,8 @@ export default function KalenderPage() {
       const fallbackMeetingIso = new Date(new Date(eventItem.date).getTime() - 60 * 60 * 1000).toISOString();
       setEditableMeetingAt(toDateTimeLocalValue(eventItem.meetingTime ?? fallbackMeetingIso));
       setEditableDeadlineAt(toDateTimeLocalValue(eventItem.signupDeadline ?? null));
+      setEditableThingCarrierId(eventItem.thingCarrierId ?? "");
+      setEditableBeerCarrierId(eventItem.beerCarrierId ?? "");
       setReason("");
       setError(null);
       setEventSignups([]);
@@ -509,6 +519,8 @@ export default function KalenderPage() {
         setEventDeadlineAt(cachedDetails.eventDeadlineAt);
         setEditableMeetingAt(cachedDetails.editableMeetingAt);
         setEditableDeadlineAt(cachedDetails.editableDeadlineAt);
+        setEditableThingCarrierId(cachedDetails.editableThingCarrierId);
+        setEditableBeerCarrierId(cachedDetails.editableBeerCarrierId);
         setEventSignups(cachedDetails.eventSignups);
         setLogs(cachedDetails.logs);
         setEventLogs(canManageEvents ? cachedDetails.eventLogs : []);
@@ -543,8 +555,19 @@ export default function KalenderPage() {
       const meetingValue = statusData.event?.meetingTime ?? resolvedFallbackMeetingIso;
       setEditableDeadlineAt(toDateTimeLocalValue(statusData.event?.signupDeadline ?? null));
       setEditableMeetingAt(toDateTimeLocalValue(meetingValue));
+      setEditableThingCarrierId(statusData.event?.thingCarrierId ?? "");
+      setEditableBeerCarrierId(statusData.event?.beerCarrierId ?? "");
       if (statusData.event?.source) {
-        setSelectedEvent((prev) => (prev ? { ...prev, source: statusData.event.source } : prev));
+        setSelectedEvent((prev) =>
+          prev
+            ? {
+                ...prev,
+                source: statusData.event.source,
+                thingCarrierId: statusData.event?.thingCarrierId ?? prev.thingCarrierId ?? null,
+                beerCarrierId: statusData.event?.beerCarrierId ?? prev.beerCarrierId ?? null
+              }
+            : prev
+        );
       }
       if (
         statusData.signup?.status === "IN" ||
@@ -570,6 +593,8 @@ export default function KalenderPage() {
         eventDeadlineAt: statusData.event?.signupDeadline ?? null,
         editableMeetingAt: toDateTimeLocalValue(meetingValue),
         editableDeadlineAt: toDateTimeLocalValue(statusData.event?.signupDeadline ?? null),
+        editableThingCarrierId: statusData.event?.thingCarrierId ?? "",
+        editableBeerCarrierId: statusData.event?.beerCarrierId ?? "",
         eventSignups: signupsData.signups ?? [],
         logs: logData.logs ?? [],
         eventLogs: logData.eventLogs ?? []
@@ -599,6 +624,8 @@ export default function KalenderPage() {
       location: currentParams.get("focusLocation") ?? "",
       source: currentParams.get("focusSource") ?? "MANUAL",
       seriesId: currentParams.get("focusSeriesId"),
+      thingCarrierId: null,
+      beerCarrierId: null,
       meetingTime: null,
       signupDeadline: null,
       signupStatus: null,
@@ -624,12 +651,13 @@ export default function KalenderPage() {
   const isMatchEvent = selectedEvent?.source === "ICAL";
   const canViewMatchMeta = Boolean(isMatchEvent);
   const canEditMatchMeta = Boolean(isMatchEvent && canAssignLateFine && eventIdForSignup);
+  const canEditEventDuties = Boolean(eventIdForSignup);
   const isDeadlinePassed = Boolean(
     eventDeadlineAt && new Date(eventDeadlineAt).getTime() <= Date.now()
   );
 
   async function saveMatchMeta() {
-    if (!canEditMatchMeta || !eventIdForSignup) return;
+    if (!eventIdForSignup) return;
     const meetingValue = editableMeetingAt.trim();
     const deadlineValue = editableDeadlineAt.trim();
     const meetingDate = meetingValue ? new Date(meetingValue) : null;
@@ -644,10 +672,21 @@ export default function KalenderPage() {
       return;
     }
 
-    const payload: { meetingTime?: string | null; signupDeadline?: string } = {};
-    payload.meetingTime = meetingDate ? meetingDate.toISOString() : null;
-    if (!isDeadlinePassed && deadlineDate) {
-      payload.signupDeadline = deadlineDate.toISOString();
+    const payload: {
+      meetingTime?: string | null;
+      signupDeadline?: string;
+      thingCarrierId?: string | null;
+      beerCarrierId?: string | null;
+    } = {
+      thingCarrierId: editableThingCarrierId.trim() || null,
+      beerCarrierId: editableBeerCarrierId.trim() || null
+    };
+
+    if (canEditMatchMeta) {
+      payload.meetingTime = meetingDate ? meetingDate.toISOString() : null;
+      if (!isDeadlinePassed && deadlineDate) {
+        payload.signupDeadline = deadlineDate.toISOString();
+      }
     }
 
     setSavingMatchMeta(true);
@@ -665,22 +704,39 @@ export default function KalenderPage() {
 
       const nextMeeting = data.event?.meetingTime ?? null;
       const nextDeadline = data.event?.signupDeadline ?? eventDeadlineAt;
+      const nextThingCarrierId = data.event?.thingCarrierId ?? "";
+      const nextBeerCarrierId = data.event?.beerCarrierId ?? "";
       setEventDeadlineAt(nextDeadline);
       setEditableMeetingAt(toDateTimeLocalValue(nextMeeting));
       setEditableDeadlineAt(toDateTimeLocalValue(nextDeadline));
+      setEditableThingCarrierId(nextThingCarrierId);
+      setEditableBeerCarrierId(nextBeerCarrierId);
       setEvents((prev) =>
         prev.map((item) =>
           item.id === eventIdForSignup || item.id === selectedEvent?.id
             ? {
                 ...item,
                 meetingTime: nextMeeting,
-                signupDeadline: nextDeadline
+                signupDeadline: nextDeadline,
+                thingCarrierId: nextThingCarrierId || null,
+                beerCarrierId: nextBeerCarrierId || null
               }
             : item
         )
       );
+      setSelectedEvent((prev) =>
+        prev
+          ? {
+              ...prev,
+              meetingTime: nextMeeting,
+              signupDeadline: nextDeadline,
+              thingCarrierId: nextThingCarrierId || null,
+              beerCarrierId: nextBeerCarrierId || null
+            }
+          : prev
+      );
       eventDetailsCacheRef.current.delete(eventIdForSignup);
-      pushToast("Kampdetaljer opdateret", "success");
+      pushToast("Begivenhed opdateret", "success");
     } finally {
       setSavingMatchMeta(false);
     }
@@ -732,6 +788,8 @@ export default function KalenderPage() {
           eventDeadlineAt,
           editableMeetingAt,
           editableDeadlineAt,
+          editableThingCarrierId,
+          editableBeerCarrierId,
           eventSignups: signupsData.signups ?? [],
           logs: logData.logs ?? [],
           eventLogs: logData.eventLogs ?? []
@@ -854,6 +912,7 @@ export default function KalenderPage() {
     const now = Date.now();
 
     for (const member of members) {
+      if (member.role === "SOME") continue;
       const status = signupMap.get(member.user.id);
       const latestLog = latestLogByUser.get(member.user.id);
       const latestAt = latestLog ? new Date(latestLog.createdAt).getTime() : null;
@@ -1038,6 +1097,8 @@ export default function KalenderPage() {
                     signupDeadline: info.event.extendedProps.signupDeadline ?? null,
                     source: String(info.event.extendedProps.source ?? "MANUAL"),
                     seriesId: info.event.extendedProps.seriesId ?? null,
+                    thingCarrierId: info.event.extendedProps.thingCarrierId ?? null,
+                    beerCarrierId: info.event.extendedProps.beerCarrierId ?? null,
                     signupStatus: info.event.extendedProps.signupStatus ?? null,
                     canceledAt: info.event.extendedProps.canceledAt ?? null,
                     canceledByName: info.event.extendedProps.canceledByName ?? null
@@ -1371,6 +1432,50 @@ export default function KalenderPage() {
                       </button>
                     </div>
                   ) : null}
+                </div>
+              ) : null}
+              {canEditEventDuties ? (
+                <div className="rounded-2xl border border-ink/10 bg-white/90 p-4">
+                  <p className="label">Praktisk</p>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <label className="label" htmlFor="thing-carrier">Tingene</label>
+                      <select
+                        id="thing-carrier"
+                        className="input"
+                        value={editableThingCarrierId}
+                        onChange={(event) => setEditableThingCarrierId(event.target.value)}
+                      >
+                        <option value="">Ingen valgt</option>
+                        {members.map((member) => (
+                          <option key={`thing-${member.user.id}`} value={member.user.id}>
+                            {member.user.name ?? "Ukendt"}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="label" htmlFor="beer-carrier">Øl</label>
+                      <select
+                        id="beer-carrier"
+                        className="input"
+                        value={editableBeerCarrierId}
+                        onChange={(event) => setEditableBeerCarrierId(event.target.value)}
+                      >
+                        <option value="">Ingen valgt</option>
+                        {members.map((member) => (
+                          <option key={`beer-${member.user.id}`} value={member.user.id}>
+                            {member.user.name ?? "Ukendt"}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex items-center justify-end">
+                    <button className="btn-primary" type="button" onClick={saveMatchMeta} disabled={savingMatchMeta}>
+                      {savingMatchMeta ? "Gemmer..." : "Gem opgaver"}
+                    </button>
+                  </div>
                 </div>
               ) : null}
               <div className="flex gap-2">
