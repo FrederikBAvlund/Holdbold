@@ -20,7 +20,7 @@ export async function processDueFineCollections(teamId: string) {
     },
     include: {
       template: {
-        select: { id: true, title: true, amount: true }
+        select: { id: true, title: true, amount: true, description: true }
       }
     },
     orderBy: { createdAt: "asc" },
@@ -69,6 +69,7 @@ export async function processDueFineCollections(teamId: string) {
         templateId: collection.template.id,
         amount: collection.template.amount,
         reason: collection.template.title,
+        description: collection.template.description ?? null,
         // Automated bøder oprettes som forslag, så en bødekasseformand/admin skal godkende dem.
         status: "FORESLAET" as const,
         createdById: null,

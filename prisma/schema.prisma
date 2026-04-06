@@ -299,6 +299,7 @@ model Fine {
   templateId    String?
   amount        Int
   reason        String
+  description   String?
   status        FineStatus @default(UNPAID)
   createdById   String?
   createdByLabel String?

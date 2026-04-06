@@ -36,6 +36,7 @@ type FineItem = {
   id: string;
   amount: number;
   reason: string;
+  description?: string | null;
   status: string;
   createdAt: string;
   createdById?: string | null;
@@ -216,7 +217,8 @@ export default function BoderPage() {
 
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
   const [fineAmount, setFineAmount] = useState(50);
-  const [fineReason, setFineReason] = useState("");
+  const [fineTitle, setFineTitle] = useState("");
+  const [fineDescription, setFineDescription] = useState("");
 
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [memberSearch, setMemberSearch] = useState("");
@@ -503,7 +505,8 @@ export default function BoderPage() {
         payloadBase.templateId = selectedTemplateId;
       } else {
         payloadBase.amount = Number(fineAmount);
-        payloadBase.reason = fineReason;
+        payloadBase.title = fineTitle;
+        payloadBase.description = fineDescription || undefined;
       }
 
       const responses = await Promise.all(
@@ -525,6 +528,11 @@ export default function BoderPage() {
       pushToast(canManageFines ? "Bøder tildelt" : "Bøder foreslået", "success");
       setShowAssignModal(false);
       setSelectedUserIds([]);
+      setMemberSearch("");
+      setSelectedTemplateId("");
+      setFineAmount(20);
+      setFineTitle("");
+      setFineDescription("");
       await refreshFinesAndApprovals();
     } finally {
       setAssignFineSubmitting(false);
@@ -826,6 +834,8 @@ export default function BoderPage() {
         createdAt: fine.createdAt,
         kindLabel: "Bøde",
         title: fine.reason,
+        description: fine.description ?? null,
+        recipientLabel: fine.user?.name ? `Tildelt til ${fine.user.name}` : null,
         amount: fine.amount,
         statusLabel,
         actorLabel
@@ -853,6 +863,8 @@ export default function BoderPage() {
         createdAt: template.createdAt,
         kindLabel: "Skabelon",
         title: template.title,
+        description: template.description ?? null,
+        recipientLabel: null,
         amount: template.amount,
         statusLabel,
         actorLabel
@@ -1021,6 +1033,7 @@ export default function BoderPage() {
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <p className="text-sm font-semibold text-ink">{fine.reason}</p>
+                    {fine.description ? <p className="text-xs text-ink/65">{fine.description}</p> : null}
                     <p className="text-xs text-ink/60">
                       {new Date(fine.createdAt).toLocaleDateString("da-DK")} · {creatorLabel(fine)}
                     </p>
@@ -1178,9 +1191,15 @@ export default function BoderPage() {
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <p className="text-sm font-semibold text-ink">{requestItem.title}</p>
+                      {requestItem.description ? (
+                        <p className="text-xs text-ink/65">{requestItem.description}</p>
+                      ) : null}
                       <p className="text-xs text-ink/60">
                         {requestItem.kindLabel} · {new Date(requestItem.createdAt).toLocaleDateString("da-DK")}
                       </p>
+                      {requestItem.recipientLabel ? (
+                        <p className="text-xs text-ink/60">{requestItem.recipientLabel}</p>
+                      ) : null}
                       {requestItem.actorLabel ? (
                         <p className="text-xs text-ink/60">{requestItem.actorLabel}</p>
                       ) : null}
@@ -1527,6 +1546,7 @@ export default function BoderPage() {
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div>
                         <p className="text-sm font-semibold text-ink">{fine.reason}</p>
+                        {fine.description ? <p className="text-xs text-ink/65">{fine.description}</p> : null}
                         <p className="text-xs text-ink/60">
                           {new Date(fine.createdAt).toLocaleString("da-DK")} · {creatorLabel(fine)}
                         </p>
@@ -1676,6 +1696,9 @@ export default function BoderPage() {
             setSelectedUserIds([]);
             setMemberSearch("");
             setSelectedTemplateId("");
+            setFineAmount(20);
+            setFineTitle("");
+            setFineDescription("");
           }}
         >
           <div className="modal-panel assign-panel max-w-lg" onClick={(event) => event.stopPropagation()}>
@@ -1694,6 +1717,9 @@ export default function BoderPage() {
                   setSelectedUserIds([]);
                   setMemberSearch("");
                   setSelectedTemplateId("");
+                  setFineAmount(20);
+                  setFineTitle("");
+                  setFineDescription("");
                 }}
                 disabled={assignFineSubmitting}
               >
@@ -1799,14 +1825,24 @@ export default function BoderPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="label" htmlFor="fine-reason">Årsag</label>
+                    <label className="label" htmlFor="fine-title">Titel</label>
                     <input
-                      id="fine-reason"
-                      value={fineReason}
-                      onChange={(event) => setFineReason(event.target.value)}
-                      placeholder="Årsag"
+                      id="fine-title"
+                      value={fineTitle}
+                      onChange={(event) => setFineTitle(event.target.value)}
+                      placeholder="Titel"
                       className="input"
                       required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="label" htmlFor="fine-description">Beskrivelse</label>
+                    <input
+                      id="fine-description"
+                      value={fineDescription}
+                      onChange={(event) => setFineDescription(event.target.value)}
+                      placeholder="Beskrivelse (valgfri)"
+                      className="input"
                     />
                   </div>
                 </>

@@ -17,7 +17,8 @@ async function getOrCreateMissedSignupTemplate(teamId: string) {
     select: {
       id: true,
       title: true,
-      amount: true
+      amount: true,
+      description: true
     }
   });
 
@@ -35,7 +36,8 @@ async function getOrCreateMissedSignupTemplate(teamId: string) {
     select: {
       id: true,
       title: true,
-      amount: true
+      amount: true,
+      description: true
     }
   });
 
@@ -131,6 +133,7 @@ export async function processMissedSignupFines(teamId: string) {
         templateId: template.id,
         amount: template.amount,
         reason: template.title,
+        description: template.description ?? null,
         status: "FORESLAET" as const,
         createdById: null,
         createdByLabel: "System"
@@ -153,4 +156,3 @@ export async function processMissedSignupFines(teamId: string) {
 
   return { created: totalCreated, events: dueEvents.length };
 }
-

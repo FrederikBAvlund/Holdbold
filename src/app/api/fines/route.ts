@@ -15,7 +15,9 @@ const createSchema = z.object({
   teamId: z.string().min(1),
   userId: z.string().min(1),
   amount: z.number().int().positive().optional(),
+  title: z.string().min(1).optional(),
   reason: z.string().min(1).optional(),
+  description: z.string().trim().optional(),
   templateId: z.string().min(1).optional(),
   eventId: z.string().optional()
 });
@@ -81,12 +83,13 @@ export async function POST(request: Request) {
   const json = await request.json();
   const body = createSchema.parse(json);
 
-  if (!body.templateId && (!body.amount || !body.reason)) {
-    return NextResponse.json({ error: "Der mangler belob eller aarsag" }, { status: 400 });
+  if (!body.templateId && (!body.amount || (!body.title && !body.reason))) {
+    return NextResponse.json({ error: "Der mangler beløb eller titel" }, { status: 400 });
   }
 
   let amount = body.amount ?? 0;
-  let reason = body.reason ?? "";
+  let reason = body.title ?? body.reason ?? "";
+  let description = body.description?.trim() || null;
   const actingMembership = await prisma.membership.findFirst({
     where: { teamId: body.teamId, userId: session.user.id, status: "ACTIVE" },
     select: { role: true }
@@ -120,6 +123,7 @@ export async function POST(request: Request) {
     }
     amount = template.amount;
     reason = template.title;
+    description = template.description?.trim() || null;
     templateId = template.id;
   }
 
@@ -131,6 +135,7 @@ export async function POST(request: Request) {
       templateId,
       amount,
       reason,
+      description,
       status,
       createdById: session.user.id,
       createdByLabel: null

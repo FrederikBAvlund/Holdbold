@@ -59,6 +59,7 @@ export async function POST(request: Request) {
         eventId: event.id,
         amount: rule.amount,
         reason: rule.name,
+        description: null,
         status: "FORESLAET",
         createdById: null,
         createdByLabel: "System"
