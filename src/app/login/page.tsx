@@ -6,6 +6,8 @@ import { useEffect, useMemo, useState } from "react";
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [identifier, setIdentifier] = useState("");
 
   const errorMessages = useMemo(
     () =>
@@ -19,12 +21,23 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const code = new URLSearchParams(window.location.search).get("error");
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("error");
+    const noticeCode = params.get("notice");
+    const emailFromQuery = params.get("email");
     if (!code) {
       setError(null);
-      return;
+    } else {
+      setError(errorMessages[code] ?? "Login mislykkedes. Prøv igen.");
     }
-    setError(errorMessages[code] ?? "Login mislykkedes. Prøv igen.");
+    if (noticeCode === "pending_approval") {
+      setNotice("Din bruger er oprettet. En administrator skal godkende dig, før du kan logge ind.");
+    } else {
+      setNotice(null);
+    }
+    if (emailFromQuery) {
+      setIdentifier(emailFromQuery.toLowerCase());
+    }
   }, [errorMessages]);
 
   function getCallbackUrl() {
@@ -72,6 +85,11 @@ export default function LoginPage() {
               {error}
             </p>
           ) : null}
+          {notice ? (
+            <p className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800">
+              {notice}
+            </p>
+          ) : null}
 
           <form onSubmit={handleCredentials} className="mt-6 space-y-4">
             <input
@@ -84,6 +102,8 @@ export default function LoginPage() {
               autoCapitalize="none"
               autoCorrect="off"
               spellCheck={false}
+              value={identifier}
+              onChange={(event) => setIdentifier(event.target.value.toLowerCase())}
               required
             />
             <input name="password" type="password" placeholder="Adgangskode" className="input" required />

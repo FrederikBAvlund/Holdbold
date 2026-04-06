@@ -60,7 +60,7 @@ export async function POST(request: Request) {
         amount: rule.amount,
         reason: rule.name,
         status: "FORESLAET",
-        createdById: body.createdById,
+        createdById: null,
         createdByLabel: "System"
       }
     });
@@ -70,28 +70,20 @@ export async function POST(request: Request) {
       select: { userId: true }
     });
 
-    const notifications = [
-      {
-        userId: member.userId,
+    const notifications = managers
+      .filter((manager) => manager.userId !== member.userId)
+      .map((manager) => ({
+        userId: manager.userId,
         teamId: body.teamId,
-        type: "FINE_SYSTEM" as const,
-        title: "Automatisk bøde",
+        type: "FINE_PROPOSED" as const,
+        title: "System foreslår bøde",
         body: `${fine.reason} · ${fine.amount} kr`,
         link: "/dashboard/boder"
-      },
-      ...managers
-        .filter((manager) => manager.userId !== member.userId)
-        .map((manager) => ({
-          userId: manager.userId,
-          teamId: body.teamId,
-          type: "FINE_SYSTEM" as const,
-          title: "Automatisk bøde",
-          body: `${fine.reason} · ${fine.amount} kr`,
-          link: "/dashboard/boder"
-        }))
-    ];
+      }));
 
-    await createNotifications(notifications);
+    if (notifications.length > 0) {
+      await createNotifications(notifications);
+    }
     created += 1;
   }
 

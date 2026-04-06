@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 export default function SignupPage() {
+  const router = useRouter();
   const [slugFromLink, setSlugFromLink] = useState("");
   const slugLocked = slugFromLink.length > 0;
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -56,7 +58,8 @@ export default function SignupPage() {
         setFieldErrors(data?.fieldErrors ?? {});
         setMessage(data?.error ?? `Kunne ikke oprette bruger (${response.status})`);
       } else {
-        setMessage(data?.message ?? "Bruger oprettet. Afventer godkendelse fra admin.");
+        const encodedEmail = encodeURIComponent(email.trim().toLowerCase());
+        router.push(`/login?notice=pending_approval&email=${encodedEmail}`);
       }
     } catch {
       setMessage("Kunne ikke oprette bruger");

@@ -167,8 +167,13 @@ a {
   .input {
     @apply w-full rounded-2xl border bg-white/70 px-4 py-3 text-[15px] shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] transition;
     min-height: 50px;
+    min-width: 0;
     border-color: color-mix(in srgb, var(--color-ink) 12%, transparent);
     color: var(--color-ink);
+  }
+
+  input[type="datetime-local"].input {
+    max-width: 100%;
   }
 
   .input:focus {

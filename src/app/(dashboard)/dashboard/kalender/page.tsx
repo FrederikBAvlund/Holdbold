@@ -96,6 +96,14 @@ export default function KalenderPage() {
   const [eventSignups, setEventSignups] = useState<EventSignup[]>([]);
   const [fineTemplates, setFineTemplates] = useState<FineTemplate[]>([]);
   const [selectedLateFineTemplateId, setSelectedLateFineTemplateId] = useState("");
+  const [loadingCalendar, setLoadingCalendar] = useState(true);
+  const [creatingEvent, setCreatingEvent] = useState(false);
+  const [openingEventId, setOpeningEventId] = useState<string | null>(null);
+  const [signupSubmitting, setSignupSubmitting] = useState<"IN" | "OUT" | null>(null);
+  const [cancelSubmitting, setCancelSubmitting] = useState(false);
+  const [reopenSubmitting, setReopenSubmitting] = useState(false);
+  const [lateFineSubmitting, setLateFineSubmitting] = useState(false);
+  const [updatingSeriesId, setUpdatingSeriesId] = useState<string | null>(null);
 
   const [showModal, setShowModal] = useState(false);
   const [title, setTitle] = useState("");
@@ -235,17 +243,32 @@ export default function KalenderPage() {
   }, [teamId]);
 
   useEffect(() => {
+    if (viewMode !== "list" || range) return;
+    const start = new Date();
+    const end = new Date();
+    end.setDate(end.getDate() + 180);
+    const next = { start: start.toISOString(), end: end.toISOString() };
+    lastRangeRef.current = next;
+    setRange(next);
+  }, [viewMode, range]);
+
+  useEffect(() => {
     async function loadCalendar() {
       if (!teamId || !range || !userId) return;
       const key = `${teamId}:${userId}:${range.start}:${range.end}`;
       if (loadedCalendarKeyRef.current === key) return;
       loadedCalendarKeyRef.current = key;
-      const response = await fetch(
-        `/api/calendar?teamId=${teamId}&start=${range.start}&end=${range.end}&userId=${userId}`
-      );
-      const data = await response.json();
-      const combined = [...(data.events ?? []), ...(data.occurrences ?? [])];
-      setEvents(combined);
+      setLoadingCalendar(true);
+      try {
+        const response = await fetch(
+          `/api/calendar?teamId=${teamId}&start=${range.start}&end=${range.end}&userId=${userId}`
+        );
+        const data = await response.json();
+        const combined = [...(data.events ?? []), ...(data.occurrences ?? [])];
+        setEvents(combined);
+      } finally {
+        setLoadingCalendar(false);
+      }
     }
 
     loadCalendar();
@@ -368,113 +391,129 @@ export default function KalenderPage() {
   async function handleCreateSeries(event: React.FormEvent) {
     event.preventDefault();
     if (!teamId || !userId) return;
+    if (creatingEvent) return;
     const startIso = toIsoFromLocalDateTime(startDate);
     if (!startIso) {
       pushToast("Ugyldigt starttidspunkt", "error");
       return;
     }
+    setCreatingEvent(true);
+    try {
+      const response =
+        recurrence === "ONCE"
+          ? await fetch("/api/events", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                teamId,
+                title,
+                location,
+                date: new Date(startIso).toISOString(),
+                signupDeadline: new Date(new Date(startIso).getTime() - deadlineHours * 60 * 60 * 1000).toISOString(),
+                createdById: userId
+              })
+            })
+          : await fetch("/api/event-series", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                teamId,
+                title,
+                location,
+                startDate: startIso,
+                recurrence,
+                interval,
+                endDate: toIsoEndOfLocalDay(endDate) ?? undefined,
+                signupDeadlineHoursBefore: deadlineHours,
+                createdById: userId
+              })
+            });
 
-    if (recurrence === "ONCE") {
-      const start = new Date(startIso);
-      const deadline = new Date(start.getTime() - deadlineHours * 60 * 60 * 1000);
-      await fetch("/api/events", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          teamId,
-          title,
-          location,
-          date: start.toISOString(),
-          signupDeadline: deadline.toISOString(),
-          createdById: userId
-        })
-      });
-    } else {
-      const endIso = toIsoEndOfLocalDay(endDate);
-      await fetch("/api/event-series", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          teamId,
-          title,
-          location,
-          startDate: startIso,
-          recurrence,
-          interval,
-          endDate: endIso ?? undefined,
-          signupDeadlineHoursBefore: deadlineHours,
-          createdById: userId
-        })
-      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        pushToast(data.error ?? "Kunne ikke oprette begivenhed", "error");
+        return;
+      }
+
+      pushToast(recurrence === "ONCE" ? "Begivenhed oprettet" : "Gentagelse oprettet", "success");
+      setShowModal(false);
+      setTitle("");
+      setLocation("");
+      setStartDate("");
+      setEndDate("");
+      setDeadlineHours(24);
+      loadedSeriesKeyRef.current = null;
+      loadedCalendarKeyRef.current = null;
+    } finally {
+      setCreatingEvent(false);
     }
-
-    setShowModal(false);
-    setTitle("");
-    setLocation("");
-    setStartDate("");
-    setEndDate("");
-    setDeadlineHours(24);
   }
 
   async function openEvent(eventItem: CalendarEvent) {
-    setSelectedEvent(eventItem);
-    setSignupStatus("UNKNOWN");
-    setEventIdForSignup(null);
-    setEventDeadlineAt(null);
-    setEditableMeetingAt("");
-    setEditableDeadlineAt("");
-    setReason("");
-    setError(null);
-    setEventSignups([]);
-
+    if (openingEventId) return;
     if (!teamId || !userId) return;
+    setOpeningEventId(eventItem.id);
+    try {
+      setSelectedEvent(eventItem);
+      setSignupStatus("UNKNOWN");
+      setEventIdForSignup(null);
+      setEventDeadlineAt(null);
+      setEditableMeetingAt("");
+      setEditableDeadlineAt("");
+      setReason("");
+      setError(null);
+      setEventSignups([]);
 
-    let eventId = eventItem.id;
-    if (eventItem.id.startsWith("series:")) {
-      const response = await fetch("/api/events/materialize", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          teamId,
-          seriesId: eventItem.seriesId,
-          date: eventItem.date
-        })
-      });
-      const data = await response.json();
-      if (response.ok) {
-        eventId = data.event.id;
+      let eventId = eventItem.id;
+      if (eventItem.id.startsWith("series:")) {
+        const response = await fetch("/api/events/materialize", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            teamId,
+            seriesId: eventItem.seriesId,
+            date: eventItem.date,
+            createdById: userId
+          })
+        });
+        const data = await response.json();
+        if (response.ok) {
+          eventId = data.event.id;
+        }
       }
-    }
 
-    setEventIdForSignup(eventId);
-    const statusResponse = await fetch(`/api/events/${eventId}/signup?userId=${userId}`);
-    const statusData = await statusResponse.json();
-    if (statusData.event?.signupDeadline) {
-      setEventDeadlineAt(statusData.event.signupDeadline);
-    }
-    const fallbackMeetingIso = statusData.event?.date
-      ? new Date(new Date(statusData.event.date).getTime() - 60 * 60 * 1000).toISOString()
-      : null;
-    const meetingValue = statusData.event?.meetingTime ?? fallbackMeetingIso;
-    setEditableDeadlineAt(toDateTimeLocalValue(statusData.event?.signupDeadline ?? null));
-    setEditableMeetingAt(toDateTimeLocalValue(meetingValue));
-    if (statusData.event?.source) {
-      setSelectedEvent((prev) => (prev ? { ...prev, source: statusData.event.source } : prev));
-    }
-    if (statusData.signup?.status) {
-      setSignupStatus(statusData.signup.status);
-      setReason(statusData.signup.reason ?? "");
-      setSelectedEvent((prev) => (prev ? { ...prev, signupStatus: statusData.signup.status } : prev));
-    }
+      setEventIdForSignup(eventId);
+      const statusResponse = await fetch(`/api/events/${eventId}/signup?userId=${userId}`);
+      const statusData = await statusResponse.json();
+      if (statusData.event?.signupDeadline) {
+        setEventDeadlineAt(statusData.event.signupDeadline);
+      }
+      const fallbackMeetingIso = statusData.event?.date
+        ? new Date(new Date(statusData.event.date).getTime() - 60 * 60 * 1000).toISOString()
+        : null;
+      const meetingValue = statusData.event?.meetingTime ?? fallbackMeetingIso;
+      setEditableDeadlineAt(toDateTimeLocalValue(statusData.event?.signupDeadline ?? null));
+      setEditableMeetingAt(toDateTimeLocalValue(meetingValue));
+      if (statusData.event?.source) {
+        setSelectedEvent((prev) => (prev ? { ...prev, source: statusData.event.source } : prev));
+      }
+      if (statusData.signup?.status) {
+        setSignupStatus(statusData.signup.status);
+        setReason(statusData.signup.reason ?? "");
+        setSelectedEvent((prev) => (prev ? { ...prev, signupStatus: statusData.signup.status } : prev));
+      }
 
-    const signupsResponse = await fetch(`/api/events/${eventId}/signups`, { cache: "no-store" });
-    const signupsData = await signupsResponse.json();
-    setEventSignups(signupsData.signups ?? []);
+      const signupsResponse = await fetch(`/api/events/${eventId}/signups`, { cache: "no-store" });
+      const signupsData = await signupsResponse.json();
+      setEventSignups(signupsData.signups ?? []);
 
-    const logResponse = await fetch(`/api/events/${eventId}/signup/logs`, { cache: "no-store" });
-    const logData = await logResponse.json();
-    setLogs(logData.logs ?? []);
-    setEventLogs(canManageEvents ? (logData.eventLogs ?? []) : []);
+      const logResponse = await fetch(`/api/events/${eventId}/signup/logs`, { cache: "no-store" });
+      const logData = await logResponse.json();
+      setLogs(logData.logs ?? []);
+      setEventLogs(canManageEvents ? (logData.eventLogs ?? []) : []);
+    } finally {
+      setOpeningEventId(null);
+    }
   }
 
   useEffect(() => {
@@ -585,90 +624,113 @@ export default function KalenderPage() {
   async function setSignup(status: "IN" | "OUT") {
     if (selectedEvent?.canceledAt) return;
     if (!eventIdForSignup || !userId) return;
+    if (signupSubmitting) return;
     if (status === "OUT" && reason.trim().length < 2) {
       setError("Skriv venligst hvorfor du ikke kan komme.");
       pushToast("Skriv venligst hvorfor du ikke kan komme.", "error");
       return;
     }
-    const response = await fetch(`/api/events/${eventIdForSignup}/signup`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId, status, reason: status === "OUT" ? reason : undefined })
-    });
-    if (!response.ok) {
-      pushToast("Kunne ikke gemme tilmelding", "error");
-      return;
+    setSignupSubmitting(status);
+    try {
+      const response = await fetch(`/api/events/${eventIdForSignup}/signup`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, status, reason: status === "OUT" ? reason : undefined })
+      });
+      if (!response.ok) {
+        pushToast("Kunne ikke gemme tilmelding", "error");
+        return;
+      }
+      setSignupStatus(status);
+      setError(null);
+      setSelectedEvent((prev) => (prev ? { ...prev, signupStatus: status } : prev));
+      setEvents((prev) =>
+        prev.map((eventItem) => {
+          if (eventItem.id === eventIdForSignup || eventItem.id === selectedEvent?.id) {
+            return { ...eventItem, signupStatus: status };
+          }
+          return eventItem;
+        })
+      );
+      const signupsResponse = await fetch(`/api/events/${eventIdForSignup}/signups`, { cache: "no-store" });
+      const signupsData = await signupsResponse.json();
+      setEventSignups(signupsData.signups ?? []);
+      if (eventIdForSignup) {
+        const logResponse = await fetch(`/api/events/${eventIdForSignup}/signup/logs`, { cache: "no-store" });
+        const logData = await logResponse.json();
+        setLogs(logData.logs ?? []);
+        setEventLogs(canManageEvents ? (logData.eventLogs ?? []) : []);
+      }
+      pushToast(status === "IN" ? "Du er tilmeldt" : "Du er frameldt", "success");
+    } finally {
+      setSignupSubmitting(null);
     }
-    setSignupStatus(status);
-    setError(null);
-    setSelectedEvent((prev) => (prev ? { ...prev, signupStatus: status } : prev));
-    setEvents((prev) =>
-      prev.map((eventItem) => {
-        if (eventItem.id === eventIdForSignup || eventItem.id === selectedEvent?.id) {
-          return { ...eventItem, signupStatus: status };
-        }
-        return eventItem;
-      })
-    );
-    const signupsResponse = await fetch(`/api/events/${eventIdForSignup}/signups`, { cache: "no-store" });
-    const signupsData = await signupsResponse.json();
-    setEventSignups(signupsData.signups ?? []);
-    if (eventIdForSignup) {
-      const logResponse = await fetch(`/api/events/${eventIdForSignup}/signup/logs`, { cache: "no-store" });
-      const logData = await logResponse.json();
-      setLogs(logData.logs ?? []);
-      setEventLogs(canManageEvents ? (logData.eventLogs ?? []) : []);
-    }
-    pushToast(status === "IN" ? "Du er tilmeldt" : "Du er frameldt", "success");
   }
 
   async function cancelEvent() {
     if (!eventIdForSignup || !canManageEvents) return;
-    const response = await fetch(`/api/events/${eventIdForSignup}/cancel`, { method: "POST" });
-    if (!response.ok) {
-      pushToast("Kunne ikke aflyse begivenhed", "error");
-      return;
+    if (cancelSubmitting) return;
+    setCancelSubmitting(true);
+    try {
+      const response = await fetch(`/api/events/${eventIdForSignup}/cancel`, { method: "POST" });
+      if (!response.ok) {
+        pushToast("Kunne ikke aflyse begivenhed", "error");
+        return;
+      }
+      const data = await response.json();
+      const canceledAt = data.event?.canceledAt ?? new Date().toISOString();
+      const canceledByName = session?.user?.name ?? "Administrator";
+      setSelectedEvent((prev) =>
+        prev ? { ...prev, canceledAt, canceledByName } : prev
+      );
+      setEvents((prev) =>
+        prev.map((eventItem) =>
+          eventItem.id === eventIdForSignup ? { ...eventItem, canceledAt, canceledByName } : eventItem
+        )
+      );
+      pushToast("Begivenhed aflyst", "success");
+    } finally {
+      setCancelSubmitting(false);
     }
-    const data = await response.json();
-    const canceledAt = data.event?.canceledAt ?? new Date().toISOString();
-    const canceledByName = session?.user?.name ?? "Administrator";
-    setSelectedEvent((prev) =>
-      prev ? { ...prev, canceledAt, canceledByName } : prev
-    );
-    setEvents((prev) =>
-      prev.map((eventItem) =>
-        eventItem.id === eventIdForSignup ? { ...eventItem, canceledAt, canceledByName } : eventItem
-      )
-    );
-    pushToast("Begivenhed aflyst", "success");
   }
 
   async function reopenEvent() {
     if (!eventIdForSignup || !canManageEvents) return;
-    const response = await fetch(`/api/events/${eventIdForSignup}/reopen`, { method: "POST" });
-    if (!response.ok) {
-      pushToast("Kunne ikke genåbne begivenhed", "error");
-      return;
+    if (reopenSubmitting) return;
+    setReopenSubmitting(true);
+    try {
+      const response = await fetch(`/api/events/${eventIdForSignup}/reopen`, { method: "POST" });
+      if (!response.ok) {
+        pushToast("Kunne ikke genåbne begivenhed", "error");
+        return;
+      }
+      await response.json();
+      setSelectedEvent((prev) =>
+        prev ? { ...prev, canceledAt: null, canceledByName: null } : prev
+      );
+      setEvents((prev) =>
+        prev.map((eventItem) =>
+          eventItem.id === eventIdForSignup ? { ...eventItem, canceledAt: null, canceledByName: null } : eventItem
+        )
+      );
+      pushToast("Begivenhed genåbnet", "success");
+    } finally {
+      setReopenSubmitting(false);
     }
-    const data = await response.json();
-    setSelectedEvent((prev) =>
-      prev ? { ...prev, canceledAt: null, canceledByName: null } : prev
-    );
-    setEvents((prev) =>
-      prev.map((eventItem) =>
-        eventItem.id === eventIdForSignup ? { ...eventItem, canceledAt: null, canceledByName: null } : eventItem
-      )
-    );
-    pushToast("Begivenhed genåbnet", "success");
   }
 
   async function updateSeriesEndDate(seriesId: string, newEndDate: string) {
-    const endIso = toIsoEndOfLocalDay(newEndDate);
-    await fetch(`/api/event-series/${seriesId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ endDate: endIso })
-    });
+    setUpdatingSeriesId(seriesId);
+    try {
+      const endIso = toIsoEndOfLocalDay(newEndDate);
+      await fetch(`/api/event-series/${seriesId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ endDate: endIso })
+      });
+    } finally {
+      setUpdatingSeriesId((prev) => (prev === seriesId ? null : prev));
+    }
   }
 
   const signupMap = useMemo(() => {
@@ -739,6 +801,7 @@ export default function KalenderPage() {
 
   async function assignLateSignupFine() {
     if (!canAssignLateFine || !teamId || !userId || !eventIdForSignup) return;
+    if (lateFineSubmitting) return;
     if (!selectedLateFineTemplateId) {
       pushToast("Vælg en bødeskabelon først", "error");
       return;
@@ -748,30 +811,35 @@ export default function KalenderPage() {
       return;
     }
 
-    const responses = await Promise.all(
-      lateFineCandidates.map((targetUserId) =>
-        fetch("/api/fines", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            teamId,
-            userId: targetUserId,
-            templateId: selectedLateFineTemplateId,
-            createdById: userId,
-            eventId: eventIdForSignup
+    setLateFineSubmitting(true);
+    try {
+      const responses = await Promise.all(
+        lateFineCandidates.map((targetUserId) =>
+          fetch("/api/fines", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              teamId,
+              userId: targetUserId,
+              templateId: selectedLateFineTemplateId,
+              createdById: userId,
+              eventId: eventIdForSignup
+            })
           })
-        })
-      )
-    );
+        )
+      );
 
-    const failed = responses.find((response) => !response.ok);
-    if (failed) {
-      const data = await failed.json().catch(() => ({}));
-      pushToast(data.error ?? "Kunne ikke oprette bøder", "error");
-      return;
+      const failed = responses.find((response) => !response.ok);
+      if (failed) {
+        const data = await failed.json().catch(() => ({}));
+        pushToast(data.error ?? "Kunne ikke oprette bøder", "error");
+        return;
+      }
+
+      pushToast("Bøder oprettet for spillere efter deadline", "success");
+    } finally {
+      setLateFineSubmitting(false);
     }
-
-    pushToast("Bøder oprettet for spillere efter deadline", "success");
   }
 
   function showListView() {
@@ -845,7 +913,7 @@ export default function KalenderPage() {
               </button>
             </div>
             {canManageEvents ? (
-              <button className="btn-primary" onClick={() => setShowModal(true)}>
+              <button className="btn-primary" onClick={() => setShowModal(true)} disabled={creatingEvent}>
                 Opret begivenhed
               </button>
             ) : null}
@@ -916,7 +984,9 @@ export default function KalenderPage() {
           </div>
         ) : (
           <div className="overflow-hidden rounded-2xl border border-ink/10 bg-white/95">
-            {upcomingEvents.length === 0 ? (
+            {loadingCalendar ? (
+              <p className="p-4 text-sm text-ink/60">Indlæser kommende begivenheder...</p>
+            ) : upcomingEvents.length === 0 ? (
               <p className="p-4 text-sm text-ink/60">Ingen kommende begivenheder.</p>
             ) : (
               <div className="overflow-x-auto">
@@ -953,7 +1023,10 @@ export default function KalenderPage() {
                           className={`cursor-pointer border-t border-ink/10 transition-colors hover:bg-ink/5 ${rowToneClass}`}
                           aria-label={`${eventItem.title} - ${statusLabel}`}
                           title={statusLabel}
-                          onClick={() => openEvent(eventItem)}
+                          onClick={() => {
+                            if (openingEventId) return;
+                            openEvent(eventItem);
+                          }}
                         >
                           <td className="px-4 py-3 text-ink/80">{date.toLocaleDateString("da-DK")}</td>
                           <td className="px-4 py-3 text-ink/80">
@@ -998,6 +1071,7 @@ export default function KalenderPage() {
                         defaultValue={item.endDate ? item.endDate.slice(0, 10) : ""}
                         className="input"
                         onBlur={(event) => updateSeriesEndDate(item.id, event.target.value)}
+                        disabled={updatingSeriesId === item.id}
                       />
                     </div>
                   </div>
@@ -1016,7 +1090,7 @@ export default function KalenderPage() {
                 <h3 className="text-lg font-semibold text-ink">Opret gentagen begivenhed</h3>
                 <p className="mt-2 text-sm text-ink/70">Vælg start, interval og evt. slutdato.</p>
               </div>
-              <button className="btn-ghost" onClick={() => setShowModal(false)}>
+              <button className="btn-ghost" onClick={() => setShowModal(false)} disabled={creatingEvent}>
                 Luk
               </button>
             </div>
@@ -1106,7 +1180,9 @@ export default function KalenderPage() {
                   placeholder="Slutdato (valgfri)"
                 />
               </div>
-              <button className="btn-primary">Opret</button>
+              <button className="btn-primary" disabled={creatingEvent}>
+                {creatingEvent ? "Opretter..." : "Opret"}
+              </button>
             </form>
             {summaryLines.length > 0 ? (
               <div className="mt-4 rounded-2xl border border-ink/10 bg-ink/5 p-3 text-sm text-ink/70">
@@ -1146,12 +1222,12 @@ export default function KalenderPage() {
             <div className="mt-4 space-y-3">
               {canManageEvents ? (
                 selectedEvent.canceledAt ? (
-                  <button className="btn-ghost" onClick={reopenEvent}>
-                    Genåbn begivenhed
+                  <button className="btn-ghost" onClick={reopenEvent} disabled={reopenSubmitting}>
+                    {reopenSubmitting ? "Genåbner..." : "Genåbn begivenhed"}
                   </button>
                 ) : (
-                  <button className="btn-ghost" onClick={cancelEvent}>
-                    Aflys begivenhed
+                  <button className="btn-ghost" onClick={cancelEvent} disabled={cancelSubmitting}>
+                    {cancelSubmitting ? "Aflyser..." : "Aflys begivenhed"}
                   </button>
                 )
               ) : null}
@@ -1159,13 +1235,13 @@ export default function KalenderPage() {
                 <div className="rounded-2xl border border-ink/10 bg-white/90 p-4">
                   <p className="label">Kampdetaljer</p>
                   <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                    <div className="space-y-2">
+                    <div className="min-w-0 space-y-2">
                       <label className="label" htmlFor="meeting-time">Mødetid</label>
                       {canEditMatchMeta ? (
                         <input
                           id="meeting-time"
                           type="datetime-local"
-                          className="input"
+                          className="input min-w-0"
                           value={editableMeetingAt}
                           onChange={(event) => setEditableMeetingAt(event.target.value)}
                         />
@@ -1178,13 +1254,13 @@ export default function KalenderPage() {
                         </div>
                       )}
                     </div>
-                    <div className="space-y-2">
+                    <div className="min-w-0 space-y-2">
                       <label className="label" htmlFor="deadline-time">Svarfrist</label>
                       {canEditMatchMeta ? (
                         <input
                           id="deadline-time"
                           type="datetime-local"
-                          className="input"
+                          className="input min-w-0"
                           value={editableDeadlineAt}
                           onChange={(event) => setEditableDeadlineAt(event.target.value)}
                           readOnly={isDeadlinePassed}
@@ -1225,18 +1301,18 @@ export default function KalenderPage() {
                     signupStatus === "IN" ? "bg-green-600 text-white" : "bg-green-100 text-green-700"
                   } ${selectedEvent?.canceledAt ? "opacity-50 cursor-not-allowed" : ""}`}
                   onClick={() => setSignup("IN")}
-                  disabled={Boolean(selectedEvent?.canceledAt)}
+                  disabled={Boolean(selectedEvent?.canceledAt) || signupSubmitting !== null}
                 >
-                  Jeg kommer
+                  {signupSubmitting === "IN" ? "Gemmer..." : "Jeg kommer"}
                 </button>
                 <button
                   className={`rounded-full px-5 py-3 text-sm font-semibold uppercase tracking-[0.2em] ${
                     signupStatus === "OUT" ? "bg-red-600 text-white" : "bg-red-100 text-red-700"
                   } ${selectedEvent?.canceledAt ? "opacity-50 cursor-not-allowed" : ""}`}
                   onClick={() => setSignup("OUT")}
-                  disabled={Boolean(selectedEvent?.canceledAt)}
+                  disabled={Boolean(selectedEvent?.canceledAt) || signupSubmitting !== null}
                 >
-                  Jeg kan ikke
+                  {signupSubmitting === "OUT" ? "Gemmer..." : "Jeg kan ikke"}
                 </button>
               </div>
               <div className="space-y-2">
@@ -1329,9 +1405,9 @@ export default function KalenderPage() {
                           className="btn-primary"
                           type="button"
                           onClick={assignLateSignupFine}
-                          disabled={!selectedLateFineTemplateId || lateFineCandidates.length === 0}
+                          disabled={!selectedLateFineTemplateId || lateFineCandidates.length === 0 || lateFineSubmitting}
                         >
-                          Giv bøde til {lateFineCandidates.length}
+                          {lateFineSubmitting ? "Opretter..." : `Giv bøde til ${lateFineCandidates.length}`}
                         </button>
                       </div>
                     ) : null}

@@ -69,30 +69,22 @@ export async function processDueFineCollections(teamId: string) {
         templateId: collection.template.id,
         amount: collection.template.amount,
         reason: collection.template.title,
-        status: "UNPAID" as const,
-        createdById: collection.createdById,
+        // Automated bøder oprettes som forslag, så en bødekasseformand/admin skal godkende dem.
+        status: "FORESLAET" as const,
+        createdById: null,
         createdByLabel: "System"
       }))
     });
 
-    const recipientNotifications = debtors.map((debtor) => ({
-      userId: debtor.userId,
-      teamId,
-      type: "FINE_SYSTEM" as const,
-      title: "Daglig bøde tilføjet",
-      body: `${collection.template.title} · ${collection.template.amount} kr`,
-      link: "/dashboard/boder"
-    }));
-
     const managerNotifications = managers.map((manager) => ({
       userId: manager.userId,
       teamId,
-      type: "FINE_SYSTEM" as const,
-      title: "Automatisk bøde uddelt",
-      body: `${debtors.length} spiller(e) har fået ${collection.template.title} (${collection.template.amount} kr).`,
+      type: "FINE_PROPOSED" as const,
+      title: "System foreslår bøder",
+      body: `${debtors.length} spiller(e) mangler betaling. ${collection.template.title} (${collection.template.amount} kr) afventer godkendelse.`,
       link: "/dashboard/boder"
     }));
 
-    await createNotifications([...recipientNotifications, ...managerNotifications]);
+    await createNotifications(managerNotifications);
   }
 }

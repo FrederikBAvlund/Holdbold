@@ -114,6 +114,10 @@ function fineStatusMeta(status: string) {
   };
 }
 
+function canDeleteFine(status: string) {
+  return ["UNPAID", "PAID_PENDING", "FORESLAET", "AFVIST"].includes(status);
+}
+
 function CollapsibleCard({
   title,
   description,
@@ -542,6 +546,17 @@ export default function BoderPage() {
       return;
     }
     pushToast("Bøde afvist", "success");
+    await refreshFinesAndApprovals();
+  }
+
+  async function deleteFine(id: string) {
+    const response = await fetch(`/api/fines/${id}`, { method: "DELETE" });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      pushToast(data.error ?? "Kunne ikke slette bøde", "error");
+      return;
+    }
+    pushToast("Bøde slettet", "success");
     await refreshFinesAndApprovals();
   }
 
@@ -999,6 +1014,11 @@ export default function BoderPage() {
                   <button className="btn-ghost" onClick={() => rejectFine(fine.id)}>
                     Afvis
                   </button>
+                  {canDeleteFine(fine.status) ? (
+                    <button className="btn-ghost" onClick={() => deleteFine(fine.id)}>
+                      Slet
+                    </button>
+                  ) : null}
                 </div>
               </div>
             ))}
@@ -1376,6 +1396,13 @@ export default function BoderPage() {
                         >
                           {fineStatusMeta(fine.status).label}
                         </span>
+                        {canManageFines && canDeleteFine(fine.status) ? (
+                          <div className="mt-2">
+                            <button className="btn-ghost" onClick={() => deleteFine(fine.id)}>
+                              Slet bøde
+                            </button>
+                          </div>
+                        ) : null}
                       </div>
                     </div>
                   </div>

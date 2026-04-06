@@ -40,6 +40,8 @@ export default function DashboardHome() {
   const [eventCounts, setEventCounts] = useState<Record<string, { in: number; out: number; missing: number }>>({});
   const [memberCount, setMemberCount] = useState(0);
   const [totalFines, setTotalFines] = useState(0);
+  const [loadingNextEvents, setLoadingNextEvents] = useState(true);
+  const [loadingFines, setLoadingFines] = useState(true);
   const defaultTeamLoadedForUserRef = useRef<string | null>(null);
   const loadedMembersKeyRef = useRef<string | null>(null);
   const loadedNextEventsKeyRef = useRef<string | null>(null);
@@ -101,70 +103,75 @@ export default function DashboardHome() {
       const key = `${teamId}:${userId}`;
       if (loadedNextEventsKeyRef.current === key) return;
       loadedNextEventsKeyRef.current = key;
+      setLoadingNextEvents(true);
 
-      const now = new Date();
-      const end = new Date(now);
-      end.setDate(end.getDate() + 90);
+      try {
+        const now = new Date();
+        const end = new Date(now);
+        end.setDate(end.getDate() + 90);
 
-      const response = await fetch(
-        `/api/calendar?teamId=${teamId}&start=${now.toISOString()}&end=${end.toISOString()}&userId=${userId}`
-      );
-      if (!response.ok) return;
-      const data = await response.json();
-      const events: CalendarEvent[] = (data.events ?? []).map((event: CalendarEvent) => ({
-        ...event,
-        date: typeof event.date === "string" ? event.date : new Date(event.date).toISOString()
-      }));
-      const occurrences: Occurrence[] = (data.occurrences ?? []).map((occ: Occurrence) => ({
-        ...occ,
-        date: typeof occ.date === "string" ? occ.date : new Date(occ.date).toISOString()
-      }));
-      const upcoming = [
-        ...events.map((item) => ({ ...item, kind: "event" })),
-        ...occurrences.map((item) => ({
-          id: item.id,
-          title: item.title,
-          date: item.date,
-          location: item.location,
-          source: "SERIES",
-          seriesId: item.seriesId,
-          meetingTime: null,
-          signupDeadline: null,
-          signupStatus: null
-        }))
-      ]
-        .filter((item) => new Date(item.date) >= now)
-        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        const response = await fetch(
+          `/api/calendar?teamId=${teamId}&start=${now.toISOString()}&end=${end.toISOString()}&userId=${userId}`
+        );
+        if (!response.ok) return;
+        const data = await response.json();
+        const events: CalendarEvent[] = (data.events ?? []).map((event: CalendarEvent) => ({
+          ...event,
+          date: typeof event.date === "string" ? event.date : new Date(event.date).toISOString()
+        }));
+        const occurrences: Occurrence[] = (data.occurrences ?? []).map((occ: Occurrence) => ({
+          ...occ,
+          date: typeof occ.date === "string" ? occ.date : new Date(occ.date).toISOString()
+        }));
+        const upcoming = [
+          ...events.map((item) => ({ ...item, kind: "event" })),
+          ...occurrences.map((item) => ({
+            id: item.id,
+            title: item.title,
+            date: item.date,
+            location: item.location,
+            source: "SERIES",
+            seriesId: item.seriesId,
+            meetingTime: null,
+            signupDeadline: null,
+            signupStatus: null
+          }))
+        ]
+          .filter((item) => new Date(item.date) >= now)
+          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-      const firstTwo = upcoming.slice(0, 2);
-      setNextEvents(firstTwo);
+        const firstTwo = upcoming.slice(0, 2);
+        setNextEvents(firstTwo);
 
-      if (firstTwo.length === 0) {
-        setEventCounts({});
-        return;
+        if (firstTwo.length === 0) {
+          setEventCounts({});
+          return;
+        }
+
+        const nextCounts: Record<string, { in: number; out: number; missing: number }> = {};
+        await Promise.all(
+          firstTwo.map(async (eventItem) => {
+            if (eventItem.id.startsWith("series:")) {
+              nextCounts[eventItem.id] = { in: 0, out: 0, missing: memberCount };
+              return;
+            }
+            const signupsResponse = await fetch(`/api/events/${eventItem.id}/signups`, { cache: "no-store" });
+            if (!signupsResponse.ok) {
+              nextCounts[eventItem.id] = { in: 0, out: 0, missing: memberCount };
+              return;
+            }
+            const signupsData = await signupsResponse.json();
+            const signups = signupsData.signups ?? [];
+            const inCount = signups.filter((signup: { status: string }) => signup.status === "IN").length;
+            const outCount = signups.filter((signup: { status: string }) => signup.status === "OUT").length;
+            const missingCount = Math.max(memberCount - inCount - outCount, 0);
+            nextCounts[eventItem.id] = { in: inCount, out: outCount, missing: missingCount };
+          })
+        );
+        setEventCounts(nextCounts);
+      } finally {
+        setLoadingNextEvents(false);
       }
-
-      const nextCounts: Record<string, { in: number; out: number; missing: number }> = {};
-      await Promise.all(
-        firstTwo.map(async (eventItem) => {
-          if (eventItem.id.startsWith("series:")) {
-            nextCounts[eventItem.id] = { in: 0, out: 0, missing: memberCount };
-            return;
-          }
-          const signupsResponse = await fetch(`/api/events/${eventItem.id}/signups`, { cache: "no-store" });
-          if (!signupsResponse.ok) {
-            nextCounts[eventItem.id] = { in: 0, out: 0, missing: memberCount };
-            return;
-          }
-          const signupsData = await signupsResponse.json();
-          const signups = signupsData.signups ?? [];
-          const inCount = signups.filter((signup: { status: string }) => signup.status === "IN").length;
-          const outCount = signups.filter((signup: { status: string }) => signup.status === "OUT").length;
-          const missingCount = Math.max(memberCount - inCount - outCount, 0);
-          nextCounts[eventItem.id] = { in: inCount, out: outCount, missing: missingCount };
-        })
-      );
-      setEventCounts(nextCounts);
     }
 
     loadNextEvents();
@@ -190,10 +197,15 @@ export default function DashboardHome() {
       const key = `${teamId}:${userId}`;
       if (loadedFinesKeyRef.current === key) return;
       loadedFinesKeyRef.current = key;
-      const response = await fetch(`/api/fines?teamId=${teamId}&userId=${userId}`);
-      const data = await response.json();
-      const list: FineItem[] = data.fines ?? [];
-      setTotalFines(list.reduce((sum, fine) => sum + fine.amount, 0));
+      setLoadingFines(true);
+      try {
+        const response = await fetch(`/api/fines?teamId=${teamId}&userId=${userId}`);
+        const data = await response.json();
+        const list: FineItem[] = data.fines ?? [];
+        setTotalFines(list.reduce((sum, fine) => sum + fine.amount, 0));
+      } finally {
+        setLoadingFines(false);
+      }
     }
 
     loadFines();
@@ -273,7 +285,9 @@ export default function DashboardHome() {
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="card-soft">
           <h3 className="text-lg font-semibold text-ink">Næste begivenheder</h3>
-          {nextEvents.length > 0 ? (
+          {loadingNextEvents ? (
+            <p className="mt-2 text-sm text-ink/70">Indlæser begivenheder...</p>
+          ) : nextEvents.length > 0 ? (
             <div className="mt-3 space-y-12">
               {nextEvents.map((eventItem) => {
                 const times = formatEventTimes(eventItem);
@@ -330,7 +344,9 @@ export default function DashboardHome() {
         <div className="card-soft">
           <h3 className="text-lg font-semibold text-ink">Mine bøder</h3>
           <p className="mt-2 text-sm text-ink/70">Total skyldsbeløb</p>
-          <div className="mt-4 text-3xl font-semibold text-ink">{totalFines} kr</div>
+          <div className="mt-4 text-3xl font-semibold text-ink">
+            {loadingFines ? "Indlæser..." : `${totalFines} kr`}
+          </div>
         </div>
       </div>
     </section>

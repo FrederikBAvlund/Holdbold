@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { createNotifications } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 
 const bodySchema = z.object({
   teamId: z.string().min(1),
   seriesId: z.string().min(1),
-  date: z.string().datetime()
+  date: z.string().datetime(),
+  createdById: z.string().min(1).optional()
 });
 
 export async function POST(request: Request) {
@@ -45,9 +47,29 @@ export async function POST(request: Request) {
       location: series.location,
       signupDeadline: deadline,
       source: "SERIES",
-      createdById: null
+      createdById: body.createdById ?? null
     }
   });
+
+  const members = await prisma.membership.findMany({
+    where: { teamId: body.teamId, status: "ACTIVE" },
+    select: { userId: true }
+  });
+
+  const notifications = members
+    .filter((member) => member.userId !== body.createdById)
+    .map((member) => ({
+      userId: member.userId,
+      teamId: body.teamId,
+      type: "EVENT" as const,
+      title: `Ny begivenhed: ${event.title}`,
+      body: `${new Date(event.date).toLocaleString("da-DK")} · ${event.location}`,
+      link: "/dashboard/kalender"
+    }));
+
+  if (notifications.length > 0) {
+    await createNotifications(notifications);
+  }
 
   return NextResponse.json({ event });
 }
