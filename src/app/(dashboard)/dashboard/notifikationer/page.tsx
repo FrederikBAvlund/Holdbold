@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
+import LoadingButton from "@/components/LoadingButton";
 
 type NotificationItem = {
   id: string;
@@ -25,6 +26,8 @@ function formatTimestamp(value: string) {
 export default function NotifikationerPage() {
   const { data: session, status: sessionStatus } = useSession();
   const [items, setItems] = useState<NotificationItem[]>([]);
+  const [markAllSubmitting, setMarkAllSubmitting] = useState(false);
+  const [openingNotificationId, setOpeningNotificationId] = useState<string | null>(null);
   const router = useRouter();
   const loadedForUserRef = useRef<string | null>(null);
 
@@ -54,15 +57,23 @@ export default function NotifikationerPage() {
   }, [items]);
 
   async function handleOpen(notification: NotificationItem) {
+    if (openingNotificationId) return;
+    setOpeningNotificationId(notification.id);
     if (!notification.readAt) {
-      const response = await fetch(`/api/notifications/${notification.id}/read`, { method: "POST" });
-      const data = await response.json();
-      setItems((prev) =>
-        prev.map((item) => (item.id === notification.id ? { ...item, readAt: new Date().toISOString() } : item))
-      );
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new CustomEvent("notifications:unread", { detail: data.unreadCount ?? 0 }));
+      try {
+        const response = await fetch(`/api/notifications/${notification.id}/read`, { method: "POST" });
+        const data = await response.json();
+        setItems((prev) =>
+          prev.map((item) => (item.id === notification.id ? { ...item, readAt: new Date().toISOString() } : item))
+        );
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("notifications:unread", { detail: data.unreadCount ?? 0 }));
+        }
+      } finally {
+        setOpeningNotificationId(null);
       }
+    } else {
+      setOpeningNotificationId(null);
     }
     if (notification.link) {
       router.push(notification.link);
@@ -70,11 +81,17 @@ export default function NotifikationerPage() {
   }
 
   async function markAllRead() {
-    const response = await fetch("/api/notifications/read-all", { method: "POST" });
-    const data = await response.json();
-    setItems((prev) => prev.map((item) => ({ ...item, readAt: item.readAt ?? new Date().toISOString() })));
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new CustomEvent("notifications:unread", { detail: data.unreadCount ?? 0 }));
+    if (markAllSubmitting) return;
+    setMarkAllSubmitting(true);
+    try {
+      const response = await fetch("/api/notifications/read-all", { method: "POST" });
+      const data = await response.json();
+      setItems((prev) => prev.map((item) => ({ ...item, readAt: item.readAt ?? new Date().toISOString() })));
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("notifications:unread", { detail: data.unreadCount ?? 0 }));
+      }
+    } finally {
+      setMarkAllSubmitting(false);
     }
   }
 
@@ -104,9 +121,14 @@ export default function NotifikationerPage() {
             <h2 className="text-2xl font-semibold text-ink">Notifikationer</h2>
             <p className="mt-2 text-ink/70">Log over nye begivenheder og bøder.</p>
           </div>
-          <button className="btn-ghost" onClick={markAllRead}>
-            Marker alle som læst
-          </button>
+          <LoadingButton
+            className="btn-ghost"
+            onClick={markAllRead}
+            isLoading={markAllSubmitting}
+            disabled={openingNotificationId !== null}
+            idleContent="Marker alle som læst"
+            loadingContent="Markerer..."
+          />
         </div>
       </header>
 
@@ -119,6 +141,7 @@ export default function NotifikationerPage() {
               <button
                 key={item.id}
                 onClick={() => handleOpen(item)}
+                disabled={openingNotificationId !== null}
                 className="flex w-full items-start gap-3 rounded-2xl border border-ink/10 bg-white/90 px-4 py-3 text-left shadow-sm transition hover:border-ink/30"
               >
                 <span className="mt-1 h-2.5 w-2.5 rounded-full bg-red-500" />
@@ -142,6 +165,7 @@ export default function NotifikationerPage() {
               <button
                 key={item.id}
                 onClick={() => handleOpen(item)}
+                disabled={openingNotificationId !== null}
                 className="flex w-full items-start gap-3 rounded-2xl border border-transparent bg-white/70 px-4 py-3 text-left transition hover:border-ink/20"
               >
                 <span className="mt-1 h-2.5 w-2.5 rounded-full bg-ink/20" />

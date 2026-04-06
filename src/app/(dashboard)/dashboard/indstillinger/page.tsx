@@ -6,6 +6,7 @@ import { setCustomTheme, setTheme } from "@/components/ThemeProvider";
 import { getStoredTeamId, setStoredTeamId } from "@/components/appState";
 import { useToast } from "@/components/ToastProvider";
 import PushSettings from "@/components/PushSettings";
+import LoadingButton from "@/components/LoadingButton";
 
 type Membership = {
   role: string;
@@ -97,6 +98,13 @@ export default function IndstillingerPage() {
   const [xlsxImporting, setXlsxImporting] = useState(false);
   const [xlsxFile, setXlsxFile] = useState<File | null>(null);
   const [icalFeeds, setIcalFeeds] = useState<IcalFeed[]>([]);
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+  const [copyingInviteLink, setCopyingInviteLink] = useState(false);
+  const [savingCustomTheme, setSavingCustomTheme] = useState(false);
+  const [usingTeamTheme, setUsingTeamTheme] = useState(false);
+  const [themeApplyingId, setThemeApplyingId] = useState<string | null>(null);
+  const [memberActionSubmitting, setMemberActionSubmitting] = useState<"approve" | "updateRole" | "delete" | null>(null);
 
   useEffect(() => {
     setTeamId(getStoredTeamId());
@@ -189,7 +197,9 @@ export default function IndstillingerPage() {
     loadIcalFeeds();
   }, [teamId]);
 
-  function handleTheme(theme: string) {
+  async function handleTheme(theme: string) {
+    if (themeApplyingId) return;
+    setThemeApplyingId(theme);
     setActive(theme);
     setHasUserTheme(true);
     if (theme === "custom") {
@@ -197,50 +207,68 @@ export default function IndstillingerPage() {
     } else {
       setTheme(theme);
     }
-    fetch("/api/me", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        themePreset: theme,
-        ...(theme === "custom" ? { themeConfig: customTheme } : {})
-      })
-    }).catch(() => undefined);
+    try {
+      await fetch("/api/me", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          themePreset: theme,
+          ...(theme === "custom" ? { themeConfig: customTheme } : {})
+        })
+      });
+    } catch {
+      pushToast("Kunne ikke gemme tema", "error");
+    } finally {
+      setThemeApplyingId(null);
+    }
   }
 
   async function handleSaveCustomTheme() {
+    if (savingCustomTheme) return;
+    setSavingCustomTheme(true);
     setHasUserTheme(true);
     setCustomTheme(customTheme);
-    await fetch("/api/me", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ themePreset: "custom", themeConfig: customTheme })
-    });
+    try {
+      await fetch("/api/me", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ themePreset: "custom", themeConfig: customTheme })
+      });
+    } finally {
+      setSavingCustomTheme(false);
+    }
   }
 
   async function handleUseTeamTheme() {
-    const response = await fetch("/api/me", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ themePreset: null, themeConfig: null })
-    });
-    if (!response.ok) {
-      pushToast("Kunne ikke skifte til holdets tema", "error");
-      return;
-    }
-    setHasUserTheme(false);
-    if (!teamId) return;
-    const teamResponse = await fetch(`/api/team/${teamId}`);
-    if (!teamResponse.ok) return;
-    const data = await teamResponse.json();
-    setMobilePayBox(data.team?.mobilePayBox ?? "");
-    const theme = data.team?.themePreset ?? "atlantic";
-    setActive(theme);
-    if (theme === "custom") {
-      const config = data.team?.themeConfig ?? customTheme;
-      setCustomThemeState((prev) => ({ ...prev, ...config }));
-      setCustomTheme(config ?? customTheme);
-    } else {
-      setTheme(theme);
+    if (usingTeamTheme) return;
+    setUsingTeamTheme(true);
+    try {
+      const response = await fetch("/api/me", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ themePreset: null, themeConfig: null })
+      });
+      if (!response.ok) {
+        pushToast("Kunne ikke skifte til holdets tema", "error");
+        return;
+      }
+      setHasUserTheme(false);
+      if (!teamId) return;
+      const teamResponse = await fetch(`/api/team/${teamId}`);
+      if (!teamResponse.ok) return;
+      const data = await teamResponse.json();
+      setMobilePayBox(data.team?.mobilePayBox ?? "");
+      const theme = data.team?.themePreset ?? "atlantic";
+      setActive(theme);
+      if (theme === "custom") {
+        const config = data.team?.themeConfig ?? customTheme;
+        setCustomThemeState((prev) => ({ ...prev, ...config }));
+        setCustomTheme(config ?? customTheme);
+      } else {
+        setTheme(theme);
+      }
+    } finally {
+      setUsingTeamTheme(false);
     }
   }
 
@@ -322,6 +350,8 @@ export default function IndstillingerPage() {
 
   async function handleCopySignupLink() {
     if (!inviteSlug) return;
+    if (copyingInviteLink) return;
+    setCopyingInviteLink(true);
     const origin = window.location.origin;
     const inviteUrl = `${origin}/signup?slug=${encodeURIComponent(inviteSlug)}`;
     try {
@@ -340,68 +370,88 @@ export default function IndstillingerPage() {
       pushToast("Invitationslink kopieret", "success");
     } catch {
       pushToast("Kunne ikke kopiere linket", "error");
+    } finally {
+      setCopyingInviteLink(false);
     }
   }
 
   async function handleUpdateRole() {
     if (!selectedMember) return;
-    const response = await fetch(`/api/team-members/${selectedMember.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ role: memberRole })
-    });
-    const data = await response.json();
-    if (!response.ok) {
-      pushToast(data.error ?? "Kunne ikke opdatere rolle", "error");
-      return;
+    if (memberActionSubmitting) return;
+    setMemberActionSubmitting("updateRole");
+    try {
+      const response = await fetch(`/api/team-members/${selectedMember.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role: memberRole })
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        pushToast(data.error ?? "Kunne ikke opdatere rolle", "error");
+        return;
+      }
+      setTeamMembers((prev) => prev.map((m) => (m.id === selectedMember.id ? { ...m, role: data.membership.role } : m)));
+      setSelectedMember((prev) => (prev ? { ...prev, role: data.membership.role } : prev));
+      pushToast("Rolle opdateret", "success");
+    } finally {
+      setMemberActionSubmitting(null);
     }
-    setTeamMembers((prev) => prev.map((m) => (m.id === selectedMember.id ? { ...m, role: data.membership.role } : m)));
-    setSelectedMember((prev) => (prev ? { ...prev, role: data.membership.role } : prev));
-    pushToast("Rolle opdateret", "success");
   }
 
   async function handleApproveMember() {
     if (!selectedMember) return;
-    const response = await fetch(`/api/team-members/${selectedMember.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ role: memberRole, status: "ACTIVE" })
-    });
-    const data = await response.json();
-    if (!response.ok) {
-      pushToast(data.error ?? "Kunne ikke godkende medlem", "error");
-      return;
+    if (memberActionSubmitting) return;
+    setMemberActionSubmitting("approve");
+    try {
+      const response = await fetch(`/api/team-members/${selectedMember.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role: memberRole, status: "ACTIVE" })
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        pushToast(data.error ?? "Kunne ikke godkende medlem", "error");
+        return;
+      }
+      setTeamMembers((prev) =>
+        prev.map((m) =>
+          m.id === selectedMember.id
+            ? { ...m, role: data.membership.role, status: data.membership.status }
+            : m
+        )
+      );
+      setSelectedMember((prev) =>
+        prev
+          ? {
+              ...prev,
+              role: data.membership.role,
+              status: data.membership.status
+            }
+          : prev
+      );
+      pushToast("Medlem godkendt", "success");
+    } finally {
+      setMemberActionSubmitting(null);
     }
-    setTeamMembers((prev) =>
-      prev.map((m) =>
-        m.id === selectedMember.id
-          ? { ...m, role: data.membership.role, status: data.membership.status }
-          : m
-      )
-    );
-    setSelectedMember((prev) =>
-      prev
-        ? {
-            ...prev,
-            role: data.membership.role,
-            status: data.membership.status
-          }
-        : prev
-    );
-    pushToast("Medlem godkendt", "success");
   }
 
   async function handleDeleteMember() {
     if (!selectedMember) return;
-    const response = await fetch(`/api/team-members/${selectedMember.id}`, { method: "DELETE" });
-    const data = await response.json();
-    if (!response.ok) {
-      pushToast(data.error ?? "Kunne ikke fjerne bruger", "error");
-      return;
+    if (memberActionSubmitting) return;
+    setMemberActionSubmitting("delete");
+    try {
+      const response = await fetch(`/api/team-members/${selectedMember.id}`, { method: "DELETE" });
+      const data = await response.json();
+      if (!response.ok) {
+        pushToast(data.error ?? "Kunne ikke fjerne bruger", "error");
+        return;
+      }
+      setTeamMembers((prev) => prev.filter((m) => m.id !== selectedMember.id));
+      setSelectedMember(null);
+      pushToast(data.warning ?? "Bruger fjernet", "success");
+    } finally {
+      setMemberActionSubmitting(null);
     }
-    setTeamMembers((prev) => prev.filter((m) => m.id !== selectedMember.id));
-    setSelectedMember(null);
-    pushToast(data.warning ?? "Bruger fjernet", "success");
   }
 
   function confirmDeleteMember() {
@@ -409,8 +459,15 @@ export default function IndstillingerPage() {
     setShowDeleteConfirm(true);
   }
 
+  async function handleSignOut() {
+    if (signingOut) return;
+    setSigningOut(true);
+    await signOut({ callbackUrl: "/login" });
+  }
+
   async function handleProfileSave(event: React.FormEvent) {
     event.preventDefault();
+    if (profileSaving) return;
     if (newPassword && newPassword.length < 6) {
       pushToast("Ny adgangskode skal være mindst 6 tegn.", "error");
       return;
@@ -420,27 +477,32 @@ export default function IndstillingerPage() {
       return;
     }
 
-    const response = await fetch("/api/me", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: profileName,
-        email: profileEmail ? profileEmail.toLowerCase() : null,
-        currentPassword: currentPassword || undefined,
-        newPassword: newPassword || undefined
-      })
-    });
+    setProfileSaving(true);
+    try {
+      const response = await fetch("/api/me", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: profileName,
+          email: profileEmail ? profileEmail.toLowerCase() : null,
+          currentPassword: currentPassword || undefined,
+          newPassword: newPassword || undefined
+        })
+      });
 
-    const data = await response.json();
-    if (!response.ok) {
-      pushToast(data.error ?? "Kunne ikke opdatere profil", "error");
-      return;
+      const data = await response.json();
+      if (!response.ok) {
+        pushToast(data.error ?? "Kunne ikke opdatere profil", "error");
+        return;
+      }
+
+      pushToast("Profil opdateret.", "success");
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } finally {
+      setProfileSaving(false);
     }
-
-    pushToast("Profil opdateret.", "success");
-    setCurrentPassword("");
-    setNewPassword("");
-    setConfirmPassword("");
   }
 
   async function handleAvatarUpload(file: File | null) {
@@ -598,9 +660,14 @@ export default function IndstillingerPage() {
             <h3 className="text-lg font-semibold text-ink">Profil</h3>
             <p className="mt-2 text-sm text-ink/70">Opdater dine oplysninger og adgangskode.</p>
           </div>
-          <button type="button" className="btn-ghost" onClick={() => signOut({ callbackUrl: "/login" })}>
-            Log ud
-          </button>
+          <LoadingButton
+            type="button"
+            className="btn-ghost"
+            onClick={handleSignOut}
+            isLoading={signingOut}
+            idleContent="Log ud"
+            loadingContent="Logger ud..."
+          />
         </div>
         <form className="mt-4 grid gap-4 lg:grid-cols-2" onSubmit={handleProfileSave}>
           <div className="space-y-2 lg:col-span-2">
@@ -689,9 +756,13 @@ export default function IndstillingerPage() {
             ) : null}
           </div>
           <div className="flex items-end gap-3">
-            <button type="submit" className="btn-primary">
-              Gem profil
-            </button>
+            <LoadingButton
+              type="submit"
+              className="btn-primary"
+              isLoading={profileSaving}
+              idleContent="Gem profil"
+              loadingContent="Gemmer..."
+            />
           </div>
         </form>
       </div>
@@ -721,14 +792,15 @@ export default function IndstillingerPage() {
                     readOnly
                     placeholder="Vælg et hold"
                   />
-                  <button
+                  <LoadingButton
                     type="button"
                     className="btn-ghost"
                     onClick={handleCopySignupLink}
                     disabled={!inviteSlug}
-                  >
-                    Kopiér link
-                  </button>
+                    isLoading={copyingInviteLink}
+                    idleContent="Kopiér link"
+                    loadingContent="Kopierer..."
+                  />
                 </div>
                 <p className="text-xs text-ink/60">
                   Spillere får holdslug udfyldt automatisk og kan ikke ændre den.
@@ -808,19 +880,25 @@ export default function IndstillingerPage() {
               <button
                 key={preset.id}
                 onClick={() => handleTheme(preset.id)}
+                disabled={themeApplyingId !== null}
                 className={`rounded-2xl border px-4 py-3 text-left text-sm font-semibold ${
                   active === preset.id ? "border-ink bg-white" : "border-ink/10 bg-white/70"
                 }`}
               >
-                {preset.label}
+                {themeApplyingId === preset.id ? "Gemmer..." : preset.label}
               </button>
             ))}
           </div>
           {hasUserTheme ? (
             <div className="mt-4">
-              <button type="button" className="btn-ghost" onClick={handleUseTeamTheme}>
-                Brug holdets standardtema
-              </button>
+              <LoadingButton
+                type="button"
+                className="btn-ghost"
+                onClick={handleUseTeamTheme}
+                isLoading={usingTeamTheme}
+                idleContent="Brug holdets standardtema"
+                loadingContent="Skifter..."
+              />
             </div>
           ) : null}
           {isAdmin ? (
@@ -863,9 +941,14 @@ export default function IndstillingerPage() {
                   </label>
                 ))}
               </div>
-              <button type="button" className="btn-primary" onClick={handleSaveCustomTheme}>
-                Gem tilpasset tema
-              </button>
+              <LoadingButton
+                type="button"
+                className="btn-primary"
+                onClick={handleSaveCustomTheme}
+                isLoading={savingCustomTheme}
+                idleContent="Gem tilpasset tema"
+                loadingContent="Gemmer..."
+              />
             </div>
           ) : null}
         </div>
@@ -943,7 +1026,7 @@ export default function IndstillingerPage() {
                 <h3 className="text-lg font-semibold text-ink">{selectedMember.user.name}</h3>
                 <p className="mt-2 text-sm text-ink/70">Medlemsoplysninger</p>
               </div>
-              <button className="btn-ghost" onClick={() => setSelectedMember(null)}>
+              <button className="btn-ghost" onClick={() => setSelectedMember(null)} disabled={memberActionSubmitting !== null}>
                 Luk
               </button>
             </div>
@@ -965,15 +1048,25 @@ export default function IndstillingerPage() {
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {selectedMember.status === "PENDING" ? (
-                    <button className="btn-primary" onClick={handleApproveMember}>
-                      Godkend medlem
-                    </button>
+                    <LoadingButton
+                      className="btn-primary"
+                      onClick={handleApproveMember}
+                      isLoading={memberActionSubmitting === "approve"}
+                      disabled={memberActionSubmitting !== null && memberActionSubmitting !== "approve"}
+                      idleContent="Godkend medlem"
+                      loadingContent="Godkender..."
+                    />
                   ) : (
-                    <button className="btn-primary" onClick={handleUpdateRole}>
-                      Opdater rolle
-                    </button>
+                    <LoadingButton
+                      className="btn-primary"
+                      onClick={handleUpdateRole}
+                      isLoading={memberActionSubmitting === "updateRole"}
+                      disabled={memberActionSubmitting !== null && memberActionSubmitting !== "updateRole"}
+                      idleContent="Opdater rolle"
+                      loadingContent="Opdaterer..."
+                    />
                   )}
-                  <button className="btn-ghost" onClick={confirmDeleteMember}>
+                  <button className="btn-ghost" onClick={confirmDeleteMember} disabled={memberActionSubmitting !== null}>
                     Slet bruger
                   </button>
                 </div>
@@ -993,7 +1086,7 @@ export default function IndstillingerPage() {
                   Er du sikker på, at du vil slette {selectedMember.user.name ?? "brugeren"}?
                 </p>
               </div>
-              <button className="btn-ghost" onClick={() => setShowDeleteConfirm(false)}>
+              <button className="btn-ghost" onClick={() => setShowDeleteConfirm(false)} disabled={memberActionSubmitting !== null}>
                 Luk
               </button>
             </div>
@@ -1001,18 +1094,21 @@ export default function IndstillingerPage() {
               <button
                 className="btn-ghost"
                 onClick={() => setShowDeleteConfirm(false)}
+                disabled={memberActionSubmitting !== null}
               >
                 Fortryd
               </button>
-              <button
+              <LoadingButton
                 className="btn-primary"
                 onClick={async () => {
                   await handleDeleteMember();
                   setShowDeleteConfirm(false);
                 }}
-              >
-                Slet bruger
-              </button>
+                isLoading={memberActionSubmitting === "delete"}
+                disabled={memberActionSubmitting !== null && memberActionSubmitting !== "delete"}
+                idleContent="Slet bruger"
+                loadingContent="Sletter..."
+              />
             </div>
           </div>
         </div>

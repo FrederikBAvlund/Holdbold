@@ -5,6 +5,7 @@ import { useSession } from "next-auth/react";
 import { getStoredTeamId, setStoredTeamId } from "@/components/appState";
 import { Combobox } from "@/components/ui/combobox";
 import { useToast } from "@/components/ToastProvider";
+import LoadingButton from "@/components/LoadingButton";
 
 type FineTemplate = {
   id: string;
@@ -237,6 +238,12 @@ export default function BoderPage() {
   const [assignFineSubmitting, setAssignFineSubmitting] = useState(false);
   const [selectedDebtorUserId, setSelectedDebtorUserId] = useState<string | null>(null);
   const [deletingFineId, setDeletingFineId] = useState<string | null>(null);
+  const [copySubmitting, setCopySubmitting] = useState(false);
+  const [pendingPaymentAction, setPendingPaymentAction] = useState<{ userId: string; action: "approve" | "reject" } | null>(null);
+  const [pendingFineAction, setPendingFineAction] = useState<{ fineId: string; action: "approve" | "reject" } | null>(null);
+  const [pendingTemplateAction, setPendingTemplateAction] = useState<{ templateId: string; action: "approve" | "reject" } | null>(null);
+  const [updateTemplateSubmitting, setUpdateTemplateSubmitting] = useState(false);
+  const [deleteTemplateSubmitting, setDeleteTemplateSubmitting] = useState(false);
 
   useEffect(() => {
     setTeamId(getStoredTeamId());
@@ -549,25 +556,37 @@ export default function BoderPage() {
   }
 
   async function approveFine(id: string) {
-    const response = await fetch(`/api/fines/${id}/approve`, { method: "POST" });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      pushToast(data.error ?? "Kunne ikke godkende bøde", "error");
-      return;
+    if (pendingFineAction) return;
+    setPendingFineAction({ fineId: id, action: "approve" });
+    try {
+      const response = await fetch(`/api/fines/${id}/approve`, { method: "POST" });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        pushToast(data.error ?? "Kunne ikke godkende bøde", "error");
+        return;
+      }
+      pushToast("Bøde godkendt", "success");
+      await refreshFinesAndApprovals();
+    } finally {
+      setPendingFineAction(null);
     }
-    pushToast("Bøde godkendt", "success");
-    await refreshFinesAndApprovals();
   }
 
   async function rejectFine(id: string) {
-    const response = await fetch(`/api/fines/${id}/reject`, { method: "POST" });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      pushToast(data.error ?? "Kunne ikke afvise bøde", "error");
-      return;
+    if (pendingFineAction) return;
+    setPendingFineAction({ fineId: id, action: "reject" });
+    try {
+      const response = await fetch(`/api/fines/${id}/reject`, { method: "POST" });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        pushToast(data.error ?? "Kunne ikke afvise bøde", "error");
+        return;
+      }
+      pushToast("Bøde afvist", "success");
+      await refreshFinesAndApprovals();
+    } finally {
+      setPendingFineAction(null);
     }
-    pushToast("Bøde afvist", "success");
-    await refreshFinesAndApprovals();
   }
 
   async function deleteFine(id: string) {
@@ -588,25 +607,37 @@ export default function BoderPage() {
   }
 
   async function approveTemplate(id: string) {
-    const response = await fetch(`/api/fine-templates/${id}/approve`, { method: "POST" });
-    const data = await response.json();
-    if (!response.ok) {
-      pushToast(data.error ?? "Kunne ikke godkende skabelon", "error");
-      return;
+    if (pendingTemplateAction) return;
+    setPendingTemplateAction({ templateId: id, action: "approve" });
+    try {
+      const response = await fetch(`/api/fine-templates/${id}/approve`, { method: "POST" });
+      const data = await response.json();
+      if (!response.ok) {
+        pushToast(data.error ?? "Kunne ikke godkende skabelon", "error");
+        return;
+      }
+      setTemplates((prev) => prev.map((item) => (item.id === id ? data.template : item)));
+      pushToast("Skabelon godkendt", "success");
+    } finally {
+      setPendingTemplateAction(null);
     }
-    setTemplates((prev) => prev.map((item) => (item.id === id ? data.template : item)));
-    pushToast("Skabelon godkendt", "success");
   }
 
   async function rejectTemplate(id: string) {
-    const response = await fetch(`/api/fine-templates/${id}/reject`, { method: "POST" });
-    const data = await response.json();
-    if (!response.ok) {
-      pushToast(data.error ?? "Kunne ikke afvise skabelon", "error");
-      return;
+    if (pendingTemplateAction) return;
+    setPendingTemplateAction({ templateId: id, action: "reject" });
+    try {
+      const response = await fetch(`/api/fine-templates/${id}/reject`, { method: "POST" });
+      const data = await response.json();
+      if (!response.ok) {
+        pushToast(data.error ?? "Kunne ikke afvise skabelon", "error");
+        return;
+      }
+      setTemplates((prev) => prev.map((item) => (item.id === id ? data.template : item)));
+      pushToast("Skabelon afvist", "success");
+    } finally {
+      setPendingTemplateAction(null);
     }
-    setTemplates((prev) => prev.map((item) => (item.id === id ? data.template : item)));
-    pushToast("Skabelon afvist", "success");
   }
 
   async function handleRequestPaymentApproval() {
@@ -633,43 +664,59 @@ export default function BoderPage() {
 
   async function approvePayment(userIdToApprove: string) {
     if (!teamId) return;
-    const response = await fetch(`/api/fines/payments/${userIdToApprove}/approve`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ teamId })
-    });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      pushToast(data.error ?? "Kunne ikke godkende betaling", "error");
-      return;
+    if (pendingPaymentAction) return;
+    setPendingPaymentAction({ userId: userIdToApprove, action: "approve" });
+    try {
+      const response = await fetch(`/api/fines/payments/${userIdToApprove}/approve`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ teamId })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        pushToast(data.error ?? "Kunne ikke godkende betaling", "error");
+        return;
+      }
+      pushToast("Betaling godkendt", "success");
+      await refreshFinesAndApprovals();
+    } finally {
+      setPendingPaymentAction(null);
     }
-    pushToast("Betaling godkendt", "success");
-    await refreshFinesAndApprovals();
   }
 
   async function rejectPayment(userIdToReject: string) {
     if (!teamId) return;
-    const response = await fetch(`/api/fines/payments/${userIdToReject}/reject`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ teamId })
-    });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      pushToast(data.error ?? "Kunne ikke afvise betaling", "error");
-      return;
+    if (pendingPaymentAction) return;
+    setPendingPaymentAction({ userId: userIdToReject, action: "reject" });
+    try {
+      const response = await fetch(`/api/fines/payments/${userIdToReject}/reject`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ teamId })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        pushToast(data.error ?? "Kunne ikke afvise betaling", "error");
+        return;
+      }
+      pushToast("Betaling afvist", "success");
+      await refreshFinesAndApprovals();
+    } finally {
+      setPendingPaymentAction(null);
     }
-    pushToast("Betaling afvist", "success");
-    await refreshFinesAndApprovals();
   }
 
   async function copyMobilePayBox() {
     if (!teamMobilePayBox) return;
+    if (copySubmitting) return;
+    setCopySubmitting(true);
     try {
       await navigator.clipboard.writeText(teamMobilePayBox);
       pushToast("MobilePay box kopieret", "success");
     } catch {
       pushToast("Kunne ikke kopiere box-nummer", "error");
+    } finally {
+      setCopySubmitting(false);
     }
   }
 
@@ -856,41 +903,53 @@ export default function BoderPage() {
   async function handleUpdateTemplate(event: React.FormEvent) {
     event.preventDefault();
     if (!editingTemplate) return;
-    const response = await fetch(`/api/fine-templates/${editingTemplate.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        title: editTitle,
-        amount: Number(editAmount),
-        category: editCategory,
-        description: editDescription || undefined
-      })
-    });
-    const data = await response.json();
-    if (!response.ok) {
-      pushToast(data.error ?? "Kunne ikke opdatere skabelon", "error");
-      return;
+    if (updateTemplateSubmitting || deleteTemplateSubmitting) return;
+    setUpdateTemplateSubmitting(true);
+    try {
+      const response = await fetch(`/api/fine-templates/${editingTemplate.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: editTitle,
+          amount: Number(editAmount),
+          category: editCategory,
+          description: editDescription || undefined
+        })
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        pushToast(data.error ?? "Kunne ikke opdatere skabelon", "error");
+        return;
+      }
+      setTemplates((prev) => prev.map((item) => (item.id === editingTemplate.id ? data.template : item)));
+      pushToast("Skabelon opdateret", "success");
+      setShowEditModal(false);
+      setEditingTemplate(null);
+    } finally {
+      setUpdateTemplateSubmitting(false);
     }
-    setTemplates((prev) => prev.map((item) => (item.id === editingTemplate.id ? data.template : item)));
-    pushToast("Skabelon opdateret", "success");
-    setShowEditModal(false);
-    setEditingTemplate(null);
   }
 
   async function handleDeleteTemplate() {
     if (!editingTemplate) return;
-    const response = await fetch(`/api/fine-templates/${editingTemplate.id}`, {
-      method: "DELETE"
-    });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      pushToast(data.error ?? "Kunne ikke slette skabelon", "error");
-      return;
+    if (deleteTemplateSubmitting || updateTemplateSubmitting) return;
+    setDeleteTemplateSubmitting(true);
+    try {
+      const response = await fetch(`/api/fine-templates/${editingTemplate.id}`, {
+        method: "DELETE"
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        pushToast(data.error ?? "Kunne ikke slette skabelon", "error");
+        return;
+      }
+      setTemplates((prev) => prev.filter((item) => item.id !== editingTemplate.id));
+      pushToast("Skabelon slettet", "success");
+      setShowEditModal(false);
+      setEditingTemplate(null);
+    } finally {
+      setDeleteTemplateSubmitting(false);
     }
-    setTemplates((prev) => prev.filter((item) => item.id !== editingTemplate.id));
-    pushToast("Skabelon slettet", "success");
-    setShowEditModal(false);
-    setEditingTemplate(null);
   }
 
   if (!teamId || !userId) {
@@ -1003,12 +1062,24 @@ export default function BoderPage() {
                   <div className="text-sm font-semibold text-ink">{payment.total} kr</div>
                 </div>
                 <div className="mt-3 flex gap-2">
-                  <button type="button" className="btn-ghost" onClick={() => approvePayment(payment.userId)}>
-                    Godkend
-                  </button>
-                  <button type="button" className="btn-ghost" onClick={() => rejectPayment(payment.userId)}>
-                    Afvis
-                  </button>
+                  <LoadingButton
+                    type="button"
+                    className="btn-ghost"
+                    onClick={() => approvePayment(payment.userId)}
+                    isLoading={pendingPaymentAction?.userId === payment.userId && pendingPaymentAction.action === "approve"}
+                    disabled={pendingPaymentAction?.userId === payment.userId && pendingPaymentAction.action === "reject"}
+                    idleContent="Godkend"
+                    loadingContent="Godkender..."
+                  />
+                  <LoadingButton
+                    type="button"
+                    className="btn-ghost"
+                    onClick={() => rejectPayment(payment.userId)}
+                    isLoading={pendingPaymentAction?.userId === payment.userId && pendingPaymentAction.action === "reject"}
+                    disabled={pendingPaymentAction?.userId === payment.userId && pendingPaymentAction.action === "approve"}
+                    idleContent="Afvis"
+                    loadingContent="Afviser..."
+                  />
                 </div>
               </div>
             ))}
@@ -1035,12 +1106,22 @@ export default function BoderPage() {
                   <div className="text-sm font-semibold text-ink">{fine.amount} kr</div>
                 </div>
                 <div className="mt-3 flex gap-2">
-                  <button className="btn-ghost" onClick={() => approveFine(fine.id)}>
-                    Godkend
-                  </button>
-                  <button className="btn-ghost" onClick={() => rejectFine(fine.id)}>
-                    Afvis
-                  </button>
+                  <LoadingButton
+                    className="btn-ghost"
+                    onClick={() => approveFine(fine.id)}
+                    isLoading={pendingFineAction?.fineId === fine.id && pendingFineAction.action === "approve"}
+                    disabled={pendingFineAction?.fineId === fine.id && pendingFineAction.action === "reject"}
+                    idleContent="Godkend"
+                    loadingContent="Godkender..."
+                  />
+                  <LoadingButton
+                    className="btn-ghost"
+                    onClick={() => rejectFine(fine.id)}
+                    isLoading={pendingFineAction?.fineId === fine.id && pendingFineAction.action === "reject"}
+                    disabled={pendingFineAction?.fineId === fine.id && pendingFineAction.action === "approve"}
+                    idleContent="Afvis"
+                    loadingContent="Afviser..."
+                  />
                   {canDeleteFine(fine.status) ? (
                     <button
                       type="button"
@@ -1048,7 +1129,7 @@ export default function BoderPage() {
                       onClick={() => deleteFine(fine.id)}
                       aria-label="Slet bøde"
                       title="Slet bøde"
-                      disabled={deletingFineId === fine.id}
+                      disabled={deletingFineId === fine.id || pendingFineAction?.fineId === fine.id}
                     >
                       {deletingFineId === fine.id ? (
                         <span
@@ -1237,12 +1318,22 @@ export default function BoderPage() {
                   <div className="text-sm font-semibold text-ink">{template.amount} kr</div>
                 </div>
                 <div className="mt-3 flex gap-2">
-                  <button className="btn-ghost" onClick={() => approveTemplate(template.id)}>
-                    Godkend
-                  </button>
-                  <button className="btn-ghost" onClick={() => rejectTemplate(template.id)}>
-                    Afvis
-                  </button>
+                  <LoadingButton
+                    className="btn-ghost"
+                    onClick={() => approveTemplate(template.id)}
+                    isLoading={pendingTemplateAction?.templateId === template.id && pendingTemplateAction.action === "approve"}
+                    disabled={pendingTemplateAction?.templateId === template.id && pendingTemplateAction.action === "reject"}
+                    idleContent="Godkend"
+                    loadingContent="Godkender..."
+                  />
+                  <LoadingButton
+                    className="btn-ghost"
+                    onClick={() => rejectTemplate(template.id)}
+                    isLoading={pendingTemplateAction?.templateId === template.id && pendingTemplateAction.action === "reject"}
+                    disabled={pendingTemplateAction?.templateId === template.id && pendingTemplateAction.action === "approve"}
+                    idleContent="Afvis"
+                    loadingContent="Afviser..."
+                  />
                 </div>
               </div>
             ))}
@@ -1317,7 +1408,7 @@ export default function BoderPage() {
                     type="button"
                     className="btn-ghost"
                     onClick={copyMobilePayBox}
-                    disabled={!teamMobilePayBox}
+                    disabled={!teamMobilePayBox || copySubmitting}
                     aria-label="Kopiér MobilePay box"
                   >
                     <span className="inline-flex items-center gap-1.5">
@@ -1331,7 +1422,7 @@ export default function BoderPage() {
                           strokeLinejoin="round"
                         />
                       </svg>
-                      Kopiér
+                      {copySubmitting ? "Kopierer..." : "Kopiér"}
                     </span>
                   </button>
                 </div>
@@ -1346,14 +1437,15 @@ export default function BoderPage() {
               </li>
             </ol>
             <div className="mt-5 flex flex-wrap gap-2">
-              <button
+              <LoadingButton
                 type="button"
                 className="btn-primary"
                 onClick={handleRequestPaymentApproval}
-                disabled={paySubmitting || unpaidTotal <= 0 || !teamMobilePayBox}
-              >
-                {paySubmitting ? "Sender..." : "Jeg har betalt mine bøder"}
-              </button>
+                disabled={unpaidTotal <= 0 || !teamMobilePayBox}
+                isLoading={paySubmitting}
+                idleContent="Jeg har betalt mine bøder"
+                loadingContent="Sender..."
+              />
               {!teamMobilePayBox ? <p className="text-xs text-red-600">MobilePay box er ikke sat af admin endnu.</p> : null}
             </div>
             <p className="mt-3 text-xs text-ink/60">
@@ -1742,23 +1834,35 @@ export default function BoderPage() {
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-red-200 bg-red-50 text-red-600 transition hover:bg-red-100"
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-red-200 bg-red-50 text-red-600 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
                   onClick={handleDeleteTemplate}
                   aria-label="Slet skabelon"
                   title="Slet skabelon"
+                  disabled={deleteTemplateSubmitting || updateTemplateSubmitting}
                 >
-                  <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5">
-                    <path
-                      d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M8 7l1 12a1 1 0 0 0 1 .92h4a1 1 0 0 0 1-.92L16 7"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.7"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
+                  {deleteTemplateSubmitting ? (
+                    <span
+                      className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-red-300 border-t-red-600"
+                      aria-hidden="true"
                     />
-                  </svg>
+                  ) : (
+                    <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5">
+                      <path
+                        d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M8 7l1 12a1 1 0 0 0 1 .92h4a1 1 0 0 0 1-.92L16 7"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.7"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  )}
                 </button>
-                <button className="btn-ghost" onClick={() => setShowEditModal(false)}>
+                <button
+                  className="btn-ghost"
+                  onClick={() => setShowEditModal(false)}
+                  disabled={updateTemplateSubmitting || deleteTemplateSubmitting}
+                >
                   Luk
                 </button>
               </div>
@@ -1811,7 +1915,13 @@ export default function BoderPage() {
                   className="input"
                 />
               </div>
-              <button className="btn-primary">Gem ændringer</button>
+              <LoadingButton
+                className="btn-primary"
+                isLoading={updateTemplateSubmitting}
+                disabled={deleteTemplateSubmitting}
+                idleContent="Gem ændringer"
+                loadingContent="Gemmer..."
+              />
             </form>
           </div>
         </div>
