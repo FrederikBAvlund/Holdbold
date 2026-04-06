@@ -66,6 +66,17 @@ type EventSignup = {
   user: { id: string; name: string | null };
 };
 
+type CachedEventDetails = {
+  signupStatus: "IN" | "OUT" | "UNKNOWN";
+  reason: string;
+  eventDeadlineAt: string | null;
+  editableMeetingAt: string;
+  editableDeadlineAt: string;
+  eventSignups: EventSignup[];
+  logs: SignupLog[];
+  eventLogs: EventLog[];
+};
+
 type FineTemplate = {
   id: string;
   title: string;
@@ -99,6 +110,7 @@ export default function KalenderPage() {
   const [loadingCalendar, setLoadingCalendar] = useState(true);
   const [creatingEvent, setCreatingEvent] = useState(false);
   const [openingEventId, setOpeningEventId] = useState<string | null>(null);
+  const [eventDetailsLoading, setEventDetailsLoading] = useState(false);
   const [signupSubmitting, setSignupSubmitting] = useState<"IN" | "OUT" | null>(null);
   const [cancelSubmitting, setCancelSubmitting] = useState(false);
   const [reopenSubmitting, setReopenSubmitting] = useState(false);
@@ -365,6 +377,7 @@ export default function KalenderPage() {
   const [logs, setLogs] = useState<SignupLog[]>([]);
   const [eventLogs, setEventLogs] = useState<EventLog[]>([]);
   const handledFocusKeyRef = useRef<string | null>(null);
+  const eventDetailsCacheRef = useRef<Map<string, CachedEventDetails>>(new Map());
 
   const toDateTimeLocalValue = (value: string | null | undefined) => {
     if (!value) return "";
@@ -453,16 +466,22 @@ export default function KalenderPage() {
     if (openingEventId) return;
     if (!teamId || !userId) return;
     setOpeningEventId(eventItem.id);
+    setEventDetailsLoading(true);
     try {
       setSelectedEvent(eventItem);
-      setSignupStatus("UNKNOWN");
+      setSignupStatus(
+        eventItem.signupStatus === "IN" || eventItem.signupStatus === "OUT" ? eventItem.signupStatus : "UNKNOWN"
+      );
       setEventIdForSignup(null);
-      setEventDeadlineAt(null);
-      setEditableMeetingAt("");
-      setEditableDeadlineAt("");
+      setEventDeadlineAt(eventItem.signupDeadline ?? null);
+      const fallbackMeetingIso = new Date(new Date(eventItem.date).getTime() - 60 * 60 * 1000).toISOString();
+      setEditableMeetingAt(toDateTimeLocalValue(eventItem.meetingTime ?? fallbackMeetingIso));
+      setEditableDeadlineAt(toDateTimeLocalValue(eventItem.signupDeadline ?? null));
       setReason("");
       setError(null);
       setEventSignups([]);
+      setLogs([]);
+      setEventLogs([]);
 
       let eventId = eventItem.id;
       if (eventItem.id.startsWith("series:")) {
@@ -483,35 +502,80 @@ export default function KalenderPage() {
       }
 
       setEventIdForSignup(eventId);
-      const statusResponse = await fetch(`/api/events/${eventId}/signup?userId=${userId}`);
-      const statusData = await statusResponse.json();
+      const cachedDetails = eventDetailsCacheRef.current.get(eventId);
+      if (cachedDetails) {
+        setSignupStatus(cachedDetails.signupStatus);
+        setReason(cachedDetails.reason);
+        setEventDeadlineAt(cachedDetails.eventDeadlineAt);
+        setEditableMeetingAt(cachedDetails.editableMeetingAt);
+        setEditableDeadlineAt(cachedDetails.editableDeadlineAt);
+        setEventSignups(cachedDetails.eventSignups);
+        setLogs(cachedDetails.logs);
+        setEventLogs(canManageEvents ? cachedDetails.eventLogs : []);
+        setSelectedEvent((prev) =>
+          prev
+            ? {
+                ...prev,
+                signupStatus:
+                  cachedDetails.signupStatus === "UNKNOWN" ? null : cachedDetails.signupStatus
+              }
+            : prev
+        );
+        return;
+      }
+
+      const [statusResponse, signupsResponse, logResponse] = await Promise.all([
+        fetch(`/api/events/${eventId}/signup?userId=${userId}`),
+        fetch(`/api/events/${eventId}/signups`, { cache: "no-store" }),
+        fetch(`/api/events/${eventId}/signup/logs`, { cache: "no-store" })
+      ]);
+      const [statusData, signupsData, logData] = await Promise.all([
+        statusResponse.json(),
+        signupsResponse.json(),
+        logResponse.json()
+      ]);
       if (statusData.event?.signupDeadline) {
         setEventDeadlineAt(statusData.event.signupDeadline);
       }
-      const fallbackMeetingIso = statusData.event?.date
+      const resolvedFallbackMeetingIso = statusData.event?.date
         ? new Date(new Date(statusData.event.date).getTime() - 60 * 60 * 1000).toISOString()
         : null;
-      const meetingValue = statusData.event?.meetingTime ?? fallbackMeetingIso;
+      const meetingValue = statusData.event?.meetingTime ?? resolvedFallbackMeetingIso;
       setEditableDeadlineAt(toDateTimeLocalValue(statusData.event?.signupDeadline ?? null));
       setEditableMeetingAt(toDateTimeLocalValue(meetingValue));
       if (statusData.event?.source) {
         setSelectedEvent((prev) => (prev ? { ...prev, source: statusData.event.source } : prev));
       }
-      if (statusData.signup?.status) {
+      if (
+        statusData.signup?.status === "IN" ||
+        statusData.signup?.status === "OUT" ||
+        statusData.signup?.status === "UNKNOWN"
+      ) {
         setSignupStatus(statusData.signup.status);
         setReason(statusData.signup.reason ?? "");
         setSelectedEvent((prev) => (prev ? { ...prev, signupStatus: statusData.signup.status } : prev));
       }
-
-      const signupsResponse = await fetch(`/api/events/${eventId}/signups`, { cache: "no-store" });
-      const signupsData = await signupsResponse.json();
       setEventSignups(signupsData.signups ?? []);
-
-      const logResponse = await fetch(`/api/events/${eventId}/signup/logs`, { cache: "no-store" });
-      const logData = await logResponse.json();
       setLogs(logData.logs ?? []);
       setEventLogs(canManageEvents ? (logData.eventLogs ?? []) : []);
+      const resolvedSignupStatus =
+        statusData.signup?.status === "IN" ||
+        statusData.signup?.status === "OUT" ||
+        statusData.signup?.status === "UNKNOWN"
+          ? statusData.signup.status
+          : "UNKNOWN";
+      eventDetailsCacheRef.current.set(eventId, {
+        signupStatus: resolvedSignupStatus,
+        reason: statusData.signup?.reason ?? "",
+        eventDeadlineAt: statusData.event?.signupDeadline ?? null,
+        editableMeetingAt: toDateTimeLocalValue(meetingValue),
+        editableDeadlineAt: toDateTimeLocalValue(statusData.event?.signupDeadline ?? null),
+        eventSignups: signupsData.signups ?? [],
+        logs: logData.logs ?? [],
+        eventLogs: logData.eventLogs ?? []
+      });
     } finally {
+      setEventDetailsLoading(false);
       setOpeningEventId(null);
     }
   }
@@ -615,6 +679,7 @@ export default function KalenderPage() {
             : item
         )
       );
+      eventDetailsCacheRef.current.delete(eventIdForSignup);
       pushToast("Kampdetaljer opdateret", "success");
     } finally {
       setSavingMatchMeta(false);
@@ -661,6 +726,16 @@ export default function KalenderPage() {
         const logData = await logResponse.json();
         setLogs(logData.logs ?? []);
         setEventLogs(canManageEvents ? (logData.eventLogs ?? []) : []);
+        eventDetailsCacheRef.current.set(eventIdForSignup, {
+          signupStatus: status,
+          reason: status === "OUT" ? reason : "",
+          eventDeadlineAt,
+          editableMeetingAt,
+          editableDeadlineAt,
+          eventSignups: signupsData.signups ?? [],
+          logs: logData.logs ?? [],
+          eventLogs: logData.eventLogs ?? []
+        });
       }
       pushToast(status === "IN" ? "Du er tilmeldt" : "Du er frameldt", "success");
     } finally {
@@ -689,6 +764,7 @@ export default function KalenderPage() {
           eventItem.id === eventIdForSignup ? { ...eventItem, canceledAt, canceledByName } : eventItem
         )
       );
+      eventDetailsCacheRef.current.delete(eventIdForSignup);
       pushToast("Begivenhed aflyst", "success");
     } finally {
       setCancelSubmitting(false);
@@ -714,6 +790,7 @@ export default function KalenderPage() {
           eventItem.id === eventIdForSignup ? { ...eventItem, canceledAt: null, canceledByName: null } : eventItem
         )
       );
+      eventDetailsCacheRef.current.delete(eventIdForSignup);
       pushToast("Begivenhed genåbnet", "success");
     } finally {
       setReopenSubmitting(false);
@@ -1304,9 +1381,14 @@ export default function KalenderPage() {
                     selectedEvent?.canceledAt || signupStatus === "IN" ? "opacity-50 cursor-not-allowed" : ""
                   }`}
                   onClick={() => setSignup("IN")}
-                  disabled={Boolean(selectedEvent?.canceledAt) || signupSubmitting !== null || signupStatus === "IN"}
+                  disabled={
+                    Boolean(selectedEvent?.canceledAt) ||
+                    signupSubmitting !== null ||
+                    signupStatus === "IN" ||
+                    eventDetailsLoading
+                  }
                 >
-                  {signupSubmitting === "IN" ? "Gemmer..." : "Jeg kommer"}
+                  {signupSubmitting === "IN" ? "Gemmer..." : eventDetailsLoading ? "Henter..." : "Jeg kommer"}
                 </button>
                 <button
                   className={`rounded-full px-5 py-3 text-sm font-semibold uppercase tracking-[0.2em] ${
@@ -1315,9 +1397,14 @@ export default function KalenderPage() {
                     selectedEvent?.canceledAt || signupStatus === "OUT" ? "opacity-50 cursor-not-allowed" : ""
                   }`}
                   onClick={() => setSignup("OUT")}
-                  disabled={Boolean(selectedEvent?.canceledAt) || signupSubmitting !== null || signupStatus === "OUT"}
+                  disabled={
+                    Boolean(selectedEvent?.canceledAt) ||
+                    signupSubmitting !== null ||
+                    signupStatus === "OUT" ||
+                    eventDetailsLoading
+                  }
                 >
-                  {signupSubmitting === "OUT" ? "Gemmer..." : "Jeg kan ikke"}
+                  {signupSubmitting === "OUT" ? "Gemmer..." : eventDetailsLoading ? "Henter..." : "Jeg kan ikke"}
                 </button>
               </div>
               <div className="space-y-2">
@@ -1334,7 +1421,10 @@ export default function KalenderPage() {
               </div>
               <div className="mt-4 rounded-2xl border border-ink/10 bg-white/90 p-4">
                 <p className="label">Tilmeldinger</p>
-                <div className="mt-3 grid gap-4 md:grid-cols-3">
+                {eventDetailsLoading ? (
+                  <p className="mt-3 text-sm text-ink/60">Henter tilmeldinger...</p>
+                ) : (
+                  <div className="mt-3 grid gap-4 md:grid-cols-3">
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm font-semibold text-ink">
                       <span className="flex items-center gap-2">
@@ -1380,7 +1470,8 @@ export default function KalenderPage() {
                       ))}
                     </div>
                   </div>
-                </div>
+                  </div>
+                )}
               </div>
               {(lateGroups.lateResponses.length > 0 || lateGroups.missingAfterDeadline.length > 0) &&
               activeDeadlineAt ? (
@@ -1460,7 +1551,7 @@ export default function KalenderPage() {
                   </div>
                 </div>
               ) : null}
-              {canManageEvents && (logs.length > 0 || eventLogs.length > 0) ? (
+              {canManageEvents && !eventDetailsLoading && (logs.length > 0 || eventLogs.length > 0) ? (
                 <div className="mt-4 rounded-2xl border border-ink/10 bg-white/90 p-4">
                   <p className="label">Historik</p>
                   <div className="mt-2 space-y-2">

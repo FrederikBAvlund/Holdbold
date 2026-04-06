@@ -236,6 +236,7 @@ export default function BoderPage() {
   const [collectionSubmitting, setCollectionSubmitting] = useState(false);
   const [assignFineSubmitting, setAssignFineSubmitting] = useState(false);
   const [selectedDebtorUserId, setSelectedDebtorUserId] = useState<string | null>(null);
+  const [deletingFineId, setDeletingFineId] = useState<string | null>(null);
 
   useEffect(() => {
     setTeamId(getStoredTeamId());
@@ -564,14 +565,20 @@ export default function BoderPage() {
   }
 
   async function deleteFine(id: string) {
-    const response = await fetch(`/api/fines/${id}`, { method: "DELETE" });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      pushToast(data.error ?? "Kunne ikke slette bøde", "error");
-      return;
+    if (deletingFineId) return;
+    setDeletingFineId(id);
+    try {
+      const response = await fetch(`/api/fines/${id}`, { method: "DELETE" });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        pushToast(data.error ?? "Kunne ikke slette bøde", "error");
+        return;
+      }
+      pushToast("Bøde slettet", "success");
+      await refreshFinesAndApprovals();
+    } finally {
+      setDeletingFineId(null);
     }
-    pushToast("Bøde slettet", "success");
-    await refreshFinesAndApprovals();
   }
 
   async function approveTemplate(id: string) {
@@ -1029,8 +1036,31 @@ export default function BoderPage() {
                     Afvis
                   </button>
                   {canDeleteFine(fine.status) ? (
-                    <button className="btn-ghost" onClick={() => deleteFine(fine.id)}>
-                      Slet
+                    <button
+                      type="button"
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-red-200 bg-red-50 text-red-600 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+                      onClick={() => deleteFine(fine.id)}
+                      aria-label="Slet bøde"
+                      title="Slet bøde"
+                      disabled={deletingFineId === fine.id}
+                    >
+                      {deletingFineId === fine.id ? (
+                        <span
+                          className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-red-300 border-t-red-600"
+                          aria-hidden="true"
+                        />
+                      ) : (
+                        <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5">
+                          <path
+                            d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M8 7l1 12a1 1 0 0 0 1 .92h4a1 1 0 0 0 1-.92L16 7"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="1.7"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      )}
                     </button>
                   ) : null}
                 </div>
@@ -1412,8 +1442,31 @@ export default function BoderPage() {
                         </span>
                         {canManageFines && canDeleteFine(fine.status) ? (
                           <div className="mt-2">
-                            <button className="btn-ghost" onClick={() => deleteFine(fine.id)}>
-                              Slet bøde
+                            <button
+                              type="button"
+                              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-red-200 bg-red-50 text-red-600 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+                              onClick={() => deleteFine(fine.id)}
+                              aria-label="Slet bøde"
+                              title="Slet bøde"
+                              disabled={deletingFineId === fine.id}
+                            >
+                              {deletingFineId === fine.id ? (
+                                <span
+                                  className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-red-300 border-t-red-600"
+                                  aria-hidden="true"
+                                />
+                              ) : (
+                                <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5">
+                                  <path
+                                    d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M8 7l1 12a1 1 0 0 0 1 .92h4a1 1 0 0 0 1-.92L16 7"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="1.7"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                  />
+                                </svg>
+                              )}
                             </button>
                           </div>
                         ) : null}
