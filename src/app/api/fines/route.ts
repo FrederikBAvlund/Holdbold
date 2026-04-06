@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { z } from "zod";
 import { authOptions } from "@/lib/auth";
-import { processDueFineCollections } from "@/lib/fineCollections";
 import { createNotifications } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 
@@ -40,8 +39,6 @@ export async function GET(request: Request) {
   if (!actingMembership) {
     return NextResponse.json({ error: "Ikke adgang" }, { status: 403 });
   }
-
-  await processDueFineCollections(parsed.teamId);
 
   if (
     parsed.userId &&
