@@ -402,6 +402,12 @@ export default function BoderPage() {
 
   const rankedDebtors = useMemo(() => {
     const totals = new Map<string, { name: string; total: number }>();
+
+    for (const member of members) {
+      if (member.role !== "SPILLER") continue;
+      totals.set(member.user.id, { name: member.user.name ?? "Ukendt", total: 0 });
+    }
+
     for (const fine of teamFines) {
       if (!debtStatuses.has(fine.status)) continue;
       const user = fine.user;
@@ -413,7 +419,7 @@ export default function BoderPage() {
     return Array.from(totals.entries())
       .map(([id, entry]) => ({ id, ...entry }))
       .sort((a, b) => b.total - a.total);
-  }, [teamFines, debtStatuses]);
+  }, [members, teamFines, debtStatuses]);
   const totalAcrossDebtors = useMemo(
     () => rankedDebtors.reduce((sum, debtor) => sum + debtor.total, 0),
     [rankedDebtors]
@@ -988,7 +994,7 @@ export default function BoderPage() {
                   <div>
                     <p className="text-sm font-semibold text-ink">{payment.name}</p>
                     <p className="text-xs text-ink/60">
-                      {payment.count} bøder · markeret{" "}
+                      {payment.count} bøder · Markeret{" "}
                       {payment.requestedAt
                         ? new Date(payment.requestedAt).toLocaleString("da-DK")
                         : "ukendt tidspunkt"}
@@ -1433,42 +1439,40 @@ export default function BoderPage() {
                           {new Date(fine.createdAt).toLocaleString("da-DK")} · {creatorLabel(fine)}
                         </p>
                       </div>
-                      <div className="text-right">
-                        <p className="text-sm font-semibold text-ink">{fine.amount} kr</p>
+                      <div className="flex items-center gap-3">
+                        <p className="text-sm font-semibold text-ink whitespace-nowrap">{fine.amount} kr</p>
                         <span
-                          className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${fineStatusMeta(fine.status).className}`}
+                          className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold whitespace-nowrap ${fineStatusMeta(fine.status).className}`}
                         >
                           {fineStatusMeta(fine.status).label}
                         </span>
                         {canManageFines && canDeleteFine(fine.status) ? (
-                          <div className="mt-2">
-                            <button
-                              type="button"
-                              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-red-200 bg-red-50 text-red-600 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
-                              onClick={() => deleteFine(fine.id)}
-                              aria-label="Slet bøde"
-                              title="Slet bøde"
-                              disabled={deletingFineId === fine.id}
-                            >
-                              {deletingFineId === fine.id ? (
-                                <span
-                                  className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-red-300 border-t-red-600"
-                                  aria-hidden="true"
+                          <button
+                            type="button"
+                            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-red-200 bg-red-50 text-red-600 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+                            onClick={() => deleteFine(fine.id)}
+                            aria-label="Slet bøde"
+                            title="Slet bøde"
+                            disabled={deletingFineId === fine.id}
+                          >
+                            {deletingFineId === fine.id ? (
+                              <span
+                                className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-red-300 border-t-red-600"
+                                aria-hidden="true"
+                              />
+                            ) : (
+                              <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5">
+                                <path
+                                  d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M8 7l1 12a1 1 0 0 0 1 .92h4a1 1 0 0 0 1-.92L16 7"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="1.7"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
                                 />
-                              ) : (
-                                <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5">
-                                  <path
-                                    d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M8 7l1 12a1 1 0 0 0 1 .92h4a1 1 0 0 0 1-.92L16 7"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="1.7"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                  />
-                                </svg>
-                              )}
-                            </button>
-                          </div>
+                              </svg>
+                            )}
+                          </button>
                         ) : null}
                       </div>
                     </div>
