@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { z } from "zod";
 import { authOptions } from "@/lib/auth";
+import { createNotifications } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 
 const updateSchema = z.object({
@@ -44,8 +45,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   });
 
   if (membership.status === "PENDING" && updated.status === "ACTIVE") {
-    await prisma.notification.create({
-      data: {
+    await createNotifications([
+      {
         userId: membership.userId,
         teamId: membership.teamId,
         type: "GENERAL",
@@ -53,7 +54,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         body: "Du har nu adgang til holdet.",
         link: "/dashboard"
       }
-    });
+    ]);
   }
 
   return NextResponse.json({ membership: updated });

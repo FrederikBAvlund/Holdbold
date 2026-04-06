@@ -180,6 +180,30 @@ export default function IndstillingerPage() {
   }, [session?.user?.id, teamId]);
 
   useEffect(() => {
+    if (!session?.user?.id) return;
+    if (session.user.hasActiveMembership) return;
+    if (!session.user.hasPendingMembership) return;
+
+    const interval = window.setInterval(async () => {
+      const response = await fetch("/api/me", { cache: "no-store" });
+      if (!response.ok) return;
+      const data = await response.json();
+      const list = data.memberships ?? [];
+      if (!Array.isArray(list) || list.length === 0) return;
+
+      setMemberships(list);
+      const firstTeamId = list[0]?.team?.id ?? "";
+      if (!firstTeamId) return;
+      setTeamId(firstTeamId);
+      setStoredTeamId(firstTeamId);
+      pushToast("Du er blevet godkendt og sat på holdet automatisk.", "success");
+      window.clearInterval(interval);
+    }, 15000);
+
+    return () => window.clearInterval(interval);
+  }, [pushToast, session?.user?.hasActiveMembership, session?.user?.hasPendingMembership, session?.user?.id]);
+
+  useEffect(() => {
     async function loadTeamMembers() {
       if (!teamId) return;
       const response = await fetch(`/api/team-members?teamId=${teamId}&includePending=true`);

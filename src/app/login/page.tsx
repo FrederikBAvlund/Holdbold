@@ -31,7 +31,7 @@ export default function LoginPage() {
       setError(errorMessages[code] ?? "Login mislykkedes. Prøv igen.");
     }
     if (noticeCode === "pending_approval") {
-      setNotice("Din bruger er oprettet. En administrator skal godkende dig, før du kan logge ind.");
+      setNotice("Din bruger er oprettet. Du kan logge ind, men en administrator skal godkende dig, før du kan bruge appen.");
     } else {
       setNotice(null);
     }
