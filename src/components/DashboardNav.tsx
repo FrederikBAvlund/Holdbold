@@ -84,6 +84,9 @@ export default function DashboardNav() {
   const [unreadCount, setUnreadCount] = useState(0);
   const pathname = usePathname();
   const sessionUserId = session?.user?.id;
+  const hasActiveMembership = session?.user?.hasActiveMembership === true;
+  const hasPendingMembership = session?.user?.hasPendingMembership === true;
+  const pendingOnly = !hasActiveMembership && hasPendingMembership;
   const lastUnreadLoadRef = useRef<{ key: string; at: number } | null>(null);
   const unreadInFlightRef = useRef<Promise<void> | null>(null);
 
@@ -96,6 +99,14 @@ export default function DashboardNav() {
       .map((chunk) => chunk[0]?.toUpperCase() ?? "")
       .join("");
   }, [session?.user?.name]);
+
+  const visibleNavItems = useMemo(
+    () =>
+      pendingOnly
+        ? navItems.filter((item) => item.href === "/dashboard/indstillinger")
+        : navItems,
+    [pendingOnly]
+  );
 
   const loadCount = useCallback(async (reason = "default") => {
     if (!sessionUserId) return;
@@ -170,7 +181,7 @@ export default function DashboardNav() {
           </div>
 
           <nav className="mt-7 flex flex-col gap-2.5">
-            {navItems.map((item) => {
+            {visibleNavItems.map((item) => {
               const active = pathname === item.href;
               const isNotifications = item.href === "/dashboard/notifikationer";
               return (
@@ -221,7 +232,7 @@ export default function DashboardNav() {
 
       <nav className="fixed bottom-3 left-1/2 z-50 w-[calc(100%-1rem)] max-w-md -translate-x-1/2 lg:hidden">
         <div className="grid grid-cols-5 rounded-2xl border border-ink/15 bg-white/88 p-2 shadow-[0_24px_46px_-30px_rgba(15,23,42,0.65)] backdrop-blur">
-          {navItems.map((item) => {
+          {visibleNavItems.map((item) => {
             const isNotifications = item.href === "/dashboard/notifikationer";
             const isActive = pathname === item.href;
             return (

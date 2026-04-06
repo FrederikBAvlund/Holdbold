@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
 import { z } from "zod";
+import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 const querySchema = z.object({
@@ -43,6 +45,11 @@ function nextOccurrence(date: Date, recurrence: string, interval: number) {
 }
 
 export async function GET(request: Request) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Ikke logget ind" }, { status: 401 });
+  }
+
   const { searchParams } = new URL(request.url);
   const parsed = querySchema.parse({
     teamId: searchParams.get("teamId") ?? "",
@@ -53,6 +60,22 @@ export async function GET(request: Request) {
 
   const start = new Date(parsed.start);
   const end = new Date(parsed.end);
+
+  const actingMembership = await prisma.membership.findFirst({
+    where: { teamId: parsed.teamId, userId: session.user.id, status: "ACTIVE" },
+    select: { role: true }
+  });
+  if (!actingMembership) {
+    return NextResponse.json({ error: "Ikke adgang" }, { status: 403 });
+  }
+
+  if (
+    parsed.userId &&
+    parsed.userId !== session.user.id &&
+    !["ADMIN", "BOEDEKASSEFORMAND", "TRAENER"].includes(actingMembership.role)
+  ) {
+    return NextResponse.json({ error: "Ikke adgang til andre spilleres tilmeldingsstatus" }, { status: 403 });
+  }
 
   const events = await prisma.event.findMany({
     where: {

@@ -44,11 +44,11 @@ export const authOptions: NextAuthOptions = {
               const valid = await bcrypt.compare(password, user.passwordHash);
               if (!valid) return null;
 
-              const hasActiveMembership = await prisma.membership.findFirst({
-                where: { userId: user.id, status: "ACTIVE" },
+              const hasMembership = await prisma.membership.findFirst({
+                where: { userId: user.id, status: { in: ["ACTIVE", "PENDING"] } },
                 select: { id: true }
               });
-              if (!hasActiveMembership) return null;
+              if (!hasMembership) return null;
 
               return {
                 id: user.id,
@@ -74,11 +74,23 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.id = user.id;
       }
+      if (token.id) {
+        const memberships = await prisma.membership.findMany({
+          where: { userId: token.id as string },
+          select: { status: true }
+        });
+        const hasActiveMembership = memberships.some((membership) => membership.status === "ACTIVE");
+        const hasPendingMembership = !hasActiveMembership && memberships.some((membership) => membership.status === "PENDING");
+        token.hasActiveMembership = hasActiveMembership;
+        token.hasPendingMembership = hasPendingMembership;
+      }
       return token;
     },
     async session({ session, token }) {
       if (session.user && token.id) {
         session.user.id = token.id as string;
+        session.user.hasActiveMembership = Boolean(token.hasActiveMembership);
+        session.user.hasPendingMembership = Boolean(token.hasPendingMembership);
       }
       return session;
     }

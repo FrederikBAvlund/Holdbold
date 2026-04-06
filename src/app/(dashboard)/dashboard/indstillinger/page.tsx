@@ -105,9 +105,18 @@ export default function IndstillingerPage() {
   const [usingTeamTheme, setUsingTeamTheme] = useState(false);
   const [themeApplyingId, setThemeApplyingId] = useState<string | null>(null);
   const [memberActionSubmitting, setMemberActionSubmitting] = useState<"approve" | "updateRole" | "delete" | null>(null);
+  const [pendingApprovalNotice, setPendingApprovalNotice] = useState(false);
 
   useEffect(() => {
     setTeamId(getStoredTeamId());
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("notice") === "pending_approval") {
+      setPendingApprovalNotice(true);
+    }
   }, []);
 
   useEffect(() => {
@@ -652,6 +661,11 @@ export default function IndstillingerPage() {
       <header className="card">
         <h2 className="text-2xl font-semibold text-ink">Indstillinger</h2>
         <p className="mt-2 text-ink/70">Team, roller og integrationsindstillinger.</p>
+        {pendingApprovalNotice ? (
+          <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900">
+            Din bruger afventer godkendelse. Du kan allerede nu aktivere push-notifikationer her i Indstillinger.
+          </p>
+        ) : null}
       </header>
 
       <div className="card-soft">

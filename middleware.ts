@@ -29,6 +29,16 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
+  const isDashboardPath = pathname.startsWith("/dashboard");
+  const isSettingsPath = pathname === "/dashboard/indstillinger" || pathname.startsWith("/dashboard/indstillinger/");
+  const hasActiveMembership = token.hasActiveMembership === true;
+
+  if (isDashboardPath && !isSettingsPath && !hasActiveMembership) {
+    const settingsUrl = new URL("/dashboard/indstillinger", request.url);
+    settingsUrl.searchParams.set("notice", "pending_approval");
+    return NextResponse.redirect(settingsUrl);
+  }
+
   return NextResponse.next();
 }
 
