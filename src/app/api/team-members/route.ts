@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { z } from "zod";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { resolveProfileImageUrl } from "@/lib/profileImages";
 
 const listSchema = z.object({
   teamId: z.string().min(1),
@@ -46,5 +47,15 @@ export async function GET(request: Request) {
     orderBy: [{ status: "asc" }, { createdAt: "asc" }]
   });
 
-  return NextResponse.json({ members });
+  const membersWithResolvedImages = await Promise.all(
+    members.map(async (member) => ({
+      ...member,
+      user: {
+        ...member.user,
+        image: await resolveProfileImageUrl(member.user.image)
+      }
+    }))
+  );
+
+  return NextResponse.json({ members: membersWithResolvedImages });
 }

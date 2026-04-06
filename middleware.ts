@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
 
-const PUBLIC_PATHS = new Set(["/", "/login", "/signup", "/offline"]);
+const PUBLIC_PATHS = new Set(["/", "/login", "/signup", "/offline", "/privatliv"]);
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -21,7 +21,12 @@ export async function middleware(request: NextRequest) {
   });
 
   if (!token) {
-    return NextResponse.redirect(new URL("/", request.url));
+    const loginUrl = new URL("/login", request.url);
+    const callbackPath = `${request.nextUrl.pathname}${request.nextUrl.search}`;
+    if (callbackPath && callbackPath !== "/login") {
+      loginUrl.searchParams.set("callbackUrl", callbackPath);
+    }
+    return NextResponse.redirect(loginUrl);
   }
 
   return NextResponse.next();

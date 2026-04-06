@@ -5,6 +5,7 @@ import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { resolveProfileImageUrl } from "@/lib/profileImages";
 
 export async function GET() {
   const session = await getServerSession(authOptions);
@@ -22,12 +23,14 @@ export async function GET() {
     orderBy: { createdAt: "asc" }
   });
 
+  const resolvedImage = await resolveProfileImageUrl(user?.image ?? null);
+
   return NextResponse.json({
     user: {
       id: session.user.id,
       name: user?.name ?? session.user.name ?? null,
       email: user?.email ?? session.user.email ?? null,
-      image: user?.image ?? null,
+      image: resolvedImage,
       themePreset: user?.themePreset ?? null,
       themeConfig: user?.themeConfig ?? null
     },
@@ -128,12 +131,14 @@ export async function PATCH(request: Request) {
       }
     });
 
+    const resolvedImage = await resolveProfileImageUrl(updated.image);
+
     return NextResponse.json({
       user: {
         id: updated.id,
         name: updated.name,
         email: updated.email,
-        image: updated.image,
+        image: resolvedImage,
         themePreset: updated.themePreset ?? null,
         themeConfig: updated.themeConfig ?? null
       }
@@ -156,6 +161,8 @@ export async function PATCH(request: Request) {
             passwordHash: data.newPassword ? await bcrypt.hash(data.newPassword, 10) : user.passwordHash
           }
         });
+
+        const resolvedImage = await resolveProfileImageUrl(updated.image);
 
         if (data.themePreset !== undefined) {
           await prisma.$executeRaw(
@@ -180,7 +187,7 @@ export async function PATCH(request: Request) {
             id: updated.id,
             name: updated.name,
             email: updated.email,
-            image: updated.image,
+            image: resolvedImage,
             themePreset: data.themePreset ?? null,
             themeConfig: data.themeConfig ?? null
           },

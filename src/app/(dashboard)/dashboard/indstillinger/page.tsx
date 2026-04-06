@@ -426,7 +426,6 @@ export default function IndstillingerPage() {
       body: JSON.stringify({
         name: profileName,
         email: profileEmail ? profileEmail.toLowerCase() : null,
-        image: profileImage || null,
         currentPassword: currentPassword || undefined,
         newPassword: newPassword || undefined
       })

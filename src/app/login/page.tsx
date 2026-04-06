@@ -27,6 +27,11 @@ export default function LoginPage() {
     setError(errorMessages[code] ?? "Login mislykkedes. Prøv igen.");
   }, [errorMessages]);
 
+  function getCallbackUrl() {
+    if (typeof window === "undefined") return "/dashboard";
+    return new URLSearchParams(window.location.search).get("callbackUrl") || "/dashboard";
+  }
+
   async function handleCredentials(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setLoading(true);
@@ -34,10 +39,11 @@ export default function LoginPage() {
     const formData = new FormData(event.currentTarget);
     const identifier = String(formData.get("identifier") ?? "").trim().toLowerCase();
     const password = String(formData.get("password") ?? "");
+    const callbackUrl = getCallbackUrl();
     const result = await signIn("credentials", {
       identifier,
       password,
-      callbackUrl: "/dashboard",
+      callbackUrl,
       redirect: false
     });
     if (result?.error) {
@@ -89,7 +95,10 @@ export default function LoginPage() {
           {process.env.FACEBOOK_CLIENT_ID && process.env.FACEBOOK_CLIENT_SECRET ? (
             <>
               <div className="my-6 border-t border-ink/10" />
-              <button className="btn-ghost w-full" onClick={() => signIn("facebook", { callbackUrl: "/dashboard" })}>
+              <button
+                className="btn-ghost w-full"
+                onClick={() => signIn("facebook", { callbackUrl: getCallbackUrl() })}
+              >
                 Fortsæt med Facebook
               </button>
             </>

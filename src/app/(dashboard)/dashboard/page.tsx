@@ -283,7 +283,7 @@ export default function DashboardHome() {
                     key={eventItem.id}
                     type="button"
                     onClick={() => openNextEvent(eventItem)}
-                    className="w-full space-y-2 rounded-2xl border border-transparent text-left text-sm text-ink/70 transition hover:border-ink/15 hover:bg-white/60"
+                    className="p-2 w-full space-y-2 rounded-2xl border border-transparent text-left text-sm text-ink/70 transition hover:border-ink/15 hover:bg-white/60"
                   >
                     <div className="text-base font-semibold text-ink">{eventItem.title}</div>
                     <div className="grid gap-2 rounded-2xl border border-ink/10 bg-white/85 p-3">
