@@ -31,6 +31,17 @@ type Member = {
 
 type FineItem = { amount: number };
 
+type DashboardSnapshot = {
+  nextEvents: CalendarEvent[];
+  eventCounts: Record<string, { in: number; out: number; missing: number }>;
+  memberCount: number;
+  totalFines: number;
+  updatedAt: number;
+};
+
+const dashboardCache = new Map<string, DashboardSnapshot>();
+const DASHBOARD_CACHE_TTL_MS = 60_000;
+
 export default function DashboardHome() {
   const router = useRouter();
   const { data: session, status: sessionStatus } = useSession();
@@ -43,9 +54,8 @@ export default function DashboardHome() {
   const [loadingNextEvents, setLoadingNextEvents] = useState(true);
   const [loadingFines, setLoadingFines] = useState(true);
   const defaultTeamLoadedForUserRef = useRef<string | null>(null);
-  const loadedMembersKeyRef = useRef<string | null>(null);
-  const loadedNextEventsKeyRef = useRef<string | null>(null);
-  const loadedFinesKeyRef = useRef<string | null>(null);
+  const hasHydratedCacheRef = useRef<string | null>(null);
+  const skipNextCacheWriteRef = useRef(false);
 
   useEffect(() => {
     setTeamId(getStoredTeamId());
@@ -54,6 +64,24 @@ export default function DashboardHome() {
   useEffect(() => {
     if (session?.user?.id) setUserId(session.user.id);
   }, [session?.user?.id]);
+
+  useEffect(() => {
+    if (!teamId || !userId) return;
+    const key = `${teamId}:${userId}`;
+    if (hasHydratedCacheRef.current === key) return;
+    hasHydratedCacheRef.current = key;
+
+    const cached = dashboardCache.get(key);
+    if (!cached) return;
+
+    skipNextCacheWriteRef.current = true;
+    setNextEvents(cached.nextEvents);
+    setEventCounts(cached.eventCounts);
+    setMemberCount(cached.memberCount);
+    setTotalFines(cached.totalFines);
+    setLoadingNextEvents(false);
+    setLoadingFines(false);
+  }, [teamId, userId]);
 
   useEffect(() => {
     async function loadDefaultTeam() {
@@ -87,23 +115,26 @@ export default function DashboardHome() {
   useEffect(() => {
     async function loadMembers() {
       if (!teamId) return;
-      if (loadedMembersKeyRef.current === teamId) return;
-      loadedMembersKeyRef.current = teamId;
+      const key = `${teamId}:${userId || "anon"}`;
+      const cached = dashboardCache.get(key);
+      const isFresh = cached && Date.now() - cached.updatedAt < DASHBOARD_CACHE_TTL_MS;
+      if (isFresh) return;
       const response = await fetch(`/api/team-members?teamId=${teamId}`);
       const data = await response.json();
       setMemberCount((data.members ?? []).length);
     }
 
     loadMembers();
-  }, [teamId]);
+  }, [teamId, userId]);
 
   useEffect(() => {
     async function loadNextEvents() {
       if (!teamId || !userId) return;
       const key = `${teamId}:${userId}`;
-      if (loadedNextEventsKeyRef.current === key) return;
-      loadedNextEventsKeyRef.current = key;
-      setLoadingNextEvents(true);
+      const cached = dashboardCache.get(key);
+      const isFresh = cached && Date.now() - cached.updatedAt < DASHBOARD_CACHE_TTL_MS;
+      if (isFresh) return;
+      setLoadingNextEvents(!cached);
 
       try {
         const now = new Date();
@@ -195,9 +226,10 @@ export default function DashboardHome() {
     async function loadFines() {
       if (!teamId || !userId) return;
       const key = `${teamId}:${userId}`;
-      if (loadedFinesKeyRef.current === key) return;
-      loadedFinesKeyRef.current = key;
-      setLoadingFines(true);
+      const cached = dashboardCache.get(key);
+      const isFresh = cached && Date.now() - cached.updatedAt < DASHBOARD_CACHE_TTL_MS;
+      if (isFresh) return;
+      setLoadingFines(!cached);
       try {
         const response = await fetch(`/api/fines?teamId=${teamId}&userId=${userId}`);
         const data = await response.json();
@@ -210,6 +242,23 @@ export default function DashboardHome() {
 
     loadFines();
   }, [teamId, userId]);
+
+  useEffect(() => {
+    if (!teamId || !userId) return;
+    if (loadingNextEvents || loadingFines) return;
+    if (skipNextCacheWriteRef.current) {
+      skipNextCacheWriteRef.current = false;
+      return;
+    }
+    const key = `${teamId}:${userId}`;
+    dashboardCache.set(key, {
+      nextEvents,
+      eventCounts,
+      memberCount,
+      totalFines,
+      updatedAt: Date.now()
+    });
+  }, [teamId, userId, nextEvents, eventCounts, memberCount, totalFines, loadingNextEvents, loadingFines]);
 
   const formatEventTimes = (eventItem: CalendarEvent) => {
     const startDate = new Date(eventItem.date);

@@ -881,21 +881,28 @@ export default function IndstillingerPage() {
                       setSelectedMember(member);
                       setMemberRole(member.role);
                     }}
-                    className="flex w-full items-center justify-between rounded-2xl border border-ink/10 bg-white/80 px-4 py-3 text-left hover:border-ink/30"
+                    className="flex w-full min-w-0 items-center justify-between gap-3 overflow-hidden rounded-2xl border border-ink/10 bg-white/80 px-4 py-3 text-left hover:border-ink/30"
                   >
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 overflow-hidden rounded-full border border-ink/10 bg-white">
+                    <div className="flex min-w-0 flex-1 items-center gap-3 overflow-hidden">
+                      <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full border border-ink/10 bg-white">
                         {member.user.image ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img src={member.user.image} alt={member.user.name} className="h-full w-full object-cover" />
                         ) : null}
                       </div>
-                      <div>
-                        <div className="text-sm font-semibold text-ink">{member.user.name}</div>
-                        <div className="text-xs text-ink/60">{member.user.email ?? "Ingen email"}</div>
+                      <div className="min-w-0 flex-1">
+                        <div className="max-w-[140px] truncate text-sm font-semibold text-ink">{member.user.name}</div>
+                        <div className="max-w-[140px] block truncate text-xs text-ink/60">{member.user.email ?? "Ingen email"}</div>
                       </div>
                     </div>
-                    <span className="rounded-full bg-ink/10 px-3 py-1 text-xs font-semibold text-ink/70">
+                    <span
+                      className="block max-w-[40%] shrink-0 truncate rounded-full bg-ink/10 px-3 py-1 text-right text-xs font-semibold text-ink/70 sm:max-w-none"
+                      title={
+                        member.status === "PENDING"
+                          ? "Afventer godkendelse"
+                          : roleLabels[member.role] ?? member.role
+                      }
+                    >
                       {member.status === "PENDING"
                         ? "Afventer godkendelse"
                         : roleLabels[member.role] ?? member.role}
