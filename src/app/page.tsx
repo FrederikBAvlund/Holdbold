@@ -39,6 +39,13 @@ export default function Home() {
                 Opret bruger
               </a>
             </div>
+            <p className="text-sm text-ink/65">
+              Ved brug af Holdbold accepterer du vores{" "}
+              <a href="/privatliv" className="underline underline-offset-4">
+                privatlivspolitik
+              </a>
+              .
+            </p>
           </div>
         </section>
       </div>

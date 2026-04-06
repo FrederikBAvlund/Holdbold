@@ -27,7 +27,6 @@ export async function GET() {
       id: session.user.id,
       name: user?.name ?? session.user.name ?? null,
       email: user?.email ?? session.user.email ?? null,
-      phone: user?.phone ?? null,
       image: user?.image ?? null,
       themePreset: user?.themePreset ?? null,
       themeConfig: user?.themeConfig ?? null
@@ -61,7 +60,6 @@ const themeConfigSchema = z
 const updateSchema = z.object({
   name: z.string().min(1).optional(),
   email: z.string().email().optional().nullable(),
-  phone: z.string().min(3).optional().nullable(),
   image: imageSchema.optional().nullable(),
   themePreset: z.string().min(1).optional().nullable(),
   themeConfig: themeConfigSchema.nullable().optional(),
@@ -123,7 +121,6 @@ export async function PATCH(request: Request) {
       data: {
         name: data.name ?? user.name,
         email: normalizedEmail === undefined ? user.email : normalizedEmail,
-        phone: data.phone === undefined ? user.phone : data.phone,
         image: data.image === undefined ? user.image : data.image,
         passwordHash: data.newPassword ? await bcrypt.hash(data.newPassword, 10) : user.passwordHash,
         ...(data.themePreset !== undefined ? { themePreset: data.themePreset } : {}),
@@ -136,7 +133,6 @@ export async function PATCH(request: Request) {
         id: updated.id,
         name: updated.name,
         email: updated.email,
-        phone: updated.phone,
         image: updated.image,
         themePreset: updated.themePreset ?? null,
         themeConfig: updated.themeConfig ?? null
@@ -156,7 +152,6 @@ export async function PATCH(request: Request) {
           data: {
             name: data.name ?? user.name,
             email: normalizedEmail === undefined ? user.email : normalizedEmail,
-            phone: data.phone === undefined ? user.phone : data.phone,
             image: data.image === undefined ? user.image : data.image,
             passwordHash: data.newPassword ? await bcrypt.hash(data.newPassword, 10) : user.passwordHash
           }
@@ -185,7 +180,6 @@ export async function PATCH(request: Request) {
             id: updated.id,
             name: updated.name,
             email: updated.email,
-            phone: updated.phone,
             image: updated.image,
             themePreset: data.themePreset ?? null,
             themeConfig: data.themeConfig ?? null

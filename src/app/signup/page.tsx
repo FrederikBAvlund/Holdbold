@@ -8,7 +8,6 @@ export default function SignupPage() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [teamSlug, setTeamSlug] = useState("");
   const [message, setMessage] = useState<string | null>(null);
@@ -37,7 +36,6 @@ export default function SignupPage() {
         body: JSON.stringify({
           name,
           email: email || undefined,
-          phone: phone || undefined,
           password,
           teamSlug
         })
@@ -81,7 +79,7 @@ export default function SignupPage() {
         <h1 className="text-3xl font-semibold text-ink" style={{ fontFamily: "var(--font-display)" }}>
           Opret bruger
         </h1>
-        <p className="mt-2 text-ink/70">Udfyld navn, slug, email/telefon og adgangskode.</p>
+        <p className="mt-2 text-ink/70">Udfyld navn, slug, email og adgangskode.</p>
 
         <form onSubmit={handleSubmit} className="mt-6 space-y-4">
           <div>
@@ -110,17 +108,6 @@ export default function SignupPage() {
               required
             />
             {fieldErrors.email ? <p className="mt-2 text-sm text-red-600">{fieldErrors.email}</p> : null}
-          </div>
-          <div>
-            <label className="label">Telefon*</label>
-            <input
-              value={phone}
-              onChange={(event) => setPhone(event.target.value)}
-              className="input mt-2"
-              placeholder="+45..."
-              required
-            />
-            {fieldErrors.phone ? <p className="mt-2 text-sm text-red-600">{fieldErrors.phone}</p> : null}
           </div>
           <div>
             <label className="label">Adgangskode*</label>
@@ -170,6 +157,13 @@ export default function SignupPage() {
         </form>
 
         {message ? <p className="mt-4 text-sm font-semibold text-ink/80">{message}</p> : null}
+        <p className="mt-4 text-xs text-ink/60">
+          Ved oprettelse accepterer du vores{" "}
+          <a href="/privatliv" className="underline underline-offset-4">
+            privatlivspolitik
+          </a>
+          .
+        </p>
       </div>
     </main>
   );

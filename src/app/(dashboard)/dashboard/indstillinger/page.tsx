@@ -20,7 +20,6 @@ type TeamMember = {
     id: string;
     name: string;
     email?: string | null;
-    phone?: string | null;
     image?: string | null;
   };
 };
@@ -88,7 +87,6 @@ export default function IndstillingerPage() {
   });
   const [profileName, setProfileName] = useState("");
   const [profileEmail, setProfileEmail] = useState("");
-  const [profilePhone, setProfilePhone] = useState("");
   const [profileImage, setProfileImage] = useState("");
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -115,7 +113,6 @@ export default function IndstillingerPage() {
       if (data.user) {
         setProfileName(data.user.name ?? "");
         setProfileEmail(data.user.email ?? "");
-        setProfilePhone(data.user.phone ?? "");
         setProfileImage(data.user.image ?? "");
       }
 
@@ -429,7 +426,6 @@ export default function IndstillingerPage() {
       body: JSON.stringify({
         name: profileName,
         email: profileEmail ? profileEmail.toLowerCase() : null,
-        phone: profilePhone || null,
         image: profileImage || null,
         currentPassword: currentPassword || undefined,
         newPassword: newPassword || undefined
@@ -657,15 +653,6 @@ export default function IndstillingerPage() {
               spellCheck={false}
               value={profileEmail}
               onChange={(event) => setProfileEmail(event.target.value.toLowerCase())}
-              className="input"
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="label" htmlFor="profile-phone">Telefon</label>
-            <input
-              id="profile-phone"
-              value={profilePhone}
-              onChange={(event) => setProfilePhone(event.target.value)}
               className="input"
             />
           </div>
@@ -963,7 +950,6 @@ export default function IndstillingerPage() {
             </div>
             <div className="mt-4 space-y-3 text-sm text-ink/70">
               <div>Email: {selectedMember.user.email ?? "—"}</div>
-              <div>Telefon: {selectedMember.user.phone ?? "—"}</div>
               <div>Rolle: {roleLabels[selectedMember.role] ?? selectedMember.role}</div>
               <div>Status: {statusLabels[selectedMember.status] ?? selectedMember.status}</div>
             </div>

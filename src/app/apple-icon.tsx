@@ -1,4 +1,5 @@
 import { ImageResponse } from "next/og";
+import { brandIconSvg } from "./brand-icon-svg";
 
 export const size = {
   width: 180,
@@ -8,42 +9,25 @@ export const size = {
 export const contentType = "image/png";
 
 export default function AppleIcon() {
+  const svgDataUri = `data:image/svg+xml;utf8,${encodeURIComponent(brandIconSvg)}`;
+
   return new ImageResponse(
     (
       <div
         style={{
           width: "100%",
           height: "100%",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background: "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)",
-          borderRadius: 36
+          display: "flex"
         }}
       >
-        <div
+        <img
+          src={svgDataUri}
+          alt="Holdbold apple icon"
           style={{
-            width: 112,
-            height: 112,
-            borderRadius: "50%",
-            background: "#ffffff",
-            border: "4px solid #e2e8f0",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center"
+            width: "100%",
+            height: "100%"
           }}
-        >
-          <div
-            style={{
-              width: 34,
-              height: 34,
-              borderRadius: "50%",
-              background: "#0f172a",
-              boxShadow:
-                "0 -42px 0 -14px #0f172a, 0 42px 0 -14px #0f172a, 42px 0 0 -14px #0f172a, -42px 0 0 -14px #0f172a"
-            }}
-          />
-        </div>
+        />
       </div>
     ),
     {

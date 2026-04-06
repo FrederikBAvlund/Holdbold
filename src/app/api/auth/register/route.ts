@@ -6,28 +6,9 @@ import { createNotifications } from "@/lib/notifications";
 
 const bodySchema = z.object({
   name: z.string().trim().min(1, "Navn er paakraevet"),
-  email: z
-    .string()
-    .trim()
-    .email("Email er ugyldig")
-    .optional()
-    .or(z.literal("")),
-  phone: z
-    .string()
-    .trim()
-    .min(6, "Telefon skal vaere mindst 6 tegn")
-    .optional()
-    .or(z.literal("")),
+  email: z.string().trim().email("Email er ugyldig"),
   password: z.string().min(8, "Adgangskode skal vaere mindst 8 tegn"),
   teamSlug: z.string().trim().min(1, "Hold slug er paakraevet")
-}).superRefine((value, context) => {
-  if (!value.email && !value.phone) {
-    context.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ["email"],
-      message: "Email eller telefon er paakraevet"
-    });
-  }
 });
 
 function toFieldErrors(error: z.ZodError) {
@@ -64,8 +45,7 @@ export async function POST(request: Request) {
 
   const body = {
     ...parsed.data,
-    email: parsed.data.email ? parsed.data.email.toLowerCase() : undefined,
-    phone: parsed.data.phone || undefined
+    email: parsed.data.email.toLowerCase()
   };
 
   const team = await prisma.team.findUnique({
@@ -83,19 +63,15 @@ export async function POST(request: Request) {
 
   const existingUser = await prisma.user.findFirst({
     where: {
-      OR: [
-        ...(body.email ? [{ email: { equals: body.email, mode: "insensitive" as const } }] : []),
-        ...(body.phone ? [{ phone: body.phone }] : [])
-      ]
+      email: { equals: body.email, mode: "insensitive" }
     }
   });
   if (existingUser) {
     return NextResponse.json(
       {
-        error: "Bruger med email/telefon findes allerede",
+        error: "Bruger med email findes allerede",
         fieldErrors: {
-          ...(body.email ? { email: "Email er allerede i brug" } : {}),
-          ...(body.phone ? { phone: "Telefon er allerede i brug" } : {})
+          email: "Email er allerede i brug"
         }
       },
       { status: 409 }
@@ -108,7 +84,6 @@ export async function POST(request: Request) {
     data: {
       name: body.name,
       email: body.email,
-      phone: body.phone,
       passwordHash,
       memberships: {
         create: {

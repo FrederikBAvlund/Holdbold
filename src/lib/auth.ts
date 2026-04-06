@@ -22,9 +22,9 @@ export const authOptions: NextAuthOptions = {
     ...(process.env.AUTH_CREDENTIALS_ENABLED === "true"
       ? [
           Credentials({
-            name: "Email eller telefon",
+            name: "Email",
             credentials: {
-              identifier: { label: "Email eller telefon", type: "text" },
+              identifier: { label: "Email", type: "email" },
               password: { label: "Adgangskode", type: "password" }
             },
             async authorize(credentials) {
@@ -33,16 +33,9 @@ export const authOptions: NextAuthOptions = {
 
               if (!identifier || !password) return null;
 
-              const normalizedIdentifier = identifier.includes("@")
-                ? identifier.toLowerCase()
-                : identifier;
-
               const user = await prisma.user.findFirst({
                 where: {
-                  OR: [
-                    { email: { equals: normalizedIdentifier, mode: "insensitive" } },
-                    { phone: normalizedIdentifier }
-                  ]
+                  email: { equals: identifier.toLowerCase(), mode: "insensitive" }
                 }
               });
 

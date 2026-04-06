@@ -110,10 +110,8 @@ async function main() {
   });
 
   const adminEmail = process.env.SEED_ADMIN_EMAIL;
-  const adminPhone = process.env.SEED_ADMIN_PHONE;
   const adminPassword = process.env.SEED_ADMIN_PASSWORD;
   const playerEmail = process.env.SEED_PLAYER_EMAIL;
-  const playerPhone = process.env.SEED_PLAYER_PHONE;
   const playerPassword = process.env.SEED_PLAYER_PASSWORD;
   const includeSinglePlayer = process.env.SEED_INCLUDE_SINGLE_PLAYER === "true";
   const includeDemoPlayers = process.env.SEED_INCLUDE_DEMO_PLAYERS === "true";
@@ -121,15 +119,14 @@ async function main() {
 
   let adminUserId = null;
 
-  if ((adminEmail || adminPhone) && adminPassword) {
+  if (adminEmail && adminPassword) {
     const passwordHash = await bcrypt.hash(adminPassword, 10);
 
     const user = await prisma.user.upsert({
-      where: adminEmail ? { email: adminEmail } : { phone: adminPhone },
+      where: { email: adminEmail },
       create: {
         name: "Admin",
         email: adminEmail,
-        phone: adminPhone,
         passwordHash
       },
       update: {}
@@ -144,15 +141,14 @@ async function main() {
     });
   }
 
-  if (includeSinglePlayer && (playerEmail || playerPhone) && playerPassword) {
+  if (includeSinglePlayer && playerEmail && playerPassword) {
     const passwordHash = await bcrypt.hash(playerPassword, 10);
 
     const user = await prisma.user.upsert({
-      where: playerEmail ? { email: playerEmail } : { phone: playerPhone },
+      where: { email: playerEmail },
       create: {
         name: "Spiller",
         email: playerEmail,
-        phone: playerPhone,
         passwordHash
       },
       update: {}

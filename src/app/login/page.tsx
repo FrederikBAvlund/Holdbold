@@ -27,17 +27,12 @@ export default function LoginPage() {
     setError(errorMessages[code] ?? "Login mislykkedes. Prøv igen.");
   }, [errorMessages]);
 
-  function normalizeIdentifier(value: string) {
-    const trimmed = value.trim();
-    return trimmed.includes("@") ? trimmed.toLowerCase() : trimmed;
-  }
-
   async function handleCredentials(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setLoading(true);
     setError(null);
     const formData = new FormData(event.currentTarget);
-    const identifier = normalizeIdentifier(String(formData.get("identifier") ?? ""));
+    const identifier = String(formData.get("identifier") ?? "").trim().toLowerCase();
     const password = String(formData.get("password") ?? "");
     const result = await signIn("credentials", {
       identifier,
@@ -65,7 +60,7 @@ export default function LoginPage() {
           <h1 className="text-3xl font-semibold text-ink" style={{ fontFamily: "var(--font-display)" }}>
             Log ind
           </h1>
-          <p className="mt-2 text-ink/70">Brug email eller telefon.</p>
+          <p className="mt-2 text-ink/70">Brug din email.</p>
           {error ? (
             <p className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700">
               {error}
@@ -75,7 +70,10 @@ export default function LoginPage() {
           <form onSubmit={handleCredentials} className="mt-6 space-y-4">
             <input
               name="identifier"
-              placeholder="Email eller telefon"
+              type="email"
+              inputMode="email"
+              autoComplete="email"
+              placeholder="Email"
               className="input"
               autoCapitalize="none"
               autoCorrect="off"
@@ -101,6 +99,13 @@ export default function LoginPage() {
             Ingen konto?{" "}
             <a href="/signup" className="font-semibold text-ink underline underline-offset-4">
               Opret dig her
+            </a>
+            .
+          </p>
+          <p className="mt-2 text-xs text-ink/60">
+            Se hvordan vi behandler data i vores{" "}
+            <a href="/privatliv" className="underline underline-offset-4">
+              privatlivspolitik
             </a>
             .
           </p>
