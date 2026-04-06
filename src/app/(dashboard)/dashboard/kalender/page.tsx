@@ -625,6 +625,7 @@ export default function KalenderPage() {
     if (selectedEvent?.canceledAt) return;
     if (!eventIdForSignup || !userId) return;
     if (signupSubmitting) return;
+    if (signupStatus === status) return;
     if (status === "OUT" && reason.trim().length < 2) {
       setError("Skriv venligst hvorfor du ikke kan komme.");
       pushToast("Skriv venligst hvorfor du ikke kan komme.", "error");
@@ -1299,18 +1300,22 @@ export default function KalenderPage() {
                 <button
                   className={`rounded-full px-5 py-3 text-sm font-semibold uppercase tracking-[0.2em] ${
                     signupStatus === "IN" ? "bg-green-600 text-white" : "bg-green-100 text-green-700"
-                  } ${selectedEvent?.canceledAt ? "opacity-50 cursor-not-allowed" : ""}`}
+                  } ${
+                    selectedEvent?.canceledAt || signupStatus === "IN" ? "opacity-50 cursor-not-allowed" : ""
+                  }`}
                   onClick={() => setSignup("IN")}
-                  disabled={Boolean(selectedEvent?.canceledAt) || signupSubmitting !== null}
+                  disabled={Boolean(selectedEvent?.canceledAt) || signupSubmitting !== null || signupStatus === "IN"}
                 >
                   {signupSubmitting === "IN" ? "Gemmer..." : "Jeg kommer"}
                 </button>
                 <button
                   className={`rounded-full px-5 py-3 text-sm font-semibold uppercase tracking-[0.2em] ${
                     signupStatus === "OUT" ? "bg-red-600 text-white" : "bg-red-100 text-red-700"
-                  } ${selectedEvent?.canceledAt ? "opacity-50 cursor-not-allowed" : ""}`}
+                  } ${
+                    selectedEvent?.canceledAt || signupStatus === "OUT" ? "opacity-50 cursor-not-allowed" : ""
+                  }`}
                   onClick={() => setSignup("OUT")}
-                  disabled={Boolean(selectedEvent?.canceledAt) || signupSubmitting !== null}
+                  disabled={Boolean(selectedEvent?.canceledAt) || signupSubmitting !== null || signupStatus === "OUT"}
                 >
                   {signupSubmitting === "OUT" ? "Gemmer..." : "Jeg kan ikke"}
                 </button>

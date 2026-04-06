@@ -227,12 +227,14 @@ export default function BoderPage() {
   const [editCategory, setEditCategory] = useState<"SOME" | "FAELLES" | "SPILLER" | "DIVERSE">("SPILLER");
   const [editDescription, setEditDescription] = useState("");
   const [showCreateTemplateModal, setShowCreateTemplateModal] = useState(false);
+  const [createTemplateSubmitting, setCreateTemplateSubmitting] = useState(false);
   const [showPayModal, setShowPayModal] = useState(false);
   const [paySubmitting, setPaySubmitting] = useState(false);
   const [showCollectionModal, setShowCollectionModal] = useState(false);
   const [collectionTemplateId, setCollectionTemplateId] = useState("");
   const [collectionDeadline, setCollectionDeadline] = useState("");
   const [collectionSubmitting, setCollectionSubmitting] = useState(false);
+  const [assignFineSubmitting, setAssignFineSubmitting] = useState(false);
   const [selectedDebtorUserId, setSelectedDebtorUserId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -432,75 +434,87 @@ export default function BoderPage() {
 
   async function handleCreateTemplate(event: React.FormEvent) {
     event.preventDefault();
+    if (createTemplateSubmitting) return;
+    setCreateTemplateSubmitting(true);
 
-    const response = await fetch("/api/fine-templates", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        teamId,
-        title: templateTitle,
-        amount: Number(templateAmount),
-        category: templateCategory,
-        description: templateDescription || undefined,
-        createdById: userId || undefined
-      })
-    });
+    try {
+      const response = await fetch("/api/fine-templates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          teamId,
+          title: templateTitle,
+          amount: Number(templateAmount),
+          category: templateCategory,
+          description: templateDescription || undefined,
+          createdById: userId || undefined
+        })
+      });
 
-    const data = await response.json();
-    if (!response.ok) {
-      pushToast(data.error ?? "Kunne ikke oprette bødeskabelon", "error");
-      return;
+      const data = await response.json();
+      if (!response.ok) {
+        pushToast(data.error ?? "Kunne ikke oprette bødeskabelon", "error");
+        return;
+      }
+
+      pushToast("Bødeskabelon oprettet", "success");
+      setTemplateTitle("");
+      setTemplateAmount(20);
+      setTemplateCategory("SPILLER");
+      setTemplateDescription("");
+      setTemplates((prev) => [data.template, ...prev]);
+      setShowCreateTemplateModal(false);
+    } finally {
+      setCreateTemplateSubmitting(false);
     }
-
-    pushToast("Bødeskabelon oprettet", "success");
-    setTemplateTitle("");
-    setTemplateAmount(20);
-    setTemplateCategory("SPILLER");
-    setTemplateDescription("");
-    setTemplates((prev) => [data.template, ...prev]);
-    setShowCreateTemplateModal(false);
   }
 
   async function handleCreateFine(event: React.FormEvent) {
     event.preventDefault();
+    if (assignFineSubmitting) return;
     if (!selectedUserIds.length) {
       pushToast("Vælg mindst én spiller", "error");
       return;
     }
+    setAssignFineSubmitting(true);
 
-    const recipients = selectedUserIds;
-    const payloadBase: Record<string, unknown> = {
-      teamId,
-      createdById: userId || undefined
-    };
+    try {
+      const recipients = selectedUserIds;
+      const payloadBase: Record<string, unknown> = {
+        teamId,
+        createdById: userId || undefined
+      };
 
-    if (selectedTemplateId) {
-      payloadBase.templateId = selectedTemplateId;
-    } else {
-      payloadBase.amount = Number(fineAmount);
-      payloadBase.reason = fineReason;
+      if (selectedTemplateId) {
+        payloadBase.templateId = selectedTemplateId;
+      } else {
+        payloadBase.amount = Number(fineAmount);
+        payloadBase.reason = fineReason;
+      }
+
+      const responses = await Promise.all(
+        recipients.map((recipientId) =>
+          fetch("/api/fines", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ...payloadBase, userId: recipientId })
+          })
+        )
+      );
+      const failed = responses.find((response) => !response.ok);
+      if (failed) {
+        const data = await failed.json().catch(() => ({}));
+        pushToast(data.error ?? "Kunne ikke oprette bøde", "error");
+        return;
+      }
+
+      pushToast(canManageFines ? "Bøder tildelt" : "Bøder foreslået", "success");
+      setShowAssignModal(false);
+      setSelectedUserIds([]);
+      await refreshFinesAndApprovals();
+    } finally {
+      setAssignFineSubmitting(false);
     }
-
-    const responses = await Promise.all(
-      recipients.map((recipientId) =>
-        fetch("/api/fines", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...payloadBase, userId: recipientId })
-        })
-      )
-    );
-    const failed = responses.find((response) => !response.ok);
-    if (failed) {
-      const data = await failed.json().catch(() => ({}));
-      pushToast(data.error ?? "Kunne ikke oprette bøde", "error");
-      return;
-    }
-
-    pushToast(canManageFines ? "Bøder tildelt" : "Bøder foreslået", "success");
-    setShowAssignModal(false);
-    setSelectedUserIds([]);
-    await refreshFinesAndApprovals();
   }
 
   async function refreshFinesAndApprovals() {
@@ -1414,7 +1428,13 @@ export default function BoderPage() {
       ) : null}
 
       {showCreateTemplateModal ? (
-        <div className="modal-backdrop" onClick={() => setShowCreateTemplateModal(false)}>
+        <div
+          className="modal-backdrop"
+          onClick={() => {
+            if (createTemplateSubmitting) return;
+            setShowCreateTemplateModal(false);
+          }}
+        >
           <div className="modal-panel max-w-2xl" onClick={(event) => event.stopPropagation()}>
             <div className="flex items-start justify-between">
               <div>
@@ -1427,7 +1447,11 @@ export default function BoderPage() {
                     : "Skabelonen sendes til godkendelse hos bødeformand/admin."}
                 </p>
               </div>
-              <button className="btn-ghost" onClick={() => setShowCreateTemplateModal(false)}>
+              <button
+                className="btn-ghost"
+                onClick={() => setShowCreateTemplateModal(false)}
+                disabled={createTemplateSubmitting}
+              >
                 Luk
               </button>
             </div>
@@ -1482,8 +1506,12 @@ export default function BoderPage() {
                   className="input"
                 />
               </div>
-              <button className="btn-primary sm:col-span-2">
-                {canManageFines ? "Opret skabelon" : "Foreslå skabelon"}
+              <button className="btn-primary sm:col-span-2" disabled={createTemplateSubmitting}>
+                {createTemplateSubmitting
+                  ? "Gemmer..."
+                  : canManageFines
+                  ? "Opret skabelon"
+                  : "Foreslå skabelon"}
               </button>
             </form>
           </div>
@@ -1494,6 +1522,7 @@ export default function BoderPage() {
         <div
           className="modal-backdrop assign-backdrop"
           onClick={() => {
+            if (assignFineSubmitting) return;
             setShowAssignModal(false);
             setSelectedUserIds([]);
             setMemberSearch("");
@@ -1511,11 +1540,13 @@ export default function BoderPage() {
               <button
                 className="btn-ghost"
                 onClick={() => {
+                  if (assignFineSubmitting) return;
                   setShowAssignModal(false);
                   setSelectedUserIds([]);
                   setMemberSearch("");
                   setSelectedTemplateId("");
                 }}
+                disabled={assignFineSubmitting}
               >
                 Luk
               </button>
@@ -1631,7 +1662,13 @@ export default function BoderPage() {
                   </div>
                 </>
               ) : null}
-              <button className="btn-primary w-full">{canManageFines ? "Tildel bøde" : "Foreslå bøde"}</button>
+              <button className="btn-primary w-full" disabled={assignFineSubmitting}>
+                {assignFineSubmitting
+                  ? "Gemmer..."
+                  : canManageFines
+                  ? "Tildel bøde"
+                  : "Foreslå bøde"}
+              </button>
             </form>
           </div>
         </div>

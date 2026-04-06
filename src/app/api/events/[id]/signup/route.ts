@@ -40,6 +40,19 @@ export async function POST(request: Request, { params }: { params: { id: string 
     return NextResponse.json({ error: "Begrundelse er påkrævet" }, { status: 400 });
   }
 
+  const existingSignup = await prisma.signup.findUnique({
+    where: {
+      eventId_userId: {
+        eventId: params.id,
+        userId: body.userId
+      }
+    }
+  });
+
+  if (existingSignup && existingSignup.status === body.status) {
+    return NextResponse.json({ signup: existingSignup, unchanged: true });
+  }
+
   const signup = await prisma.signup.upsert({
     where: {
       eventId_userId: {
