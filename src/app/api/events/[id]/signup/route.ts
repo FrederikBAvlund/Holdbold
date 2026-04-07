@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
 import { z } from "zod";
+import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { createNotifications } from "@/lib/notifications";
 import { getOrCreateMissedSignupTemplate } from "@/lib/autoFines";
@@ -45,11 +47,60 @@ export async function GET(request: Request, { params }: { params: { id: string }
 }
 
 export async function POST(request: Request, { params }: { params: { id: string } }) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Ikke logget ind" }, { status: 401 });
+  }
+
   const json = await request.json();
   const body = bodySchema.parse(json);
 
   if (body.status === "OUT" && (!body.reason || body.reason.trim().length < 2)) {
     return NextResponse.json({ error: "Begrundelse er påkrævet" }, { status: 400 });
+  }
+
+  const event = await prisma.event.findUnique({
+    where: { id: params.id },
+    select: {
+      id: true,
+      teamId: true,
+      title: true,
+      signupDeadline: true
+    }
+  });
+  if (!event) {
+    return NextResponse.json({ error: "Begivenhed ikke fundet" }, { status: 404 });
+  }
+
+  const actingMembership = await prisma.membership.findFirst({
+    where: {
+      teamId: event.teamId,
+      userId: session.user.id,
+      status: "ACTIVE"
+    },
+    select: { role: true }
+  });
+  if (!actingMembership) {
+    return NextResponse.json({ error: "Ikke adgang" }, { status: 403 });
+  }
+
+  const isOwnSignup = body.userId === session.user.id;
+  const canManageOtherSignups =
+    actingMembership.role === "ADMIN" || actingMembership.role === "BOEDEKASSEFORMAND";
+  if (!isOwnSignup && !canManageOtherSignups) {
+    return NextResponse.json({ error: "Kun admin/bødekasseformand kan opdatere andres svar" }, { status: 403 });
+  }
+
+  const targetMembership = await prisma.membership.findFirst({
+    where: {
+      teamId: event.teamId,
+      userId: body.userId,
+      status: "ACTIVE"
+    },
+    select: { role: true, userId: true }
+  });
+  if (!targetMembership) {
+    return NextResponse.json({ error: "Spiller ikke fundet på holdet" }, { status: 404 });
   }
 
   const existingSignup = await prisma.signup.findUnique({
@@ -61,7 +112,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
     }
   });
 
-  if (existingSignup && existingSignup.status === body.status) {
+  if (existingSignup && existingSignup.status === body.status && (existingSignup.reason ?? null) === (body.reason ?? null)) {
     return NextResponse.json({ signup: existingSignup, unchanged: true });
   }
 
@@ -84,19 +135,6 @@ export async function POST(request: Request, { params }: { params: { id: string 
     }
   });
 
-  const event = await prisma.event.findUnique({
-    where: { id: params.id },
-    select: {
-      id: true,
-      teamId: true,
-      title: true,
-      signupDeadline: true
-    }
-  });
-  if (!event) {
-    return NextResponse.json({ error: "Begivenhed ikke fundet" }, { status: 404 });
-  }
-
   await prisma.signupLog.create({
     data: {
       signupId: signup.id,
@@ -108,18 +146,24 @@ export async function POST(request: Request, { params }: { params: { id: string 
     }
   });
 
+  if (!isOwnSignup) {
+    const targetUser = await prisma.user.findUnique({
+      where: { id: body.userId },
+      select: { name: true }
+    });
+    await prisma.eventLog.create({
+      data: {
+        eventId: event.id,
+        actorId: session.user.id,
+        type: "SIGNUP",
+        message: `${targetUser?.name ?? "Bruger"} sat til ${body.status === "IN" ? "Jeg kommer" : body.status === "OUT" ? "Jeg kan ikke" : "Mangler svar"}`
+      }
+    });
+  }
+
   const deadlinePassed = new Date(event.signupDeadline).getTime() <= Date.now();
   if (deadlinePassed && (body.status === "IN" || body.status === "OUT")) {
-    const membership = await prisma.membership.findFirst({
-      where: {
-        teamId: event.teamId,
-        userId: body.userId,
-        status: "ACTIVE"
-      },
-      select: { role: true }
-    });
-
-    if (membership && membership.role !== "SOME") {
+    if (targetMembership.role !== "SOME") {
       const existingFine = await prisma.fine.findFirst({
         where: {
           teamId: event.teamId,

@@ -235,6 +235,7 @@ export default function KalenderPage() {
   const canAssignLateFine = actingMember
     ? actingMember.role === "ADMIN" || actingMember.role === "BOEDEKASSEFORMAND"
     : false;
+  const canEditOtherSignups = canAssignLateFine;
 
   useEffect(() => {
     function update() {
@@ -380,6 +381,11 @@ export default function KalenderPage() {
   const [editableThingCarrierId, setEditableThingCarrierId] = useState("");
   const [editableBeerCarrierId, setEditableBeerCarrierId] = useState("");
   const [savingMatchMeta, setSavingMatchMeta] = useState(false);
+  const [selectedLateFineUserIds, setSelectedLateFineUserIds] = useState<string[]>([]);
+  const [editingSignupMember, setEditingSignupMember] = useState<Member | null>(null);
+  const [editingSignupStatus, setEditingSignupStatus] = useState<"IN" | "OUT" | "UNKNOWN">("UNKNOWN");
+  const [editingSignupReason, setEditingSignupReason] = useState("");
+  const [editingSignupSubmitting, setEditingSignupSubmitting] = useState(false);
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [logs, setLogs] = useState<SignupLog[]>([]);
@@ -936,6 +942,85 @@ export default function KalenderPage() {
     );
   }, [lateGroups]);
 
+  useEffect(() => {
+    setSelectedLateFineUserIds((prev) => {
+      if (lateFineCandidates.length === 0) return [];
+      if (prev.length === 0) return lateFineCandidates;
+      const allowed = new Set(lateFineCandidates);
+      const kept = prev.filter((id) => allowed.has(id));
+      return kept.length > 0 ? kept : lateFineCandidates;
+    });
+  }, [lateFineCandidates]);
+
+  function toggleLateFineUser(userId: string) {
+    setSelectedLateFineUserIds((prev) =>
+      prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]
+    );
+  }
+
+  function openSignupEditor(member: Member) {
+    if (!canEditOtherSignups) return;
+    const currentStatus = signupMap.get(member.user.id);
+    const initialStatus: "IN" | "OUT" | "UNKNOWN" =
+      currentStatus === "IN" || currentStatus === "OUT" ? currentStatus : "UNKNOWN";
+    const latestReason = logs.find((entry) => entry.user.id === member.user.id)?.reason ?? "";
+    setEditingSignupMember(member);
+    setEditingSignupStatus(initialStatus);
+    setEditingSignupReason(initialStatus === "OUT" ? latestReason : "");
+  }
+
+  async function saveEditedSignup() {
+    if (!editingSignupMember || !eventIdForSignup || !userId) return;
+    if (editingSignupSubmitting) return;
+    if (editingSignupStatus === "OUT" && editingSignupReason.trim().length < 2) {
+      pushToast("Skriv venligst en begrundelse.", "error");
+      return;
+    }
+
+    setEditingSignupSubmitting(true);
+    try {
+      const response = await fetch(`/api/events/${eventIdForSignup}/signup`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: editingSignupMember.user.id,
+          status: editingSignupStatus,
+          reason: editingSignupStatus === "OUT" ? editingSignupReason : undefined
+        })
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        pushToast(data.error ?? "Kunne ikke opdatere tilmelding", "error");
+        return;
+      }
+
+      const [signupsResponse, logResponse] = await Promise.all([
+        fetch(`/api/events/${eventIdForSignup}/signups`, { cache: "no-store" }),
+        fetch(`/api/events/${eventIdForSignup}/signup/logs`, { cache: "no-store" })
+      ]);
+      const [signupsData, logData] = await Promise.all([signupsResponse.json(), logResponse.json()]);
+      setEventSignups(signupsData.signups ?? []);
+      setLogs(logData.logs ?? []);
+      setEventLogs(canManageEvents ? (logData.eventLogs ?? []) : []);
+      eventDetailsCacheRef.current.set(eventIdForSignup, {
+        signupStatus,
+        reason,
+        eventDeadlineAt,
+        editableMeetingAt,
+        editableDeadlineAt,
+        editableThingCarrierId,
+        editableBeerCarrierId,
+        eventSignups: signupsData.signups ?? [],
+        logs: logData.logs ?? [],
+        eventLogs: logData.eventLogs ?? []
+      });
+      pushToast("Tilmelding opdateret", "success");
+      setEditingSignupMember(null);
+    } finally {
+      setEditingSignupSubmitting(false);
+    }
+  }
+
   async function assignLateSignupFine() {
     if (!canAssignLateFine || !teamId || !userId || !eventIdForSignup) return;
     if (lateFineSubmitting) return;
@@ -943,7 +1028,7 @@ export default function KalenderPage() {
       pushToast("Vælg en bødeskabelon først", "error");
       return;
     }
-    if (lateFineCandidates.length === 0) {
+    if (selectedLateFineUserIds.length === 0) {
       pushToast("Ingen spillere at give bøde til", "info");
       return;
     }
@@ -951,7 +1036,7 @@ export default function KalenderPage() {
     setLateFineSubmitting(true);
     try {
       const responses = await Promise.all(
-        lateFineCandidates.map((targetUserId) =>
+        selectedLateFineUserIds.map((targetUserId) =>
           fetch("/api/fines", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -973,7 +1058,7 @@ export default function KalenderPage() {
         return;
       }
 
-      pushToast("Bøder oprettet for spillere efter deadline", "success");
+      pushToast(`Bøder oprettet for ${selectedLateFineUserIds.length} spiller(e)`, "success");
     } finally {
       setLateFineSubmitting(false);
     }
@@ -1541,7 +1626,15 @@ export default function KalenderPage() {
                     <div className="space-y-1 text-sm text-ink/70">
                       {signupGroups.in.length === 0 ? <div>Ingen</div> : null}
                       {signupGroups.in.map((member) => (
-                        <div key={member.user.id}>{member.user.name ?? "Ukendt"}</div>
+                        <button
+                          key={member.user.id}
+                          type="button"
+                          onClick={() => openSignupEditor(member)}
+                          className={`block text-left ${canEditOtherSignups ? "hover:underline" : ""}`}
+                          disabled={!canEditOtherSignups}
+                        >
+                          {member.user.name ?? "Ukendt"}
+                        </button>
                       ))}
                     </div>
                   </div>
@@ -1556,7 +1649,15 @@ export default function KalenderPage() {
                     <div className="space-y-1 text-sm text-ink/70">
                       {signupGroups.out.length === 0 ? <div>Ingen</div> : null}
                       {signupGroups.out.map((member) => (
-                        <div key={member.user.id}>{member.user.name ?? "Ukendt"}</div>
+                        <button
+                          key={member.user.id}
+                          type="button"
+                          onClick={() => openSignupEditor(member)}
+                          className={`block text-left ${canEditOtherSignups ? "hover:underline" : ""}`}
+                          disabled={!canEditOtherSignups}
+                        >
+                          {member.user.name ?? "Ukendt"}
+                        </button>
                       ))}
                     </div>
                   </div>
@@ -1571,13 +1672,83 @@ export default function KalenderPage() {
                     <div className="space-y-1 text-sm text-ink/70">
                       {signupGroups.missing.length === 0 ? <div>Ingen</div> : null}
                       {signupGroups.missing.map((member) => (
-                        <div key={member.user.id}>{member.user.name ?? "Ukendt"}</div>
+                        <button
+                          key={member.user.id}
+                          type="button"
+                          onClick={() => openSignupEditor(member)}
+                          className={`block text-left ${canEditOtherSignups ? "hover:underline" : ""}`}
+                          disabled={!canEditOtherSignups}
+                        >
+                          {member.user.name ?? "Ukendt"}
+                        </button>
                       ))}
                     </div>
                   </div>
                   </div>
                 )}
               </div>
+              {editingSignupMember ? (
+                <div className="mt-4 rounded-2xl border border-ink/10 bg-white/90 p-4">
+                  <p className="label">Rediger tilmelding</p>
+                  <p className="mt-1 text-sm text-ink/70">{editingSignupMember.user.name ?? "Ukendt"}</p>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                    <button
+                      type="button"
+                      className={`rounded-full px-4 py-2 text-sm font-semibold ${
+                        editingSignupStatus === "IN" ? "bg-green-600 text-white" : "bg-green-100 text-green-700"
+                      }`}
+                      onClick={() => setEditingSignupStatus("IN")}
+                    >
+                      Jeg kommer
+                    </button>
+                    <button
+                      type="button"
+                      className={`rounded-full px-4 py-2 text-sm font-semibold ${
+                        editingSignupStatus === "OUT" ? "bg-red-600 text-white" : "bg-red-100 text-red-700"
+                      }`}
+                      onClick={() => setEditingSignupStatus("OUT")}
+                    >
+                      Jeg kan ikke
+                    </button>
+                    <button
+                      type="button"
+                      className={`rounded-full px-4 py-2 text-sm font-semibold ${
+                        editingSignupStatus === "UNKNOWN" ? "bg-amber-500 text-white" : "bg-amber-100 text-amber-800"
+                      }`}
+                      onClick={() => setEditingSignupStatus("UNKNOWN")}
+                    >
+                      Mangler svar
+                    </button>
+                  </div>
+                  <div className="mt-3 space-y-2">
+                    <label className="label">Begrundelse</label>
+                    <textarea
+                      className="input min-h-[80px]"
+                      placeholder="Valgfri begrundelse (påkrævet ved 'Jeg kan ikke')"
+                      value={editingSignupReason}
+                      onChange={(event) => setEditingSignupReason(event.target.value)}
+                    />
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      className="btn-primary"
+                      onClick={saveEditedSignup}
+                      disabled={editingSignupSubmitting}
+                    >
+                      {editingSignupSubmitting ? "Gemmer..." : "Gem ændring"}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-ghost"
+                      onClick={() => setEditingSignupMember(null)}
+                      disabled={editingSignupSubmitting}
+                    >
+                      Annuller
+                    </button>
+                  </div>
+                </div>
+              ) : null}
               {(lateGroups.lateResponses.length > 0 || lateGroups.missingAfterDeadline.length > 0) &&
               activeDeadlineAt ? (
                 <div className="mt-4 rounded-2xl border border-red-200 bg-red-50/70 p-4">
@@ -1606,9 +1777,9 @@ export default function KalenderPage() {
                           className="btn-primary"
                           type="button"
                           onClick={assignLateSignupFine}
-                          disabled={!selectedLateFineTemplateId || lateFineCandidates.length === 0 || lateFineSubmitting}
+                          disabled={!selectedLateFineTemplateId || selectedLateFineUserIds.length === 0 || lateFineSubmitting}
                         >
-                          {lateFineSubmitting ? "Opretter..." : `Giv bøde til ${lateFineCandidates.length}`}
+                          {lateFineSubmitting ? "Opretter..." : `Giv bøde til ${selectedLateFineUserIds.length}`}
                         </button>
                       </div>
                     ) : null}
@@ -1621,7 +1792,24 @@ export default function KalenderPage() {
                     <p className="mt-2 text-xs text-ink/60">
                       Ingen godkendte bødeskabeloner fundet endnu.
                     </p>
-                  ) : null}
+                  ) : (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        className="btn-ghost text-xs"
+                        onClick={() => setSelectedLateFineUserIds(lateFineCandidates)}
+                      >
+                        Vælg alle
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-ghost text-xs"
+                        onClick={() => setSelectedLateFineUserIds([])}
+                      >
+                        Fravælg alle
+                      </button>
+                    </div>
+                  )}
                   <div className="mt-3 grid gap-4 md:grid-cols-2">
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-sm font-semibold text-ink">
@@ -1634,7 +1822,14 @@ export default function KalenderPage() {
                       <div className="space-y-1 text-sm text-ink/75">
                         {lateGroups.lateResponses.length === 0 ? <div>Ingen</div> : null}
                         {lateGroups.lateResponses.map((member) => (
-                          <div key={`late-${member.user.id}`}>{member.user.name ?? "Ukendt"}</div>
+                          <label key={`late-${member.user.id}`} className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={selectedLateFineUserIds.includes(member.user.id)}
+                              onChange={() => toggleLateFineUser(member.user.id)}
+                            />
+                            <span>{member.user.name ?? "Ukendt"}</span>
+                          </label>
                         ))}
                       </div>
                     </div>
@@ -1649,7 +1844,14 @@ export default function KalenderPage() {
                       <div className="space-y-1 text-sm text-ink/75">
                         {lateGroups.missingAfterDeadline.length === 0 ? <div>Ingen</div> : null}
                         {lateGroups.missingAfterDeadline.map((member) => (
-                          <div key={`missing-${member.user.id}`}>{member.user.name ?? "Ukendt"}</div>
+                          <label key={`missing-${member.user.id}`} className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={selectedLateFineUserIds.includes(member.user.id)}
+                              onChange={() => toggleLateFineUser(member.user.id)}
+                            />
+                            <span>{member.user.name ?? "Ukendt"}</span>
+                          </label>
                         ))}
                       </div>
                     </div>
