@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useDashboardTeam } from "@/components/DashboardTeamProvider";
 
@@ -288,7 +289,7 @@ export default function DashboardHome() {
           {loadingNextEvents ? (
             <p className="mt-2 text-sm text-ink/70">Indlæser begivenheder...</p>
           ) : nextEvents.length > 0 ? (
-            <div className="mt-3 space-y-12">
+            <div className="mt-3 space-y-3">
               {nextEvents.map((eventItem) => {
                 const times = formatEventTimes(eventItem);
                 const counts = eventCounts[eventItem.id] ?? { in: 0, out: 0, missing: memberCount };
@@ -297,7 +298,7 @@ export default function DashboardHome() {
                     key={eventItem.id}
                     type="button"
                     onClick={() => openNextEvent(eventItem)}
-                    className="w-full space-y-2 rounded-control border border-transparent p-2 text-left text-sm text-ink/70 transition hover:border-ink/12 hover:bg-white/55"
+                    className="w-full space-y-2 rounded-control border border-ink/10 bg-white p-4 text-left text-sm text-ink/70 shadow-sm transition hover:border-ink/14 hover:bg-white/88"
                   >
                     <div className="text-base font-semibold text-ink">{eventItem.title}</div>
                     <div className="grid gap-2 rounded-control border border-ink/10 bg-white/80 p-3">
@@ -342,11 +343,30 @@ export default function DashboardHome() {
           )}
         </div>
         <div className="card-soft">
-          <h3 className="text-lg font-semibold text-ink">Mine bøder</h3>
-          <p className="mt-2 text-sm text-ink/70">Total skyldsbeløb</p>
-          <div className="mt-4 text-3xl font-semibold text-ink">
-            {loadingFines ? "Indlæser..." : `${totalFines} kr`}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0">
+              <h3 className="text-base font-semibold leading-tight text-ink sm:text-lg">Mine bøder</h3>
+              <p className="mt-0.5 text-xs text-ink/55">Skylder i alt</p>
+            </div>
+            <div className="shrink-0 rounded-control border border-ink/10 bg-white/70 px-4 py-2 text-right shadow-sm">
+              <p
+                className={`tabular-nums tracking-tight text-ink ${
+                  loadingFines ? "text-sm font-medium text-ink/50" : "text-xl font-semibold sm:text-2xl"
+                }`}
+              >
+                {loadingFines ? "Indlæser..." : `${totalFines} kr`}
+              </p>
+            </div>
           </div>
+          <Link
+            href="/dashboard/boder"
+            className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-moss hover:underline"
+          >
+            Se bøder
+            <span aria-hidden className="text-moss/80">
+              →
+            </span>
+          </Link>
         </div>
       </div>
     </section>

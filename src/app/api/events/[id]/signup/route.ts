@@ -65,6 +65,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
       id: true,
       teamId: true,
       title: true,
+      date: true,
       signupDeadline: true
     }
   });
@@ -89,6 +90,14 @@ export async function POST(request: Request, { params }: { params: { id: string 
     actingMembership.role === "ADMIN" || actingMembership.role === "BOEDEKASSEFORMAND";
   if (!isOwnSignup && !canManageOtherSignups) {
     return NextResponse.json({ error: "Kun admin/bødekasseformand kan opdatere andres svar" }, { status: 403 });
+  }
+
+  const eventStartMs = new Date(event.date).getTime();
+  if (isOwnSignup && eventStartMs <= Date.now()) {
+    return NextResponse.json(
+      { error: "Begivenheden er afviklet, så dit svar kan ikke ændres." },
+      { status: 400 }
+    );
   }
 
   const targetMembership = await prisma.membership.findFirst({

@@ -600,6 +600,9 @@ export default function KalenderPage() {
   const isDeadlinePassed = Boolean(
     eventDeadlineAt && new Date(eventDeadlineAt).getTime() <= Date.now()
   );
+  const signupLockedPastStart = Boolean(
+    selectedEvent?.date && new Date(selectedEvent.date).getTime() <= Date.now()
+  );
 
   async function saveMatchMeta() {
     if (!eventIdForSignup) return;
@@ -689,6 +692,10 @@ export default function KalenderPage() {
 
   async function setSignup(status: "IN" | "OUT") {
     if (selectedEvent?.canceledAt) return;
+    if (signupLockedPastStart) {
+      pushToast("Begivenheden er afviklet – du kan ikke ændre dit svar.", "error");
+      return;
+    }
     if (!eventIdForSignup || !userId) return;
     if (signupSubmitting) return;
     if (signupStatus === status) return;
@@ -1045,17 +1052,17 @@ export default function KalenderPage() {
 
   return (
     <section className="space-y-6">
-      <header className="card">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h2 className="text-2xl font-semibold text-ink">Kalender</h2>
-            <p className="mt-2 text-ink/70">Overblik over kampe og træning.</p>
+      <header className="card !p-4 sm:!p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+          <div className="min-w-0">
+            <h2 className="font-display text-xl font-semibold leading-tight text-ink sm:text-2xl">Kalender</h2>
+            <p className="mt-1 text-sm leading-snug text-ink/70">Overblik over kampe og træning.</p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="inline-flex rounded-full border border-ink/15 bg-white/80 p-1">
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+            <div className="inline-flex w-full rounded-full border border-ink/15 bg-white/80 p-1 sm:w-auto">
               <button
                 type="button"
-                className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+                className={`min-h-[2.75rem] flex-1 rounded-full px-4 py-2 text-sm font-semibold transition sm:min-h-0 sm:flex-none ${
                   viewMode === "calendar" ? "bg-ink text-fog" : "text-ink/75 hover:text-ink"
                 }`}
                 onClick={showCalendarView}
@@ -1064,7 +1071,7 @@ export default function KalenderPage() {
               </button>
               <button
                 type="button"
-                className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+                className={`min-h-[2.75rem] flex-1 rounded-full px-4 py-2 text-sm font-semibold transition sm:min-h-0 sm:flex-none ${
                   viewMode === "list" ? "bg-ink text-fog" : "text-ink/75 hover:text-ink"
                 }`}
                 onClick={showListView}
@@ -1073,7 +1080,11 @@ export default function KalenderPage() {
               </button>
             </div>
             {canManageEvents ? (
-              <button className="btn-primary" onClick={() => setShowModal(true)} disabled={creatingEvent}>
+              <button
+                className="btn-primary w-full whitespace-nowrap sm:w-auto"
+                onClick={() => setShowModal(true)}
+                disabled={creatingEvent}
+              >
                 Opret begivenhed
               </button>
             ) : null}
@@ -1081,9 +1092,9 @@ export default function KalenderPage() {
         </div>
       </header>
 
-      <div className="card">
+      <div className="card !p-3 sm:!p-5">
         {viewMode === "calendar" ? (
-          <div className="rounded-2xl border border-ink/10 bg-white/90 p-3">
+          <div className="overflow-hidden rounded-app-soft bg-white/40">
             <FullCalendar
               plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
               initialView={isMobile ? "dayGridWeek" : "dayGridMonth"}
@@ -1131,14 +1142,29 @@ export default function KalenderPage() {
               eventContent={(arg) => {
                 const canceled = arg.event.extendedProps.canceledAt;
                 const color = arg.event.backgroundColor || "#94a3b8";
+                const timePart = arg.timeText?.trim() ?? "";
                 return (
-                  <div className={`flex items-center gap-2 ${canceled ? "line-through opacity-60" : ""}`}>
-                    <span
-                      className="inline-block h-2 w-2 rounded-full"
-                      style={{ backgroundColor: color }}
-                    />
-                    {arg.timeText ? `${arg.timeText} ` : ""}
-                    {arg.event.title}
+                  <div
+                    className={`w-full min-w-0 text-left ${canceled ? "line-through opacity-60" : ""}`}
+                  >
+                    <div className="flex gap-1.5 sm:items-center sm:gap-2">
+                      <span
+                        className="mt-0.5 h-2 w-2 shrink-0 rounded-full sm:mt-0"
+                        style={{ backgroundColor: color }}
+                        aria-hidden
+                      />
+                      <span className="min-w-0 break-words leading-snug">
+                        {timePart ? (
+                          <span className="whitespace-nowrap font-semibold tabular-nums text-ink/80">
+                            {timePart}
+                            <span className="mx-0.5 font-normal text-ink/35" aria-hidden>
+                              ·
+                            </span>
+                          </span>
+                        ) : null}
+                        <span className="font-semibold text-ink">{arg.event.title}</span>
+                      </span>
+                    </div>
                   </div>
                 );
               }}
@@ -1458,11 +1484,18 @@ export default function KalenderPage() {
                 </div>
               ) : null}
               {canEditEventDuties ? (
-                <div className="rounded-2xl border border-ink/10 bg-white/90 p-4">
-                  <p className="label">Praktisk</p>
-                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                    <div className="space-y-2">
-                      <label className="label" htmlFor="thing-carrier">Tingene</label>
+                <div className="rounded-2xl border border-ink/10 bg-white/90 p-4 sm:p-5">
+                  <div className="border-b border-ink/10 pb-4">
+                    <p className="text-sm font-semibold text-ink">Praktisk</p>
+                    <p className="mt-1 max-w-prose text-xs leading-relaxed text-ink/55">
+                      Hvem tager tingene med og står for øl? Gem når du har fordelt opgaverne.
+                    </p>
+                  </div>
+                  <div className="mt-5 grid gap-5 sm:grid-cols-2">
+                    <div className="flex min-w-0 flex-col gap-2.5">
+                      <label className="text-xs font-medium text-ink/70" htmlFor="thing-carrier">
+                        Tingene
+                      </label>
                       <select
                         id="thing-carrier"
                         className="input"
@@ -1477,8 +1510,10 @@ export default function KalenderPage() {
                         ))}
                       </select>
                     </div>
-                    <div className="space-y-2">
-                      <label className="label" htmlFor="beer-carrier">Øl</label>
+                    <div className="flex min-w-0 flex-col gap-2.5">
+                      <label className="text-xs font-medium text-ink/70" htmlFor="beer-carrier">
+                        Øl
+                      </label>
                       <select
                         id="beer-carrier"
                         className="input"
@@ -1494,58 +1529,121 @@ export default function KalenderPage() {
                       </select>
                     </div>
                   </div>
-                  <div className="mt-3 flex items-center justify-end">
-                    <button className="btn-primary" type="button" onClick={saveMatchMeta} disabled={savingMatchMeta}>
+                  <div className="mt-5 flex border-t border-ink/10 pt-4 sm:justify-end">
+                    <button
+                      className="btn-primary w-full sm:w-auto"
+                      type="button"
+                      onClick={saveMatchMeta}
+                      disabled={savingMatchMeta}
+                    >
                       {savingMatchMeta ? "Gemmer..." : "Gem opgaver"}
                     </button>
                   </div>
                 </div>
               ) : null}
-              <div className="flex gap-2">
-                <button
-                  className={`rounded-full px-5 py-3 text-sm font-semibold uppercase tracking-[0.2em] ${
-                    signupStatus === "IN" ? "bg-green-600 text-white" : "bg-green-100 text-green-700"
-                  } ${
-                    selectedEvent?.canceledAt || signupStatus === "IN" ? "opacity-50 cursor-not-allowed" : ""
-                  }`}
-                  onClick={() => setSignup("IN")}
-                  disabled={
-                    Boolean(selectedEvent?.canceledAt) ||
-                    signupSubmitting !== null ||
-                    signupStatus === "IN" ||
-                    eventDetailsLoading
-                  }
-                >
-                  {signupSubmitting === "IN" ? "Gemmer..." : eventDetailsLoading ? "Henter..." : "Jeg kommer"}
-                </button>
-                <button
-                  className={`rounded-full px-5 py-3 text-sm font-semibold uppercase tracking-[0.2em] ${
-                    signupStatus === "OUT" ? "bg-red-600 text-white" : "bg-red-100 text-red-700"
-                  } ${
-                    selectedEvent?.canceledAt || signupStatus === "OUT" ? "opacity-50 cursor-not-allowed" : ""
-                  }`}
-                  onClick={() => setSignup("OUT")}
-                  disabled={
-                    Boolean(selectedEvent?.canceledAt) ||
-                    signupSubmitting !== null ||
-                    signupStatus === "OUT" ||
-                    eventDetailsLoading
-                  }
-                >
-                  {signupSubmitting === "OUT" ? "Gemmer..." : eventDetailsLoading ? "Henter..." : "Jeg kan ikke"}
-                </button>
-              </div>
-              <div className="space-y-2">
-                <label className="label" htmlFor="reason">Hvis du ikke kan komme, skriv hvorfor</label>
-                <textarea
-                  id="reason"
-                  value={reason}
-                  onChange={(event) => setReason(event.target.value)}
-                  placeholder="Skriv kort hvorfor..."
-                  className="input min-h-[90px]"
-                  disabled={Boolean(selectedEvent?.canceledAt)}
-                />
-                {error ? <p className="text-sm text-red-600">{error}</p> : null}
+              <div className="rounded-2xl border border-ink/10 bg-white/90 p-4 sm:p-5">
+                <div className="mb-4 border-b border-ink/10 pb-4">
+                  <p className="text-sm font-semibold text-ink">Din tilmelding</p>
+                  <p className="mt-1 max-w-prose text-xs leading-relaxed text-ink/55">
+                    Angiv din deltagelse her.
+                  </p>
+                  {signupLockedPastStart ? (
+                    <p className="mt-3 rounded-control border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-950">
+                      Begivenheden er afviklet — dit svar kan ikke ændres her.
+                    </p>
+                  ) : null}
+                </div>
+                <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
+                  <button
+                    type="button"
+                    className={`rounded-control flex min-h-[3rem] items-center justify-center gap-2 px-3 py-2.5 text-sm font-semibold transition ${
+                      signupStatus === "IN"
+                        ? "bg-green-600 text-white shadow-md ring-2 ring-green-800 ring-offset-2 ring-offset-white"
+                        : signupLockedPastStart || selectedEvent?.canceledAt
+                          ? "cursor-not-allowed border-2 border-ink/10 bg-ink/[0.04] text-ink/35"
+                          : "border-2 border-green-200 bg-green-50 text-green-900 hover:border-green-300 hover:bg-green-100"
+                    } ${signupStatus === "IN" ? "cursor-not-allowed" : ""}`}
+                    onClick={() => setSignup("IN")}
+                    disabled={
+                      Boolean(selectedEvent?.canceledAt) ||
+                      signupLockedPastStart ||
+                      signupSubmitting !== null ||
+                      signupStatus === "IN" ||
+                      eventDetailsLoading
+                    }
+                  >
+                    {signupSubmitting === "IN" ? (
+                      "Gemmer..."
+                    ) : eventDetailsLoading ? (
+                      "Henter..."
+                    ) : (
+                      <>
+                        {signupStatus === "IN" ? (
+                          <span className="text-lg font-bold leading-none" aria-hidden>
+                            ✓
+                          </span>
+                        ) : null}
+                        Jeg kommer
+                      </>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    className={`rounded-control flex min-h-[3rem] items-center justify-center gap-2 px-3 py-2.5 text-sm font-semibold transition ${
+                      signupStatus === "OUT"
+                        ? "bg-red-600 text-white shadow-md ring-2 ring-red-900 ring-offset-2 ring-offset-white"
+                        : signupLockedPastStart || selectedEvent?.canceledAt
+                          ? "cursor-not-allowed border-2 border-ink/10 bg-ink/[0.04] text-ink/35"
+                          : "border-2 border-red-200 bg-red-50 text-red-900 hover:border-red-300 hover:bg-red-100"
+                    } ${signupStatus === "OUT" ? "cursor-not-allowed" : ""}`}
+                    onClick={() => setSignup("OUT")}
+                    disabled={
+                      Boolean(selectedEvent?.canceledAt) ||
+                      signupLockedPastStart ||
+                      signupSubmitting !== null ||
+                      signupStatus === "OUT" ||
+                      eventDetailsLoading
+                    }
+                  >
+                    {signupSubmitting === "OUT" ? (
+                      "Gemmer..."
+                    ) : eventDetailsLoading ? (
+                      "Henter..."
+                    ) : (
+                      <>
+                        {signupStatus === "OUT" ? (
+                          <span className="text-lg font-bold leading-none" aria-hidden>
+                            ✓
+                          </span>
+                        ) : null}
+                        Jeg kan ikke
+                      </>
+                    )}
+                  </button>
+                </div>
+                <div className="mt-5 space-y-2">
+                  <div>
+                    <label className="text-xs font-medium text-ink/70" htmlFor="reason">
+                      Begrundelse ved framelding <span className="text-red-700">*</span>
+                    </label>
+                    <p id="reason-hint" className="mt-0.5 text-xs text-ink/50">
+                      Påkrævet, når du vælger <strong>Jeg kan ikke</strong>.
+                    </p>
+                  </div>
+                  <textarea
+                    id="reason"
+                    value={reason}
+                    onChange={(event) => {
+                      setReason(event.target.value);
+                      if (error) setError(null);
+                    }}
+                    placeholder="Fx. sygdom, skade, arbejde, familie…"
+                    className="input min-h-[90px]"
+                    disabled={Boolean(selectedEvent?.canceledAt) || signupLockedPastStart}
+                    aria-describedby="reason-hint"
+                  />
+                  {error ? <p className="text-xs text-red-600">{error}</p> : null}
+                </div>
               </div>
               <div className="mt-4 rounded-2xl border border-ink/10 bg-white/90 p-4">
                 <p className="label">Tilmeldinger</p>
@@ -1659,12 +1757,19 @@ export default function KalenderPage() {
                     </button>
                   </div>
                   <div className="mt-3 space-y-2">
-                    <label className="label">Begrundelse</label>
+                    <div>
+                      <label className="text-xs font-medium text-ink/70" htmlFor="editing-signup-reason">
+                        Begrundelse <span className="text-red-700">*</span>
+                      </label>
+                      <p className="mt-0.5 text-xs text-ink/50">Påkrævet, når status er «Jeg kan ikke».</p>
+                    </div>
                     <textarea
+                      id="editing-signup-reason"
                       className="input min-h-[80px]"
-                      placeholder="Valgfri begrundelse (påkrævet ved 'Jeg kan ikke')"
+                      placeholder="Fx. sygdom, skade, arbejde, familie…"
                       value={editingSignupReason}
                       onChange={(event) => setEditingSignupReason(event.target.value)}
+                      aria-required={editingSignupStatus === "OUT"}
                     />
                   </div>
                   <div className="mt-3 flex flex-wrap gap-2">
