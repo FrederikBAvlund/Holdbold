@@ -7,11 +7,11 @@ import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 
 const navItems = [
-  { href: "/dashboard", label: "Overblik", icon: "home" },
-  { href: "/dashboard/kalender", label: "Kalender", icon: "calendar" },
-  { href: "/dashboard/boder", label: "Bøder", icon: "receipt" },
-  { href: "/dashboard/notifikationer", label: "Notifikationer", icon: "bell" },
-  { href: "/dashboard/indstillinger", label: "Indstillinger", icon: "settings" }
+  { href: "/dashboard", label: "Overblik", shortLabel: "Overblik", icon: "home" },
+  { href: "/dashboard/kalender", label: "Kalender", shortLabel: "Kalender", icon: "calendar" },
+  { href: "/dashboard/boder", label: "Bøder", shortLabel: "Bøder", icon: "receipt" },
+  { href: "/dashboard/notifikationer", label: "Notifikationer", shortLabel: "Notif.", icon: "bell" },
+  { href: "/dashboard/indstillinger", label: "Indstillinger", shortLabel: "Indstill.", icon: "settings" }
 ];
 
 const icons = {
@@ -189,29 +189,36 @@ export default function DashboardNav({
 
   const mobileNavBar = (
     <nav
-      className="pointer-events-none fixed inset-x-0 bottom-0 z-50 flex justify-center px-2 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))] lg:hidden"
+      className="pointer-events-none fixed inset-x-0 bottom-0 z-50 flex justify-center px-3 pb-[max(0.65rem,env(safe-area-inset-bottom,0px))] lg:hidden"
       aria-label="Hovednavigation"
     >
       <div className="pointer-events-auto w-full max-w-md">
-        <div className="grid grid-cols-5 rounded-2xl border border-ink/15 bg-white/88 p-2 shadow-[0_24px_46px_-30px_rgba(15,23,42,0.65)] backdrop-blur">
+        <div className="grid grid-cols-5 gap-1 rounded-[1.35rem] border border-ink/10 bg-fog/95 p-2 shadow-[0_12px_40px_-12px_rgba(15,23,42,0.35)] ring-1 ring-black/[0.04] backdrop-blur-xl">
           {visibleNavItems.map((item) => {
             const isNotifications = item.href === "/dashboard/notifikationer";
             const isActive = pathname === item.href;
             return (
-              <Link key={item.href} href={item.href} className="relative flex items-center justify-center">
+              <Link
+                key={item.href}
+                href={item.href}
+                aria-label={item.label}
+                className={`relative flex min-h-[3.4rem] min-w-0 flex-col items-center justify-center gap-1 rounded-control px-0.5 py-1 transition-colors duration-150 ${
+                  isActive ? "bg-moss/14 text-moss" : "text-ink/65 hover:bg-ink/[0.04]"
+                }`}
+              >
                 <span
-                  className={`flex h-11 w-11 items-center justify-center rounded-xl border transition ${
+                  className={`relative flex h-9 w-9 shrink-0 items-center justify-center rounded-control border transition ${
                     isActive
-                      ? "border-ink/20 bg-ink text-fog shadow-[0_12px_20px_-14px_rgba(15,23,42,0.8)]"
-                      : "border-transparent text-ink/65 hover:border-ink/15 hover:bg-white"
+                      ? "border-moss/40 bg-moss text-fog shadow-md"
+                      : "border-transparent bg-ink/[0.05] text-ink/70"
                   }`}
                 >
-                  <span className="sr-only">{item.label}</span>
                   {icons[item.icon as keyof typeof icons]}
                 </span>
+                <span className="text-nav-label max-w-[4.25rem] truncate text-center">{item.shortLabel}</span>
                 {isNotifications && unreadCount > 0 ? (
-                  <span className="absolute right-1 top-0 inline-flex min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold text-white">
-                    {unreadCount}
+                  <span className="absolute right-0.5 top-1 inline-flex min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold text-white shadow-sm">
+                    {unreadCount > 99 ? "99+" : unreadCount}
                   </span>
                 ) : null}
               </Link>
@@ -224,17 +231,26 @@ export default function DashboardNav({
 
   return (
     <>
-      <aside className="hidden lg:block lg:w-[286px] lg:shrink-0">
-        <div className="card sticky top-6 flex h-[calc(100vh-3rem)] flex-col overflow-hidden px-5 py-6">
-          <div className="space-y-3">
-            <p className="text-[11px] font-bold uppercase tracking-[0.34em] text-moss">Holdbold</p>
-            <h1 className="text-[2rem] font-semibold leading-none text-ink" style={{ fontFamily: "var(--font-display)" }}>
-              Dashboard
-            </h1>
-            <p className="text-sm text-ink/65">Kalender, bøder og hold samlet i et hurtigt overblik.</p>
+      <aside className="hidden lg:block lg:w-[308px] lg:shrink-0">
+        <div className="sticky top-6 flex h-[calc(100vh-3rem)] flex-col overflow-hidden rounded-app border border-ink/10 bg-fog/95 shadow-[0_20px_50px_-28px_rgba(15,23,42,0.35)] backdrop-blur-xl">
+          <div className="relative shrink-0 overflow-hidden px-5 pb-6 pt-7">
+            <div
+              className="pointer-events-none absolute inset-0 opacity-[0.97]"
+              style={{
+                background: `linear-gradient(135deg, color-mix(in srgb, var(--color-moss) 92%, black) 0%, var(--color-button) 55%, color-mix(in srgb, var(--color-moss) 75%, var(--color-button)) 100%)`
+              }}
+            />
+            <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-white/15 blur-2xl" />
+            <div className="relative space-y-2 text-fog">
+              <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-white/75">Holdbold</p>
+              <h1 className="font-display text-[1.85rem] font-bold leading-[1.1] tracking-tight">Dashboard</h1>
+              <p className="max-w-[16rem] text-sm leading-snug text-white/88">
+                Kalender, bøder og hold samlet i ét overblik.
+              </p>
+            </div>
           </div>
 
-          <nav className="mt-7 flex flex-col gap-2.5">
+          <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-3 py-4">
             {visibleNavItems.map((item) => {
               const active = pathname === item.href;
               const isNotifications = item.href === "/dashboard/notifikationer";
@@ -242,26 +258,26 @@ export default function DashboardNav({
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`group flex items-center justify-between rounded-2xl border px-3.5 py-3 text-sm font-semibold transition ${
+                  className={`group flex items-center justify-between rounded-control border px-3 py-2.5 text-sm font-semibold transition ${
                     active
-                      ? "border-ink/20 bg-white text-ink shadow-[0_16px_30px_-24px_rgba(15,23,42,0.45)]"
-                      : "border-transparent bg-ink/5 text-ink/75 hover:border-ink/20 hover:bg-white/80 hover:text-ink"
+                      ? "border-moss/20 bg-white text-ink shadow-[0_8px_24px_-16px_rgba(15,23,42,0.35)] ring-1 ring-moss/15"
+                      : "border-transparent text-ink/78 hover:bg-white/70 hover:text-ink"
                   }`}
                 >
-                  <span className="flex items-center gap-3">
+                  <span className="flex min-w-0 items-center gap-3">
                     <span
-                      className={`inline-flex h-9 w-9 items-center justify-center rounded-xl border transition ${
+                      className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-control border transition ${
                         active
-                          ? "border-ink/20 bg-ink text-fog"
-                          : "border-ink/10 bg-white/70 text-ink/70 group-hover:border-ink/20 group-hover:text-ink"
+                          ? "border-moss/30 bg-moss text-fog shadow-sm"
+                          : "border-ink/10 bg-white text-ink/65 group-hover:border-moss/25 group-hover:text-ink"
                       }`}
                     >
                       {icons[item.icon as keyof typeof icons]}
                     </span>
-                    <span>{item.label}</span>
+                    <span className="truncate">{item.label}</span>
                   </span>
                   {isNotifications && unreadCount > 0 ? (
-                    <span className="inline-flex min-w-[22px] items-center justify-center rounded-full bg-red-500 px-2 py-0.5 text-xs font-semibold text-white">
+                    <span className="inline-flex min-w-[22px] shrink-0 items-center justify-center rounded-full bg-red-500 px-2 py-0.5 text-xs font-semibold text-white">
                       {unreadCount}
                     </span>
                   ) : null}
@@ -270,14 +286,14 @@ export default function DashboardNav({
             })}
           </nav>
 
-          <div className="mt-auto rounded-2xl border border-ink/10 bg-white/65 px-3.5 py-3">
+          <div className="shrink-0 border-t border-ink/10 bg-white/55 px-4 py-4">
             <div className="flex items-center gap-3">
-              <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-ink text-xs font-bold uppercase tracking-[0.12em] text-fog">
+              <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-moss to-[color:var(--color-button)] text-xs font-bold uppercase tracking-wide text-fog shadow-md ring-2 ring-white/90">
                 {initials}
               </span>
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold text-ink">{displayName || "Holdbold bruger"}</p>
-                <p className="truncate text-xs text-ink/60">{displayEmail || "Logget ind"}</p>
+                <p className="truncate text-xs text-ink/55">{displayEmail || "Logget ind"}</p>
               </div>
             </div>
           </div>

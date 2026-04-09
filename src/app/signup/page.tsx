@@ -77,14 +77,26 @@ export default function SignupPage() {
   }
 
   return (
-    <main className="min-h-screen px-4 py-10 sm:px-6">
-      <div className="card mx-auto max-w-xl">
-        <h1 className="text-3xl font-semibold text-ink" style={{ fontFamily: "var(--font-display)" }}>
-          Opret bruger
-        </h1>
-        <p className="mt-2 text-ink/70">Udfyld navn, slug, email og adgangskode.</p>
+    <main className="flex min-h-screen items-center justify-center px-4 py-10 pt-[max(2rem,env(safe-area-inset-top,0px))] sm:px-6">
+      <div className="card relative flex w-full max-w-3xl flex-col overflow-hidden p-0 shadow-[0_32px_64px_-36px_rgba(15,23,42,0.45)] sm:max-h-[min(92vh,880px)] sm:flex-row sm:overflow-hidden">
+        <div className="relative flex shrink-0 flex-col justify-between bg-gradient-to-br from-moss via-[color:var(--color-button)] to-moss px-8 py-10 text-fog sm:w-[38%] sm:min-w-[200px] sm:py-12">
+          <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/20 blur-3xl" />
+          <div className="relative space-y-4">
+            <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-white/75">Holdbold</p>
+            <h1 className="font-display text-3xl font-bold leading-tight tracking-tight sm:text-[2rem]">Opret bruger</h1>
+            <p className="max-w-[14rem] text-sm leading-relaxed text-white/88">
+              Navn, email, adgangskode og hold — så er du klar.
+            </p>
+          </div>
+          <p className="relative mt-8 hidden text-xs text-white/65 sm:mt-0 sm:block">Invitationslink udfylder holdslug automatisk.</p>
+        </div>
 
-        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+        <div className="relative min-h-0 flex-1 overflow-y-auto px-6 py-8 sm:px-10 sm:py-10">
+          <div className="pointer-events-none absolute -right-8 -top-8 h-36 w-36 rounded-full bg-moss/10 blur-3xl sm:hidden" />
+          <div className="relative">
+            <p className="text-ink/70 sm:hidden">Udfyld felterne for at oprette din konto.</p>
+
+        <form onSubmit={handleSubmit} className="mt-6 space-y-4 sm:mt-0">
           <div>
             <label className="label">Navn*</label>
             <input
@@ -160,13 +172,15 @@ export default function SignupPage() {
         </form>
 
         {message ? <p className="mt-4 text-sm font-semibold text-ink/80">{message}</p> : null}
-        <p className="mt-4 text-xs text-ink/60">
+        <p className="mt-4 text-xs text-ink/55">
           Ved oprettelse accepterer du vores{" "}
-          <a href="/privatliv" className="underline underline-offset-4">
+          <a href="/privatliv" className="font-medium text-moss underline decoration-moss/30 underline-offset-4">
             privatlivspolitik
           </a>
           .
         </p>
+          </div>
+        </div>
       </div>
     </main>
   );
