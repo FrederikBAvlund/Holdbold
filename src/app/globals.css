@@ -441,50 +441,85 @@ a {
   --gradient-end: #86e7ff;
 }
 
-/* FullCalendar tweaks */
+/* FullCalendar tweaks — matcher øvrig app (ink / fog, samme udtryk som Kalender/Liste-toggle) */
 .fc {
   font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
   color: var(--color-ink);
+  --fc-page-bg-color: transparent;
+  --fc-neutral-bg-color: color-mix(in srgb, white 90%, var(--color-fog));
 }
 
 .fc .fc-toolbar {
-  gap: 0.625rem;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.fc .fc-toolbar-chunk {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
 }
 
 .fc .fc-toolbar-title {
   font-weight: 700;
-  font-size: clamp(1.35rem, 2vw, 1.85rem);
+  font-size: clamp(1.2rem, 3.5vw, 1.65rem);
   text-transform: capitalize;
   letter-spacing: -0.025em;
+  line-height: 1.2;
 }
 
 .fc .fc-button {
-  background: color-mix(in srgb, var(--color-fog) 65%, white);
-  border: 1px solid color-mix(in srgb, var(--color-ink) 10%, transparent);
-  color: var(--color-ink);
-  border-radius: var(--radius-control);
-  padding: 0.4rem 0.85rem;
-  box-shadow: var(--shadow-sm);
-  text-transform: capitalize;
+  border-radius: 999px;
+  text-transform: none;
   font-weight: 600;
   font-size: 0.8125rem;
+  line-height: 1.2;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
 }
 
-.fc .fc-button:hover {
-  background: color-mix(in srgb, var(--color-fog) 88%, white);
-  border-color: color-mix(in srgb, var(--color-ink) 18%, transparent);
+.fc .fc-button.fc-button-primary {
+  background: color-mix(in srgb, white 88%, var(--color-fog));
+  border: 1px solid color-mix(in srgb, var(--color-ink) 12%, transparent);
+  color: var(--color-ink);
+  padding: 0.45rem 0.95rem;
+  box-shadow: none;
 }
 
-.fc .fc-button-primary:not(:disabled).fc-button-active,
-.fc .fc-button-primary:not(:disabled):active {
-  background: linear-gradient(
-    135deg,
-    var(--color-button),
-    color-mix(in srgb, var(--color-button) 78%, var(--color-moss))
-  );
-  color: var(--color-button-text);
-  border-color: color-mix(in srgb, var(--color-button) 35%, transparent);
-  box-shadow: 0 8px 18px -12px color-mix(in srgb, var(--color-button) 55%, transparent);
+.fc .fc-button.fc-button-primary:not(:disabled):hover {
+  background: color-mix(in srgb, var(--color-fog) 55%, white);
+  border-color: color-mix(in srgb, var(--color-ink) 20%, transparent);
+  color: var(--color-ink);
+}
+
+.fc .fc-button.fc-button-primary:not(:disabled).fc-button-active,
+.fc .fc-button.fc-button-primary:not(:disabled):active {
+  background: var(--color-ink);
+  color: var(--color-fog);
+  border-color: var(--color-ink);
+  box-shadow: var(--shadow-sm);
+}
+
+.fc .fc-button.fc-button-primary:not(:disabled).fc-button-active:hover {
+  background: color-mix(in srgb, var(--color-ink) 92%, white);
+  color: var(--color-fog);
+  border-color: var(--color-ink);
+}
+
+.fc .fc-prev-button,
+.fc .fc-next-button {
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.05rem;
+  line-height: 1;
 }
 
 .fc .fc-scrollgrid,
@@ -514,10 +549,25 @@ a {
 }
 
 .fc .fc-daygrid-event {
-  border-radius: 8px;
-  padding: 2px 8px;
+  border-radius: var(--radius-control);
+  padding: 3px 6px;
+  margin-top: 2px;
   font-weight: 600;
+  font-size: 0.75rem;
+  line-height: 1.25;
   border: none;
+}
+
+.fc-dayGridMonth-view .fc-daygrid-day {
+  min-height: 4.25rem;
+}
+
+.fc-dayGridWeek-view .fc-daygrid-day {
+  min-height: 6.25rem;
+}
+
+.fc .fc-daygrid-day-events {
+  margin-bottom: 0.2rem;
 }
 
 @media (max-width: 1024px) {
@@ -536,17 +586,54 @@ a {
 
 @media (max-width: 768px) {
   .fc .fc-toolbar {
-    flex-wrap: wrap;
-    gap: 0.45rem;
+    gap: 0.55rem;
   }
 
   .fc .fc-toolbar-title {
+    font-size: 1.1rem;
+  }
+
+  /* Række 1: forrige/næste + visning (Uge/Måned), række 2: titel centreret */
+  .fc .fc-toolbar .fc-toolbar-chunk:nth-child(1) {
+    order: 1;
+  }
+
+  .fc .fc-toolbar .fc-toolbar-chunk:nth-child(3) {
+    order: 1;
+    margin-left: auto;
+  }
+
+  .fc .fc-toolbar .fc-toolbar-chunk:nth-child(2) {
+    order: 2;
+    flex: 1 1 100%;
+    display: flex;
+    justify-content: center;
+    margin-top: 0.35rem;
+  }
+
+  .fc .fc-button.fc-button-primary {
+    padding: 0.42rem 0.75rem;
+    font-size: 0.78rem;
+  }
+
+  .fc .fc-prev-button,
+  .fc .fc-next-button {
+    min-width: 3rem;
+    min-height: 3rem;
     font-size: 1.15rem;
   }
 
-  .fc .fc-button {
-    padding: 0.28rem 0.55rem;
-    font-size: 0.74rem;
+  .fc-dayGridMonth-view .fc-daygrid-day {
+    min-height: 4rem;
+  }
+
+  .fc-dayGridWeek-view .fc-daygrid-day {
+    min-height: 5.75rem;
+  }
+
+  .fc .fc-daygrid-event {
+    font-size: 0.7rem;
+    padding: 3px 5px;
   }
 
   .card {
