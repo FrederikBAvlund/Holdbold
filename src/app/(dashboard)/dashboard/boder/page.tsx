@@ -2,12 +2,11 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
-import { getStoredTeamId, setStoredTeamId } from "@/components/appState";
+import { useDashboardTeam } from "@/components/DashboardTeamProvider";
 import { Combobox } from "@/components/ui/combobox";
 import { useToast } from "@/components/ToastProvider";
 import LoadingButton from "@/components/LoadingButton";
 import { TrashIcon } from "@/components/TrashIcon";
-import { fetchMeCached } from "@/lib/meClientCache";
 import { CollapsibleCard } from "@/components/CollapsibleCard";
 import { FineEventLink } from "./FineEventLink";
 import { categoryLabel, categoryOptions, fineRoles, roleLabel } from "./boderConstants";
@@ -23,10 +22,8 @@ import {
 export default function BoderPage() {
   const { pushToast } = useToast();
   const { data: session, status: sessionStatus } = useSession();
-  const [teamId, setTeamId] = useState("");
-  const [userId, setUserId] = useState("");
-  const defaultTeamLoadedForUserRef = useRef<string | null>(null);
-  const loadedMembersKeyRef = useRef<string | null>(null);
+  const { teamId, userId, members: teamMembers, actingMember } = useDashboardTeam();
+  const members = teamMembers as Member[];
   const loadedTemplatesKeyRef = useRef<string | null>(null);
   const loadedMyFinesKeyRef = useRef<string | null>(null);
   const loadedTeamFinesKeyRef = useRef<string | null>(null);
@@ -34,7 +31,6 @@ export default function BoderPage() {
   const loadedPendingPaymentsKeyRef = useRef<string | null>(null);
   const loadedCollectionsKeyRef = useRef<string | null>(null);
 
-  const [members, setMembers] = useState<Member[]>([]);
   const [templates, setTemplates] = useState<FineTemplate[]>([]);
   const [fines, setFines] = useState<FineItem[]>([]);
   const [teamFines, setTeamFines] = useState<FineItem[]>([]);
@@ -80,57 +76,8 @@ export default function BoderPage() {
   const [updateTemplateSubmitting, setUpdateTemplateSubmitting] = useState(false);
   const [deleteTemplateSubmitting, setDeleteTemplateSubmitting] = useState(false);
 
-  useEffect(() => {
-    setTeamId(getStoredTeamId());
-  }, []);
-
-  useEffect(() => {
-    if (session?.user?.id) {
-      setUserId(session.user.id);
-    }
-  }, [session?.user?.id]);
-
-  useEffect(() => {
-    async function loadDefaultTeam() {
-      const sessionUserId = session?.user?.id;
-      if (!sessionUserId) {
-        defaultTeamLoadedForUserRef.current = null;
-        return;
-      }
-      if (defaultTeamLoadedForUserRef.current === sessionUserId) return;
-      defaultTeamLoadedForUserRef.current = sessionUserId;
-
-      const { ok, data } = await fetchMeCached();
-      if (!ok) return;
-      const memberships = data.memberships ?? [];
-      const firstTeam = memberships[0]?.team?.id;
-      if (!firstTeam) return;
-      const currentTeamId = teamId || getStoredTeamId();
-      const isCurrentValid = memberships.some((membership) => membership.team?.id === currentTeamId);
-      if (!currentTeamId || !isCurrentValid) {
-        setTeamId(firstTeam);
-        setStoredTeamId(firstTeam);
-      }
-    }
-
-    loadDefaultTeam();
-  }, [session?.user?.id, teamId]);
-  const actingMember = members.find((member) => member.user.id === userId);
   const canManageFines = actingMember ? fineRoles.includes(actingMember.role) : false;
   const isAdmin = actingMember?.role === "ADMIN";
-
-  useEffect(() => {
-    async function loadMembers() {
-      if (!teamId) return;
-      if (loadedMembersKeyRef.current === teamId) return;
-      loadedMembersKeyRef.current = teamId;
-      const response = await fetch(`/api/team-members?teamId=${teamId}`);
-      const data = await response.json();
-      setMembers(data.members ?? []);
-    }
-
-    loadMembers();
-  }, [teamId]);
 
   useEffect(() => {
     async function loadTemplates() {

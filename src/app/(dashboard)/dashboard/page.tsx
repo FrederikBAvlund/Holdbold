@@ -3,8 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { getStoredTeamId, setStoredTeamId } from "@/components/appState";
-import { fetchMeCached } from "@/lib/meClientCache";
+import { useDashboardTeam } from "@/components/DashboardTeamProvider";
 
 type CalendarEvent = {
   id: string;
@@ -26,10 +25,6 @@ type Occurrence = {
   seriesId: string;
 };
 
-type Member = {
-  user: { id: string; name: string | null };
-};
-
 type FineItem = { amount: number };
 
 type DashboardSnapshot = {
@@ -46,25 +41,15 @@ const DASHBOARD_CACHE_TTL_MS = 60_000;
 export default function DashboardHome() {
   const router = useRouter();
   const { data: session, status: sessionStatus } = useSession();
-  const [teamId, setTeamId] = useState("");
-  const [userId, setUserId] = useState("");
+  const { teamId, userId, members } = useDashboardTeam();
+  const memberCount = members.length;
   const [nextEvents, setNextEvents] = useState<CalendarEvent[]>([]);
   const [eventCounts, setEventCounts] = useState<Record<string, { in: number; out: number; missing: number }>>({});
-  const [memberCount, setMemberCount] = useState(0);
   const [totalFines, setTotalFines] = useState(0);
   const [loadingNextEvents, setLoadingNextEvents] = useState(true);
   const [loadingFines, setLoadingFines] = useState(true);
-  const defaultTeamLoadedForUserRef = useRef<string | null>(null);
   const hasHydratedCacheRef = useRef<string | null>(null);
   const skipNextCacheWriteRef = useRef(false);
-
-  useEffect(() => {
-    setTeamId(getStoredTeamId());
-  }, []);
-
-  useEffect(() => {
-    if (session?.user?.id) setUserId(session.user.id);
-  }, [session?.user?.id]);
 
   useEffect(() => {
     if (!teamId || !userId) return;
@@ -78,51 +63,9 @@ export default function DashboardHome() {
     skipNextCacheWriteRef.current = true;
     setNextEvents(cached.nextEvents);
     setEventCounts(cached.eventCounts);
-    setMemberCount(cached.memberCount);
     setTotalFines(cached.totalFines);
     setLoadingNextEvents(false);
     setLoadingFines(false);
-  }, [teamId, userId]);
-
-  useEffect(() => {
-    async function loadDefaultTeam() {
-      const sessionUserId = session?.user?.id;
-      if (!sessionUserId) {
-        defaultTeamLoadedForUserRef.current = null;
-        return;
-      }
-      if (defaultTeamLoadedForUserRef.current === sessionUserId) return;
-      defaultTeamLoadedForUserRef.current = sessionUserId;
-
-      const { ok, data } = await fetchMeCached();
-      if (!ok) return;
-      const memberships = data.memberships ?? [];
-      const firstTeam = memberships[0]?.team?.id;
-      if (!firstTeam) return;
-      const currentTeamId = teamId || getStoredTeamId();
-      const isCurrentValid = memberships.some((membership) => membership.team?.id === currentTeamId);
-      if (!currentTeamId || !isCurrentValid) {
-        setTeamId(firstTeam);
-        setStoredTeamId(firstTeam);
-      }
-    }
-
-    loadDefaultTeam();
-  }, [session?.user?.id, teamId]);
-
-  useEffect(() => {
-    async function loadMembers() {
-      if (!teamId) return;
-      const key = `${teamId}:${userId || "anon"}`;
-      const cached = dashboardCache.get(key);
-      const isFresh = cached && Date.now() - cached.updatedAt < DASHBOARD_CACHE_TTL_MS;
-      if (isFresh) return;
-      const response = await fetch(`/api/team-members?teamId=${teamId}`);
-      const data = await response.json();
-      setMemberCount((data.members ?? []).length);
-    }
-
-    loadMembers();
   }, [teamId, userId]);
 
   useEffect(() => {
@@ -182,7 +125,6 @@ export default function DashboardHome() {
         const membersResponse = await fetch(`/api/team-members?teamId=${teamId}`);
         const membersData = membersResponse.ok ? await membersResponse.json() : { members: [] };
         const membersLen = (membersData.members ?? []).length;
-        setMemberCount(membersLen);
 
         const nextCounts: Record<string, { in: number; out: number; missing: number }> = {};
         await Promise.all(

@@ -12,8 +12,7 @@ import daLocale from "@fullcalendar/core/locales/da";
 import "@fullcalendar/common/main.css";
 import "@fullcalendar/daygrid/main.css";
 import "@fullcalendar/timegrid/main.css";
-import { getStoredTeamId, setStoredTeamId } from "@/components/appState";
-import { fetchMeCached } from "@/lib/meClientCache";
+import { useDashboardTeam, type DashboardTeamMember } from "@/components/DashboardTeamProvider";
 
 type CalendarEvent = {
   id: string;
@@ -39,11 +38,6 @@ type SeriesItem = {
   recurrence: string;
   interval: number;
   endDate?: string | null;
-};
-
-type Member = {
-  role: string;
-  user: { id: string; name: string };
 };
 
 type SignupLog = {
@@ -95,20 +89,16 @@ export default function KalenderPage() {
   const { pushToast } = useToast();
   const router = useRouter();
   const { data: session, status: sessionStatus } = useSession();
+  const { teamId, userId, members, actingMember } = useDashboardTeam();
   const [range, setRange] = useState<{ start: string; end: string } | null>(null);
   const lastRangeRef = useRef<{ start: string; end: string } | null>(null);
-  const defaultTeamLoadedForUserRef = useRef<string | null>(null);
-  const loadedMembersKeyRef = useRef<string | null>(null);
   const loadedCalendarKeyRef = useRef<string | null>(null);
   const loadedSeriesKeyRef = useRef<string | null>(null);
   const loadedFineTemplatesKeyRef = useRef<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [viewMode, setViewMode] = useState<"calendar" | "list">("calendar");
-  const [teamId, setTeamId] = useState("");
-  const [userId, setUserId] = useState("");
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [series, setSeries] = useState<SeriesItem[]>([]);
-  const [members, setMembers] = useState<Member[]>([]);
   const [eventSignups, setEventSignups] = useState<EventSignup[]>([]);
   const [fineTemplates, setFineTemplates] = useState<FineTemplate[]>([]);
   const [selectedLateFineTemplateId, setSelectedLateFineTemplateId] = useState("");
@@ -182,7 +172,6 @@ export default function KalenderPage() {
   };
 
   useEffect(() => {
-    setTeamId(getStoredTeamId());
     if (typeof window !== "undefined") {
       const storedMode = window.localStorage.getItem("calendarViewMode");
       if (storedMode === "list" || storedMode === "calendar") {
@@ -197,38 +186,6 @@ export default function KalenderPage() {
     }
   }, [viewMode]);
 
-  useEffect(() => {
-    if (session?.user?.id) {
-      setUserId(session.user.id);
-    }
-  }, [session?.user?.id]);
-
-  useEffect(() => {
-    async function loadDefaultTeam() {
-      const sessionUserId = session?.user?.id;
-      if (!sessionUserId) {
-        defaultTeamLoadedForUserRef.current = null;
-        return;
-      }
-      if (defaultTeamLoadedForUserRef.current === sessionUserId) return;
-      defaultTeamLoadedForUserRef.current = sessionUserId;
-
-      const { ok, data } = await fetchMeCached();
-      if (!ok) return;
-      const memberships = data.memberships ?? [];
-      const firstTeam = memberships[0]?.team?.id;
-      if (!firstTeam) return;
-      const currentTeamId = teamId || getStoredTeamId();
-      const isCurrentValid = memberships.some((membership) => membership.team?.id === currentTeamId);
-      if (!currentTeamId || !isCurrentValid) {
-        setTeamId(firstTeam);
-        setStoredTeamId(firstTeam);
-      }
-    }
-
-    loadDefaultTeam();
-  }, [session?.user?.id, teamId]);
-  const actingMember = members.find((member) => member.user.id === userId);
   const canManageEvents = actingMember ? adminRoles.includes(actingMember.role) : false;
   const canAssignLateFine = actingMember
     ? actingMember.role === "ADMIN" || actingMember.role === "BOEDEKASSEFORMAND"
@@ -243,19 +200,6 @@ export default function KalenderPage() {
     window.addEventListener("resize", update);
     return () => window.removeEventListener("resize", update);
   }, []);
-
-  useEffect(() => {
-    async function loadMembers() {
-      if (!teamId) return;
-      if (loadedMembersKeyRef.current === teamId) return;
-      loadedMembersKeyRef.current = teamId;
-      const response = await fetch(`/api/team-members?teamId=${teamId}`);
-      const data = await response.json();
-      setMembers(data.members ?? []);
-    }
-
-    loadMembers();
-  }, [teamId]);
 
   useEffect(() => {
     if (viewMode !== "list" || range) return;
@@ -380,7 +324,7 @@ export default function KalenderPage() {
   const [editableBeerCarrierId, setEditableBeerCarrierId] = useState("");
   const [savingMatchMeta, setSavingMatchMeta] = useState(false);
   const [selectedLateFineUserIds, setSelectedLateFineUserIds] = useState<string[]>([]);
-  const [editingSignupMember, setEditingSignupMember] = useState<Member | null>(null);
+  const [editingSignupMember, setEditingSignupMember] = useState<DashboardTeamMember | null>(null);
   const [editingSignupStatus, setEditingSignupStatus] = useState<"IN" | "OUT" | "UNKNOWN">("UNKNOWN");
   const [editingSignupReason, setEditingSignupReason] = useState("");
   const [editingSignupSubmitting, setEditingSignupSubmitting] = useState(false);
@@ -876,9 +820,9 @@ export default function KalenderPage() {
 
   const signupGroups = useMemo(() => {
     const grouped = {
-      in: [] as Member[],
-      out: [] as Member[],
-      missing: [] as Member[]
+      in: [] as DashboardTeamMember[],
+      out: [] as DashboardTeamMember[],
+      missing: [] as DashboardTeamMember[]
     };
     for (const member of members) {
       const status = signupMap.get(member.user.id);
@@ -898,7 +842,7 @@ export default function KalenderPage() {
   const lateGroups = useMemo(() => {
     const deadlineMs = activeDeadlineAt ? new Date(activeDeadlineAt).getTime() : null;
     if (!deadlineMs) {
-      return { lateResponses: [] as Member[], missingAfterDeadline: [] as Member[] };
+      return { lateResponses: [] as DashboardTeamMember[], missingAfterDeadline: [] as DashboardTeamMember[] };
     }
 
     const latestLogByUser = new Map<string, SignupLog>();
@@ -908,8 +852,8 @@ export default function KalenderPage() {
       }
     }
 
-    const lateResponses: Member[] = [];
-    const missingAfterDeadline: Member[] = [];
+    const lateResponses: DashboardTeamMember[] = [];
+    const missingAfterDeadline: DashboardTeamMember[] = [];
     const now = Date.now();
 
     for (const member of members) {
@@ -953,7 +897,7 @@ export default function KalenderPage() {
     );
   }
 
-  function openSignupEditor(member: Member) {
+  function openSignupEditor(member: DashboardTeamMember) {
     if (!canEditOtherSignups) return;
     const currentStatus = signupMap.get(member.user.id);
     const initialStatus: "IN" | "OUT" | "UNKNOWN" =
@@ -1746,63 +1690,69 @@ export default function KalenderPage() {
               {(lateGroups.lateResponses.length > 0 || lateGroups.missingAfterDeadline.length > 0) &&
               activeDeadlineAt ? (
                 <div className="mt-4 rounded-2xl border border-red-200 bg-red-50/70 p-4">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <p className="label text-red-700">Efter deadline</p>
-                      <p className="mt-1 text-xs text-red-700/80">
-                        Deadline: {formatTimestamp(activeDeadlineAt)}
-                      </p>
-                    </div>
-                    {canAssignLateFine ? (
-                      <div className="flex flex-wrap items-center gap-2">
-                        <select
-                          className="input min-w-[220px]"
-                          value={selectedLateFineTemplateId}
-                          onChange={(event) => setSelectedLateFineTemplateId(event.target.value)}
-                        >
-                          <option value="">Vælg bødeskabelon</option>
-                          {fineTemplates.map((template) => (
-                            <option key={template.id} value={template.id}>
-                              {template.title} ({template.amount} kr)
-                            </option>
-                          ))}
-                        </select>
-                        <button
-                          className="btn-primary"
-                          type="button"
-                          onClick={assignLateSignupFine}
-                          disabled={!selectedLateFineTemplateId || selectedLateFineUserIds.length === 0 || lateFineSubmitting}
-                        >
-                          {lateFineSubmitting ? "Opretter..." : `Giv bøde til ${selectedLateFineUserIds.length}`}
-                        </button>
-                      </div>
-                    ) : null}
+                  <div>
+                    <p className="label text-red-700">Efter deadline</p>
+                    <p className="mt-1 text-xs text-red-700/80">
+                      Deadline: {formatTimestamp(activeDeadlineAt)}
+                    </p>
                   </div>
                   {!canAssignLateFine ? (
                     <p className="mt-2 text-xs text-ink/60">
                       Kun bødeformand/admin kan tildele bøder herfra.
                     </p>
-                  ) : fineTemplates.length === 0 ? (
-                    <p className="mt-2 text-xs text-ink/60">
-                      Ingen godkendte bødeskabeloner fundet endnu.
-                    </p>
                   ) : (
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        className="btn-ghost text-xs"
-                        onClick={() => setSelectedLateFineUserIds(lateFineCandidates)}
+                    <>
+                      <select
+                        className="input mt-3 w-full min-w-0 max-w-xl"
+                        value={selectedLateFineTemplateId}
+                        onChange={(event) => setSelectedLateFineTemplateId(event.target.value)}
                       >
-                        Vælg alle
-                      </button>
-                      <button
-                        type="button"
-                        className="btn-ghost text-xs"
-                        onClick={() => setSelectedLateFineUserIds([])}
-                      >
-                        Fravælg alle
-                      </button>
-                    </div>
+                        <option value="">Vælg bødeskabelon</option>
+                        {fineTemplates.map((template) => (
+                          <option key={template.id} value={template.id}>
+                            {template.title} ({template.amount} kr)
+                          </option>
+                        ))}
+                      </select>
+                      {fineTemplates.length === 0 ? (
+                        <p className="mt-2 text-xs text-ink/60">
+                          Ingen godkendte bødeskabeloner fundet endnu.
+                        </p>
+                      ) : (
+                        <div className="my-3 flex flex-col gap-2">
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              className="btn-ghost min-h-[2.75rem] flex-1 text-xs"
+                              onClick={() => setSelectedLateFineUserIds(lateFineCandidates)}
+                            >
+                              Vælg alle
+                            </button>
+                            <button
+                              type="button"
+                              className="btn-ghost min-h-[2.75rem] flex-1 text-xs"
+                              onClick={() => setSelectedLateFineUserIds([])}
+                            >
+                              Fravælg alle
+                            </button>
+                          </div>
+                          <button
+                            className="btn-primary w-full mt-1"
+                            type="button"
+                            onClick={assignLateSignupFine}
+                            disabled={
+                              !selectedLateFineTemplateId ||
+                              selectedLateFineUserIds.length === 0 ||
+                              lateFineSubmitting
+                            }
+                          >
+                            {lateFineSubmitting
+                              ? "Opretter..."
+                              : `Giv bøde til ${selectedLateFineUserIds.length}`}
+                          </button>
+                        </div>
+                      )}
+                    </>
                   )}
                   <div className="mt-3 grid gap-4 md:grid-cols-2">
                     <div className="space-y-2">
