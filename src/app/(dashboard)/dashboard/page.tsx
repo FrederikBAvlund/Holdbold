@@ -284,6 +284,11 @@ export default function DashboardHome() {
     };
   };
 
+  const greetingName =
+    session?.user?.name?.trim()?.split(" ")[0] ||
+    (session?.user?.email ? session.user.email.split("@")[0] : "") ||
+    "Dig";
+
   const openNextEvent = (eventItem: CalendarEvent) => {
     const params = new URLSearchParams();
     params.set("focusEvent", eventItem.id);
@@ -299,8 +304,7 @@ export default function DashboardHome() {
     return (
       <section className="space-y-6">
         <header className="card">
-          <h2 className="text-2xl font-semibold text-ink">Velkommen tilbage</h2>
-          <p className="mt-2 text-ink/70">Indlæser...</p>
+          <h2 className="font-display text-[1.65rem] font-semibold leading-tight text-ink sm:text-3xl">Indlæser…</h2>
         </header>
       </section>
     );
@@ -310,7 +314,7 @@ export default function DashboardHome() {
     return (
       <section className="space-y-6">
         <header className="card">
-          <h2 className="text-2xl font-semibold text-ink">Velkommen tilbage</h2>
+          <h2 className="font-display text-[1.65rem] font-semibold leading-tight text-ink sm:text-3xl">Overblik</h2>
           <p className="mt-2 text-ink/70">Du skal være logget ind for at se overblikket.</p>
         </header>
       </section>
@@ -331,7 +335,7 @@ export default function DashboardHome() {
   return (
     <section className="space-y-6">
       <header className="card">
-        <h2 className="text-2xl font-semibold text-ink">Velkommen tilbage</h2>
+        <h2 className="text-xl font-semibold text-ink">Velkommen tilbage, {greetingName}!</h2>
         <p className="mt-2 text-ink/70">
           Her får du et hurtigt overblik. Brug menuen for kalender, bøder, notifikationer og indstillinger.
         </p>
@@ -351,22 +355,22 @@ export default function DashboardHome() {
                     key={eventItem.id}
                     type="button"
                     onClick={() => openNextEvent(eventItem)}
-                    className="p-2 w-full space-y-2 rounded-2xl border border-transparent text-left text-sm text-ink/70 transition hover:border-ink/15 hover:bg-white/60"
+                    className="w-full space-y-2 rounded-control border border-transparent p-2 text-left text-sm text-ink/70 transition hover:border-ink/12 hover:bg-white/55"
                   >
                     <div className="text-base font-semibold text-ink">{eventItem.title}</div>
-                    <div className="grid gap-2 rounded-2xl border border-ink/10 bg-white/85 p-3">
+                    <div className="grid gap-2 rounded-control border border-ink/10 bg-white/80 p-3">
                       <div className="flex items-center justify-between gap-4">
-                        <span className="text-xs font-semibold uppercase tracking-[0.2em] text-ink/55">Start</span>
+                        <span className="text-xs font-semibold uppercase tracking-[0.08em] text-ink/55">Start</span>
                         <span className="font-semibold text-ink">{times.start}</span>
                       </div>
                       {times.meeting ? (
                         <div className="flex items-center justify-between gap-4">
-                          <span className="text-xs font-semibold uppercase tracking-[0.2em] text-ink/55">Mødetid</span>
+                          <span className="text-xs font-semibold uppercase tracking-[0.08em] text-ink/55">Mødetid</span>
                           <span className="font-semibold text-ink">{times.meeting}</span>
                         </div>
                       ) : null}
                       <div className="flex items-center justify-between gap-4">
-                        <span className="text-xs font-semibold uppercase tracking-[0.2em] text-ink/55">Svarfrist</span>
+                        <span className="text-xs font-semibold uppercase tracking-[0.08em] text-ink/55">Svarfrist</span>
                         <span className="font-semibold text-ink">{times.deadline}</span>
                       </div>
                     </div>

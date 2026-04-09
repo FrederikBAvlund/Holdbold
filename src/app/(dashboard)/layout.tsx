@@ -11,7 +11,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   }
 
   return (
-    <div className="min-h-screen pb-24 pt-2 lg:pb-10 lg:pt-4">
+    <div className="min-h-screen pb-nav-pad pt-[max(0.375rem,env(safe-area-inset-top,0px))] lg:pb-10 lg:pt-4">
       <PendingAccessGuard />
       <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-6 px-3 sm:px-5 lg:flex-row lg:gap-7 lg:px-6">
         <DashboardNav

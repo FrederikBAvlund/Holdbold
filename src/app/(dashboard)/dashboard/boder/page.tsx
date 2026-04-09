@@ -818,47 +818,63 @@ export default function BoderPage() {
     );
   }
 
-  return (
-    <section className="space-y-6">
-      <header className="card">
-        <h2 className="text-2xl font-semibold text-ink">Bøder</h2>
-        <p className="mt-2 text-ink/70">Overblik over bøder og skabeloner.</p>
-      </header>
+  const assignLabel = canManageFines ? "Tildel bøde" : "Foreslå bøde";
+  const openCollectionModal = () => {
+    if (!collectionDeadline) {
+      const nextDay = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      const local = new Date(nextDay.getTime() - nextDay.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+      setCollectionDeadline(local);
+    }
+    setShowCollectionModal(true);
+  };
 
-      <div className="flex flex-wrap items-center gap-4">
-        <button className="btn-primary" onClick={() => setShowAssignModal(true)}>
-          {canManageFines ? "Tildel bøde" : "Foreslå bøde"}
+  return (
+    <>
+      <div className="fixed inset-x-0 top-0 z-40 border-b border-ink/10 bg-fog/95 px-3 py-1.5 pt-[max(0.35rem,env(safe-area-inset-top,0px))] pb-1.5 shadow-md backdrop-blur-lg lg:hidden">
+        <div className="mx-auto w-full max-w-lg">
+          <button type="button" className="btn-primary w-full shadow-[0_10px_28px_-14px_rgba(0,0,0,0.35)]" onClick={() => setShowAssignModal(true)}>
+            {assignLabel}
+          </button>
+        </div>
+      </div>
+
+      <section className="space-y-6">
+        <div className="flex flex-col gap-2 lg:contents">
+          <div className="shrink-0 lg:hidden" aria-hidden style={{ height: "3.65rem" }} />
+          <header className="card">
+            <h2 className="text-2xl font-semibold text-ink">Bøder</h2>
+            <p className="mt-2 text-ink/70">Overblik over bøder og skabeloner.</p>
+          </header>
+        </div>
+
+      <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-center lg:gap-4">
+        <button type="button" className="btn-primary hidden lg:inline-flex" onClick={() => setShowAssignModal(true)}>
+          {assignLabel}
         </button>
-        {unpaidTotal > 0 ? (
-          <button className="btn-ghost" onClick={() => setShowPayModal(true)}>
-            Betal bøder
-          </button>
+        {unpaidTotal > 0 || canManageFines ? (
+          <div className="flex w-full gap-2 lg:w-auto lg:gap-4">
+            {unpaidTotal > 0 ? (
+              <button type="button" className="btn-ghost min-h-[2.75rem] min-w-0 flex-1 lg:min-h-0 lg:flex-none" onClick={() => setShowPayModal(true)}>
+                Betal bøder
+              </button>
+            ) : null}
+            {canManageFines ? (
+              <button type="button" className="btn-ghost min-h-[2.75rem] min-w-0 flex-1 lg:min-h-0 lg:flex-none" onClick={openCollectionModal}>
+                Indsaml bøder
+              </button>
+            ) : null}
+          </div>
         ) : null}
-        {canManageFines ? (
-          <button
-            className="btn-ghost"
-            onClick={() => {
-              if (!collectionDeadline) {
-                const nextDay = new Date(Date.now() + 24 * 60 * 60 * 1000);
-                const local = new Date(nextDay.getTime() - nextDay.getTimezoneOffset() * 60000)
-                  .toISOString()
-                  .slice(0, 16);
-                setCollectionDeadline(local);
-              }
-              setShowCollectionModal(true);
-            }}
-          >
-            Indsaml bøder
-          </button>
-        ) : null}
-        {canManageFines ? (
-          <span className="rounded-full bg-moss/10 px-3 py-1 text-xs font-semibold text-moss">Bødekasseformand</span>
-        ) : null}
-        {hasPendingPayment ? (
-          <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
-            Betaling afventer godkendelse
-          </span>
-        ) : null}
+        <div className="flex flex-wrap items-center gap-2 lg:gap-4">
+          {canManageFines ? (
+            <span className="rounded-full bg-moss/10 px-3 py-1 text-xs font-semibold text-moss">Bødekasseformand</span>
+          ) : null}
+          {hasPendingPayment ? (
+            <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
+              Betaling afventer godkendelse
+            </span>
+          ) : null}
+        </div>
       </div>
 
       <CollapsibleCard
@@ -1234,7 +1250,7 @@ export default function BoderPage() {
                     </button>
                     <button
                       type="button"
-                      className="btn-ghost"
+                      className="btn-primary"
                       onClick={() => {
                         setSelectedTemplateId(template.id);
                         setShowAssignModal(true);
@@ -1544,16 +1560,19 @@ export default function BoderPage() {
             setFineDescription("");
           }}
         >
-          <div className="modal-panel assign-panel max-w-lg" onClick={(event) => event.stopPropagation()}>
-            <div className="flex items-start justify-between">
-            <div>
-              <h3 className="text-lg font-semibold text-ink">
-                {canManageFines ? "Tildel bøde" : "Foreslå bøde"}
-              </h3>
-              <p className="mt-2 text-sm text-ink/70">Vælg modtager og bødeskabelon.</p>
-            </div>
+          <div
+            className="modal-panel assign-panel max-w-lg flex min-h-0 flex-col sm:max-h-[min(88vh,860px)] sm:overflow-auto"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex shrink-0 items-start justify-between gap-3">
+              <div>
+                <h3 className="text-lg font-semibold text-ink">
+                  {canManageFines ? "Tildel bøde" : "Foreslå bøde"}
+                </h3>
+                <p className="mt-2 text-sm text-ink/70">Vælg modtager og bødeskabelon.</p>
+              </div>
               <button
-                className="btn-ghost"
+                className="btn-ghost shrink-0"
                 onClick={() => {
                   if (assignFineSubmitting) return;
                   setShowAssignModal(false);
@@ -1569,135 +1588,143 @@ export default function BoderPage() {
                 Luk
               </button>
             </div>
-            <form onSubmit={handleCreateFine} className="mt-4 grid min-w-0 gap-3">
-              <div className="space-y-2">
-                <label className="label">Modtagere</label>
-                <input
-                  value={memberSearch}
-                  onChange={(event) => setMemberSearch(event.target.value)}
-                  placeholder="Søg spiller..."
-                  className="input"
-                />
-                <div className="flex flex-wrap items-center gap-2">
-                  <div className="inline-flex rounded-full border border-ink/15 bg-white/70 p-1">
-                    <button
-                      type="button"
-                      className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-                        selectedUserIds.length > 0 && selectedUserIds.length === filteredMembers.length
-                          ? "bg-ink text-fog"
-                          : "text-ink/70 hover:bg-ink/5"
-                      }`}
-                      onClick={() => setSelectedUserIds(filteredMembers.map((member) => member.user.id))}
-                    >
-                      Alle
-                    </button>
-                    <button
-                      type="button"
-                      className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-                        selectedUserIds.length === 0
-                          ? "bg-ink text-fog"
-                          : "text-ink/70 hover:bg-ink/5"
-                      }`}
-                      onClick={() => setSelectedUserIds([])}
-                    >
-                      Ingen
-                    </button>
+            <form onSubmit={handleCreateFine} className="mt-4 flex min-h-0 min-w-0 flex-1 flex-col gap-0 sm:block sm:flex-none">
+              <div className="min-h-0 min-w-0 flex-1 space-y-3 overflow-y-auto overflow-x-hidden overscroll-contain pb-3 sm:max-h-none sm:overflow-visible sm:pb-0">
+                <div className="space-y-2">
+                  <label className="label">Modtagere</label>
+                  <input
+                    value={memberSearch}
+                    onChange={(event) => setMemberSearch(event.target.value)}
+                    placeholder="Søg spiller..."
+                    className="input"
+                  />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="inline-flex rounded-full border border-ink/15 bg-white/70 p-1">
+                      <button
+                        type="button"
+                        className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                          selectedUserIds.length > 0 && selectedUserIds.length === filteredMembers.length
+                            ? "bg-ink text-fog"
+                            : "text-ink/70 hover:bg-ink/5"
+                        }`}
+                        onClick={() => setSelectedUserIds(filteredMembers.map((member) => member.user.id))}
+                      >
+                        Alle
+                      </button>
+                      <button
+                        type="button"
+                        className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                          selectedUserIds.length === 0 ? "bg-ink text-fog" : "text-ink/70 hover:bg-ink/5"
+                        }`}
+                        onClick={() => setSelectedUserIds([])}
+                      >
+                        Ingen
+                      </button>
+                    </div>
+                    <span className="rounded-full bg-ink/10 px-3 py-1 text-xs font-semibold text-ink/70">
+                      {selectedUserIds.length} valgt
+                    </span>
                   </div>
-                  <span className="rounded-full bg-ink/10 px-3 py-1 text-xs font-semibold text-ink/70">
-                    {selectedUserIds.length} valgt
-                  </span>
+                  <div className="max-h-[min(32dvh,220px)] space-y-2 overflow-y-auto rounded-2xl border border-ink/10 bg-white/80 p-3 sm:max-h-[34vh]">
+                    {filteredMembers.length === 0 ? (
+                      <p className="text-sm text-ink/60">Ingen spillere matcher.</p>
+                    ) : (
+                      filteredMembers.map((member) => {
+                        const checked = selectedUserIds.includes(member.user.id);
+                        return (
+                          <label
+                            key={member.user.id}
+                            className="flex items-center justify-between gap-3 rounded-xl border border-ink/10 bg-white/70 px-3 py-2 text-sm text-ink/85"
+                          >
+                            <span className="flex min-w-0 items-center gap-2">
+                              <input
+                                type="checkbox"
+                                className="h-4 w-4 rounded border-ink/30"
+                                checked={checked}
+                                onChange={(event) => {
+                                  setSelectedUserIds((prev) =>
+                                    event.target.checked
+                                      ? [...prev, member.user.id]
+                                      : prev.filter((id) => id !== member.user.id)
+                                  );
+                                }}
+                              />
+                              <span className="truncate">{member.user.name}</span>
+                            </span>
+                            <span className="shrink-0 rounded-full bg-ink/10 px-2 py-0.5 text-[11px] font-semibold text-ink/70">
+                              {roleLabel[member.role] ?? member.role}
+                            </span>
+                          </label>
+                        );
+                      })
+                    )}
+                  </div>
                 </div>
-                <div className="max-h-[34vh] space-y-2 overflow-auto rounded-2xl border border-ink/10 bg-white/80 p-3">
-                  {filteredMembers.length === 0 ? (
-                    <p className="text-sm text-ink/60">Ingen spillere matcher.</p>
-                  ) : (
-                    filteredMembers.map((member) => {
-                      const checked = selectedUserIds.includes(member.user.id);
-                      return (
-                        <label
-                          key={member.user.id}
-                          className="flex items-center justify-between gap-3 rounded-xl border border-ink/10 bg-white/70 px-3 py-2 text-sm text-ink/85"
-                        >
-                          <span className="flex min-w-0 items-center gap-2">
-                          <input
-                            type="checkbox"
-                            className="h-4 w-4 rounded border-ink/30"
-                            checked={checked}
-                            onChange={(event) => {
-                              setSelectedUserIds((prev) =>
-                                event.target.checked
-                                  ? [...prev, member.user.id]
-                                  : prev.filter((id) => id !== member.user.id)
-                              );
-                            }}
-                          />
-                            <span className="truncate">{member.user.name}</span>
-                          </span>
-                          <span className="shrink-0 rounded-full bg-ink/10 px-2 py-0.5 text-[11px] font-semibold text-ink/70">
-                            {roleLabel[member.role] ?? member.role}
-                          </span>
-                        </label>
-                      );
-                    })
-                  )}
+                <div className="space-y-2">
+                  <label className="label">Skabelon</label>
+                  <Combobox
+                    value={selectedTemplateId}
+                    onChange={setSelectedTemplateId}
+                    options={templateOptions}
+                    placeholder="Vælg skabelon (valgfri)"
+                    searchPlaceholder="Søg skabelon..."
+                    emptyLabel="Ingen skabeloner matcher"
+                  />
                 </div>
+                {!selectedTemplateId ? (
+                  <>
+                    <div className="space-y-2">
+                      <label className="label" htmlFor="fine-amount">
+                        Beløb
+                      </label>
+                      <input
+                        id="fine-amount"
+                        type="text"
+                        inputMode="numeric"
+                        value={fineAmount}
+                        onChange={(event) => setFineAmount(event.target.value)}
+                        placeholder="Beløb (heltal, negativt = kredit)"
+                        className="input"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="label" htmlFor="fine-title">
+                        Titel
+                      </label>
+                      <input
+                        id="fine-title"
+                        value={fineTitle}
+                        onChange={(event) => setFineTitle(event.target.value)}
+                        placeholder="Titel"
+                        className="input"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="label" htmlFor="fine-description">
+                        Beskrivelse
+                      </label>
+                      <input
+                        id="fine-description"
+                        value={fineDescription}
+                        onChange={(event) => setFineDescription(event.target.value)}
+                        placeholder="Beskrivelse (valgfri)"
+                        className="input"
+                      />
+                    </div>
+                  </>
+                ) : null}
               </div>
-              <div className="space-y-2">
-                <label className="label">Skabelon</label>
-                <Combobox
-                  value={selectedTemplateId}
-                  onChange={setSelectedTemplateId}
-                  options={templateOptions}
-                  placeholder="Vælg skabelon (valgfri)"
-                  searchPlaceholder="Søg skabelon..."
-                  emptyLabel="Ingen skabeloner matcher"
-                />
+              <div className="shrink-0 border-t border-ink/10 bg-fog/95 pt-3 max-[639px]:pb-[calc(0.65rem+env(safe-area-inset-bottom,0px)+4.75rem)] sm:border-0 sm:bg-transparent sm:pb-0 sm:pt-4">
+                <button type="submit" className="btn-primary w-full" disabled={assignFineSubmitting}>
+                  {assignFineSubmitting
+                    ? "Gemmer..."
+                    : canManageFines
+                      ? "Tildel bøde"
+                      : "Foreslå bøde"}
+                </button>
               </div>
-              {!selectedTemplateId ? (
-                <>
-                  <div className="space-y-2">
-                    <label className="label" htmlFor="fine-amount">Beløb</label>
-                    <input
-                      id="fine-amount"
-                      type="text"
-                      inputMode="numeric"
-                      value={fineAmount}
-                      onChange={(event) => setFineAmount(event.target.value)}
-                      placeholder="Beløb (heltal, negativt = kredit)"
-                      className="input"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="label" htmlFor="fine-title">Titel</label>
-                    <input
-                      id="fine-title"
-                      value={fineTitle}
-                      onChange={(event) => setFineTitle(event.target.value)}
-                      placeholder="Titel"
-                      className="input"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="label" htmlFor="fine-description">Beskrivelse</label>
-                    <input
-                      id="fine-description"
-                      value={fineDescription}
-                      onChange={(event) => setFineDescription(event.target.value)}
-                      placeholder="Beskrivelse (valgfri)"
-                      className="input"
-                    />
-                  </div>
-                </>
-              ) : null}
-              <button className="btn-primary w-full" disabled={assignFineSubmitting}>
-                {assignFineSubmitting
-                  ? "Gemmer..."
-                  : canManageFines
-                  ? "Tildel bøde"
-                  : "Foreslå bøde"}
-              </button>
             </form>
           </div>
         </div>
@@ -1799,5 +1826,6 @@ export default function BoderPage() {
         </div>
       ) : null}
     </section>
+    </>
   );
 }
