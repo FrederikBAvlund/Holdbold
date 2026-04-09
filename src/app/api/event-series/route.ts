@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
 import { z } from "zod";
-import { authOptions } from "@/lib/auth";
+import { EVENT_MANAGER_ROLES, requireActiveTeamMember, requireSession } from "@/lib/apiAuth";
 import { prisma } from "@/lib/prisma";
 
 const listSchema = z.object({
@@ -20,22 +19,15 @@ const createSchema = z.object({
 });
 
 export async function GET(request: Request) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Ikke logget ind" }, { status: 401 });
-  }
+  const session = await requireSession();
+  if (!session.ok) return session.response;
 
   const { searchParams } = new URL(request.url);
   const teamId = searchParams.get("teamId") ?? "";
   const parsed = listSchema.parse({ teamId });
 
-  const actingMembership = await prisma.membership.findFirst({
-    where: { teamId: parsed.teamId, userId: session.user.id, status: "ACTIVE" },
-    select: { id: true }
-  });
-  if (!actingMembership) {
-    return NextResponse.json({ error: "Ikke adgang" }, { status: 403 });
-  }
+  const member = await requireActiveTeamMember(session.userId, parsed.teamId);
+  if (!member.ok) return member.response;
 
   const series = await prisma.eventSeries.findMany({
     where: { teamId: parsed.teamId },
@@ -46,22 +38,15 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Ikke logget ind" }, { status: 401 });
-  }
+  const session = await requireSession();
+  if (!session.ok) return session.response;
 
   const json = await request.json();
   const body = createSchema.parse(json);
 
-  const actingMembership = await prisma.membership.findFirst({
-    where: { teamId: body.teamId, userId: session.user.id, status: "ACTIVE" },
-    select: { role: true }
-  });
-  if (!actingMembership) {
-    return NextResponse.json({ error: "Ikke adgang" }, { status: 403 });
-  }
-  if (!["ADMIN", "TRAENER", "BOEDEKASSEFORMAND"].includes(actingMembership.role)) {
+  const member = await requireActiveTeamMember(session.userId, body.teamId);
+  if (!member.ok) return member.response;
+  if (!EVENT_MANAGER_ROLES.includes(member.role)) {
     return NextResponse.json({ error: "Kun trænere/admin kan oprette gentagelser" }, { status: 403 });
   }
 
@@ -75,7 +60,7 @@ export async function POST(request: Request) {
       interval: body.interval ?? 1,
       endDate: body.endDate ? new Date(body.endDate) : null,
       signupDeadlineHoursBefore: body.signupDeadlineHoursBefore ?? 24,
-      createdById: session.user.id
+      createdById: session.userId
     }
   });
 

@@ -13,15 +13,16 @@ export async function GET() {
     return NextResponse.json({ user: null, memberships: [] }, { status: 401 });
   }
 
-  const user = await prisma.user.findUnique({
-    where: { id: session.user.id }
-  });
-
-  const memberships = await prisma.membership.findMany({
-    where: { userId: session.user.id, status: "ACTIVE" },
-    include: { team: true },
-    orderBy: { createdAt: "asc" }
-  });
+  const [user, memberships] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: session.user.id }
+    }),
+    prisma.membership.findMany({
+      where: { userId: session.user.id, status: "ACTIVE" },
+      include: { team: true },
+      orderBy: { createdAt: "asc" }
+    })
+  ]);
 
   const resolvedImage = await resolveProfileImageUrl(user?.image ?? null);
 

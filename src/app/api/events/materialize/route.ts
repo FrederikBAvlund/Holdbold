@@ -2,17 +2,25 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createNotifications } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
+import { requireActiveTeamMember, requireSession } from "@/lib/apiAuth";
 
 const bodySchema = z.object({
   teamId: z.string().min(1),
   seriesId: z.string().min(1),
-  date: z.string().datetime(),
-  createdById: z.string().min(1).optional()
+  date: z.string().datetime()
 });
 
 export async function POST(request: Request) {
+  const session = await requireSession();
+  if (!session.ok) return session.response;
+
   const json = await request.json();
   const body = bodySchema.parse(json);
+
+  const member = await requireActiveTeamMember(session.userId, body.teamId);
+  if (!member.ok) return member.response;
+
+  const createdById = session.userId;
 
   const date = new Date(body.date);
 
@@ -47,7 +55,7 @@ export async function POST(request: Request) {
       location: series.location,
       signupDeadline: deadline,
       source: "SERIES",
-      createdById: body.createdById ?? null
+      createdById
     }
   });
 
@@ -57,9 +65,9 @@ export async function POST(request: Request) {
   });
 
   const notifications = members
-    .filter((member) => member.userId !== body.createdById)
-    .map((member) => ({
-      userId: member.userId,
+    .filter((m) => m.userId !== createdById)
+    .map((m) => ({
+      userId: m.userId,
       teamId: body.teamId,
       type: "EVENT" as const,
       title: `Ny begivenhed: ${event.title}`,

@@ -52,7 +52,7 @@ export async function processMissedSignupFines(teamId: string) {
     getOrCreateMissedSignupTemplate(teamId),
     prisma.membership.findMany({
       where: { teamId, status: "ACTIVE", role: { not: "SOME" } },
-      select: { userId: true, role: true }
+      select: { userId: true, role: true, createdAt: true }
     }),
     prisma.membership.findMany({
       where: { teamId, status: "ACTIVE", role: { in: ["ADMIN", "BOEDEKASSEFORMAND"] } },
@@ -99,8 +99,10 @@ export async function processMissedSignupFines(teamId: string) {
       }
     }
 
+    const deadlineDate = new Date(event.signupDeadline);
     const candidateUserIds = players
       .filter((member) => member.role !== "SOME")
+      .filter((member) => member.createdAt <= deadlineDate)
       .map((member) => member.userId)
       .filter((targetUserId) => {
         const status = statusByUser.get(targetUserId);

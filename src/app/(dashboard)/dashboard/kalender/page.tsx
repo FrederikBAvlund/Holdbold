@@ -13,6 +13,7 @@ import "@fullcalendar/common/main.css";
 import "@fullcalendar/daygrid/main.css";
 import "@fullcalendar/timegrid/main.css";
 import { getStoredTeamId, setStoredTeamId } from "@/components/appState";
+import { fetchMeCached } from "@/lib/meClientCache";
 
 type CalendarEvent = {
   id: string;
@@ -212,16 +213,13 @@ export default function KalenderPage() {
       if (defaultTeamLoadedForUserRef.current === sessionUserId) return;
       defaultTeamLoadedForUserRef.current = sessionUserId;
 
-      const response = await fetch("/api/me");
-      if (!response.ok) return;
-      const data = await response.json();
+      const { ok, data } = await fetchMeCached();
+      if (!ok) return;
       const memberships = data.memberships ?? [];
       const firstTeam = memberships[0]?.team?.id;
       if (!firstTeam) return;
       const currentTeamId = teamId || getStoredTeamId();
-      const isCurrentValid = memberships.some(
-        (membership: { team?: { id?: string } }) => membership.team?.id === currentTeamId
-      );
+      const isCurrentValid = memberships.some((membership) => membership.team?.id === currentTeamId);
       if (!currentTeamId || !isCurrentValid) {
         setTeamId(firstTeam);
         setStoredTeamId(firstTeam);
@@ -436,8 +434,7 @@ export default function KalenderPage() {
                 title,
                 location,
                 date: new Date(startIso).toISOString(),
-                signupDeadline: new Date(new Date(startIso).getTime() - deadlineHours * 60 * 60 * 1000).toISOString(),
-                createdById: userId
+                signupDeadline: new Date(new Date(startIso).getTime() - deadlineHours * 60 * 60 * 1000).toISOString()
               })
             })
           : await fetch("/api/event-series", {
@@ -451,8 +448,7 @@ export default function KalenderPage() {
                 recurrence,
                 interval,
                 endDate: toIsoEndOfLocalDay(endDate) ?? undefined,
-                signupDeadlineHoursBefore: deadlineHours,
-                createdById: userId
+                signupDeadlineHoursBefore: deadlineHours
               })
             });
 
@@ -507,8 +503,7 @@ export default function KalenderPage() {
           body: JSON.stringify({
             teamId,
             seriesId: eventItem.seriesId,
-            date: eventItem.date,
-            createdById: userId
+            date: eventItem.date
           })
         });
         const data = await response.json();
@@ -1044,7 +1039,6 @@ export default function KalenderPage() {
               teamId,
               userId: targetUserId,
               templateId: selectedLateFineTemplateId,
-              createdById: userId,
               eventId: eventIdForSignup
             })
           })

@@ -2,16 +2,22 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createNotifications } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
+import { FINE_AUTOMATION_ROLES, requireActiveTeamMemberWithRoles, requireSession } from "@/lib/apiAuth";
 
 const bodySchema = z.object({
   teamId: z.string().min(1),
-  eventId: z.string().min(1),
-  createdById: z.string().min(1).optional()
+  eventId: z.string().min(1)
 });
 
 export async function POST(request: Request) {
+  const session = await requireSession();
+  if (!session.ok) return session.response;
+
   const json = await request.json();
   const body = bodySchema.parse(json);
+
+  const auth = await requireActiveTeamMemberWithRoles(session.userId, body.teamId, FINE_AUTOMATION_ROLES);
+  if (!auth.ok) return auth.response;
 
   const event = await prisma.event.findFirst({
     where: { id: body.eventId, teamId: body.teamId },
@@ -40,10 +46,13 @@ export async function POST(request: Request) {
     include: { user: true }
   });
 
+  const deadlineAt = event.signupDeadline;
+
   const signupMap = new Map(event.signups.map((signup) => [signup.userId, signup.status]));
 
   let created = 0;
   for (const member of members) {
+    if (member.createdAt > deadlineAt) continue;
     const status = signupMap.get(member.userId);
     if (status === "IN" || status === "OUT") continue;
 

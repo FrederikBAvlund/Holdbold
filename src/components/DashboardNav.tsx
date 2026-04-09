@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 
@@ -79,9 +80,26 @@ const icons = {
   )
 };
 
-export default function DashboardNav() {
+function initialsFromDisplayName(name: string) {
+  const source = name.trim();
+  if (!source) return "HB";
+  return source
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((chunk) => chunk[0]?.toUpperCase() ?? "")
+    .join("");
+}
+
+export default function DashboardNav({
+  serverUserName = null,
+  serverUserEmail = null
+}: {
+  serverUserName?: string | null;
+  serverUserEmail?: string | null;
+}) {
   const { data: session } = useSession();
   const [unreadCount, setUnreadCount] = useState(0);
+  const [mobileNavMounted, setMobileNavMounted] = useState(false);
   const pathname = usePathname();
   const sessionUserId = session?.user?.id;
   const hasActiveMembership = session?.user?.hasActiveMembership === true;
@@ -90,15 +108,12 @@ export default function DashboardNav() {
   const lastUnreadLoadRef = useRef<{ key: string; at: number } | null>(null);
   const unreadInFlightRef = useRef<Promise<void> | null>(null);
 
-  const initials = useMemo(() => {
-    const source = session?.user?.name?.trim() ?? "";
-    if (!source) return "HB";
-    return source
-      .split(/\s+/)
-      .slice(0, 2)
-      .map((chunk) => chunk[0]?.toUpperCase() ?? "")
-      .join("");
-  }, [session?.user?.name]);
+  // useSession() mangler ofte name/email på første client-render (SessionProvider refetch),
+  // mens SSR har fuld session → hydration mismatch. Server props er identiske på SSR og hydrering.
+  const displayName = session?.user?.name?.trim() || serverUserName?.trim() || "";
+  const displayEmail = session?.user?.email?.trim() || serverUserEmail?.trim() || "";
+
+  const initials = useMemo(() => initialsFromDisplayName(displayName), [displayName]);
 
   const visibleNavItems = useMemo(
     () =>
@@ -168,6 +183,45 @@ export default function DashboardNav() {
     return () => window.removeEventListener("notifications:unread", onUnreadUpdate);
   }, []);
 
+  useEffect(() => {
+    setMobileNavMounted(true);
+  }, []);
+
+  const mobileNavBar = (
+    <nav
+      className="pointer-events-none fixed inset-x-0 bottom-0 z-50 flex justify-center px-2 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))] lg:hidden"
+      aria-label="Hovednavigation"
+    >
+      <div className="pointer-events-auto w-full max-w-md">
+        <div className="grid grid-cols-5 rounded-2xl border border-ink/15 bg-white/88 p-2 shadow-[0_24px_46px_-30px_rgba(15,23,42,0.65)] backdrop-blur">
+          {visibleNavItems.map((item) => {
+            const isNotifications = item.href === "/dashboard/notifikationer";
+            const isActive = pathname === item.href;
+            return (
+              <Link key={item.href} href={item.href} className="relative flex items-center justify-center">
+                <span
+                  className={`flex h-11 w-11 items-center justify-center rounded-xl border transition ${
+                    isActive
+                      ? "border-ink/20 bg-ink text-fog shadow-[0_12px_20px_-14px_rgba(15,23,42,0.8)]"
+                      : "border-transparent text-ink/65 hover:border-ink/15 hover:bg-white"
+                  }`}
+                >
+                  <span className="sr-only">{item.label}</span>
+                  {icons[item.icon as keyof typeof icons]}
+                </span>
+                {isNotifications && unreadCount > 0 ? (
+                  <span className="absolute right-1 top-0 inline-flex min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold text-white">
+                    {unreadCount}
+                  </span>
+                ) : null}
+              </Link>
+            );
+          })}
+        </div>
+      </div>
+    </nav>
+  );
+
   return (
     <>
       <aside className="hidden lg:block lg:w-[286px] lg:shrink-0">
@@ -222,41 +276,15 @@ export default function DashboardNav() {
                 {initials}
               </span>
               <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-ink">{session?.user?.name ?? "Holdbold bruger"}</p>
-                <p className="truncate text-xs text-ink/60">{session?.user?.email ?? "Logget ind"}</p>
+                <p className="truncate text-sm font-semibold text-ink">{displayName || "Holdbold bruger"}</p>
+                <p className="truncate text-xs text-ink/60">{displayEmail || "Logget ind"}</p>
               </div>
             </div>
           </div>
         </div>
       </aside>
 
-      <nav className="fixed bottom-3 left-1/2 z-50 w-[calc(100%-1rem)] max-w-md -translate-x-1/2 lg:hidden">
-        <div className="grid grid-cols-5 rounded-2xl border border-ink/15 bg-white/88 p-2 shadow-[0_24px_46px_-30px_rgba(15,23,42,0.65)] backdrop-blur">
-          {visibleNavItems.map((item) => {
-            const isNotifications = item.href === "/dashboard/notifikationer";
-            const isActive = pathname === item.href;
-            return (
-              <Link key={item.href} href={item.href} className="relative flex items-center justify-center">
-                <span
-                  className={`flex h-11 w-11 items-center justify-center rounded-xl border transition ${
-                    isActive
-                      ? "border-ink/20 bg-ink text-fog shadow-[0_12px_20px_-14px_rgba(15,23,42,0.8)]"
-                      : "border-transparent text-ink/65 hover:border-ink/15 hover:bg-white"
-                  }`}
-                >
-                  <span className="sr-only">{item.label}</span>
-                  {icons[item.icon as keyof typeof icons]}
-                </span>
-                {isNotifications && unreadCount > 0 ? (
-                  <span className="absolute right-1 top-0 inline-flex min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold text-white">
-                    {unreadCount}
-                  </span>
-                ) : null}
-              </Link>
-            );
-          })}
-        </div>
-      </nav>
+      {mobileNavMounted ? createPortal(mobileNavBar, document.body) : null}
     </>
   );
 }

@@ -97,7 +97,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
       userId: body.userId,
       status: "ACTIVE"
     },
-    select: { role: true, userId: true }
+    select: { role: true, userId: true, createdAt: true }
   });
   if (!targetMembership) {
     return NextResponse.json({ error: "Spiller ikke fundet på holdet" }, { status: 404 });
@@ -162,7 +162,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
   }
 
   const deadlinePassed = new Date(event.signupDeadline).getTime() <= Date.now();
-  if (deadlinePassed && (body.status === "IN" || body.status === "OUT")) {
+  const wasMemberAtDeadline = targetMembership.createdAt <= event.signupDeadline;
+  if (deadlinePassed && wasMemberAtDeadline && (body.status === "IN" || body.status === "OUT")) {
     if (targetMembership.role !== "SOME") {
       const existingFine = await prisma.fine.findFirst({
         where: {

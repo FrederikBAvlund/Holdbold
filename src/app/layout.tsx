@@ -1,10 +1,12 @@
 import "./globals.css";
 import type { Metadata, Viewport } from "next";
 import { Space_Grotesk, Manrope } from "next/font/google";
+import { getServerSession } from "next-auth";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import AuthSessionProvider from "@/components/SessionProvider";
 import ToastProvider from "@/components/ToastProvider";
 import PwaRegister from "@/components/PwaRegister";
+import { authOptions } from "@/lib/auth";
 
 const display = Space_Grotesk({
   subsets: ["latin"],
@@ -39,17 +41,19 @@ export const viewport: Viewport = {
   themeColor: "#d90429"
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children
 }: {
   children: React.ReactNode;
 }) {
+  const session = await getServerSession(authOptions);
+
   return (
     <html lang="da" className={`${display.variable} ${sans.variable}`}>
       <body>
         <PwaRegister />
         <ThemeProvider />
-        <AuthSessionProvider>
+        <AuthSessionProvider session={session}>
           <ToastProvider>{children}</ToastProvider>
         </AuthSessionProvider>
       </body>

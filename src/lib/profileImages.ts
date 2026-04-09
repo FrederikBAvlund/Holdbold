@@ -1,6 +1,10 @@
 const SUPABASE_BUCKET = process.env.SUPABASE_PROFILE_BUCKET ?? "profile-images";
 const SIGNED_URL_TTL_SECONDS = 60 * 60 * 24 * 7;
 
+/** In-memory cache to avoid repeated Supabase sign calls per server instance. */
+const signedUrlCache = new Map<string, { url: string | null; expiresAt: number }>();
+const SIGN_CACHE_MS = 45 * 60 * 1000;
+
 function extractObjectPath(imageValue: string): string | null {
   if (imageValue.startsWith("supabase:")) {
     const path = imageValue.slice("supabase:".length);
@@ -50,6 +54,13 @@ export async function resolveProfileImageUrl(imageValue?: string | null): Promis
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!supabaseUrl || !serviceRoleKey) return null;
 
+  const cacheKey = `${objectPath}`;
+  const now = Date.now();
+  const cached = signedUrlCache.get(cacheKey);
+  if (cached && cached.expiresAt > now) {
+    return cached.url;
+  }
+
   try {
     const signResponse = await fetch(
       `${supabaseUrl}/storage/v1/object/sign/${SUPABASE_BUCKET}/${objectPath}`,
@@ -65,16 +76,23 @@ export async function resolveProfileImageUrl(imageValue?: string | null): Promis
     );
 
     if (!signResponse.ok) {
+      signedUrlCache.set(cacheKey, { url: null, expiresAt: now + 60_000 });
       return null;
     }
 
     const data = (await signResponse.json()) as { signedURL?: string; signedUrl?: string };
     const signedPath = data.signedURL ?? data.signedUrl;
-    if (!signedPath) return null;
-    if (signedPath.startsWith("http://") || signedPath.startsWith("https://")) return signedPath;
-    if (signedPath.startsWith("/storage/v1/")) return `${supabaseUrl}${signedPath}`;
-    if (signedPath.startsWith("/object/")) return `${supabaseUrl}/storage/v1${signedPath}`;
-    return `${supabaseUrl}/storage/v1/${signedPath.replace(/^\/+/, "")}`;
+    if (!signedPath) {
+      signedUrlCache.set(cacheKey, { url: null, expiresAt: now + 60_000 });
+      return null;
+    }
+    let resolved: string;
+    if (signedPath.startsWith("http://") || signedPath.startsWith("https://")) resolved = signedPath;
+    else if (signedPath.startsWith("/storage/v1/")) resolved = `${supabaseUrl}${signedPath}`;
+    else if (signedPath.startsWith("/object/")) resolved = `${supabaseUrl}/storage/v1${signedPath}`;
+    else resolved = `${supabaseUrl}/storage/v1/${signedPath.replace(/^\/+/, "")}`;
+    signedUrlCache.set(cacheKey, { url: resolved, expiresAt: now + SIGN_CACHE_MS });
+    return resolved;
   } catch {
     return null;
   }

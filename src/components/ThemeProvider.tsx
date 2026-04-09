@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { getStoredTeamId, getStoredTheme, setStoredTeamId, setStoredTheme } from "@/components/appState";
+import { fetchMeCached } from "@/lib/meClientCache";
 
 const DEFAULT_THEME = "atlantic";
 
@@ -66,9 +67,8 @@ export function ThemeProvider() {
       }
 
       let teamId = getStoredTeamId();
-      const meResponse = await fetch("/api/me");
-      if (meResponse.ok) {
-        const meData = await meResponse.json();
+      const { ok: meOk, data: meData } = await fetchMeCached();
+      if (meOk) {
         const userTheme = meData.user?.themePreset as string | null | undefined;
         const userThemeConfig = meData.user?.themeConfig as ThemeConfig | null | undefined;
         if (userTheme) {
@@ -84,7 +84,7 @@ export function ThemeProvider() {
 
         const memberships = meData.memberships ?? [];
         const firstTeam = memberships[0]?.team?.id ?? "";
-        const isCurrentValid = memberships.some((membership: { team?: { id?: string } }) => membership.team?.id === teamId);
+        const isCurrentValid = memberships.some((membership) => membership.team?.id === teamId);
         if (!teamId || !isCurrentValid) {
           teamId = firstTeam;
           if (teamId) {

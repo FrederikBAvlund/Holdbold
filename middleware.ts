@@ -12,6 +12,13 @@ export async function middleware(request: NextRequest) {
   }
 
   if (pathname.startsWith("/api/")) {
+    const apiToken = await getToken({
+      req: request,
+      secret: process.env.NEXTAUTH_SECRET
+    });
+    if (!apiToken) {
+      return NextResponse.json({ error: "Ikke logget ind" }, { status: 401 });
+    }
     return NextResponse.next();
   }
 
@@ -44,6 +51,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|sw.js|brand|uploads|api/auth|api/health).*)"
+    "/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|sw.js|brand|uploads|api/auth|api/health|api/cron).*)"
   ]
 };

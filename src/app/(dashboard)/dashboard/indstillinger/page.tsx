@@ -6,7 +6,9 @@ import { setCustomTheme, setTheme } from "@/components/ThemeProvider";
 import { getStoredTeamId, setStoredTeamId } from "@/components/appState";
 import { useToast } from "@/components/ToastProvider";
 import PushSettings from "@/components/PushSettings";
+import { CollapsibleCard } from "@/components/CollapsibleCard";
 import LoadingButton from "@/components/LoadingButton";
+import { clearMeClientCache } from "@/lib/meClientCache";
 
 type Membership = {
   role: string;
@@ -242,7 +244,7 @@ export default function IndstillingerPage() {
       setTheme(theme);
     }
     try {
-      await fetch("/api/me", {
+      const response = await fetch("/api/me", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -250,6 +252,7 @@ export default function IndstillingerPage() {
           ...(theme === "custom" ? { themeConfig: customTheme } : {})
         })
       });
+      if (response.ok) clearMeClientCache();
     } catch {
       pushToast("Kunne ikke gemme tema", "error");
     } finally {
@@ -263,11 +266,12 @@ export default function IndstillingerPage() {
     setHasUserTheme(true);
     setCustomTheme(customTheme);
     try {
-      await fetch("/api/me", {
+      const response = await fetch("/api/me", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ themePreset: "custom", themeConfig: customTheme })
       });
+      if (response.ok) clearMeClientCache();
     } finally {
       setSavingCustomTheme(false);
     }
@@ -286,6 +290,7 @@ export default function IndstillingerPage() {
         pushToast("Kunne ikke skifte til holdets tema", "error");
         return;
       }
+      clearMeClientCache();
       setHasUserTheme(false);
       if (!teamId) return;
       const teamResponse = await fetch(`/api/team/${teamId}`);
@@ -319,7 +324,11 @@ export default function IndstillingerPage() {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ themePreset: "custom", themeConfig: customTheme })
-      }).catch(() => undefined);
+      })
+        .then((r) => {
+          if (r.ok) clearMeClientCache();
+        })
+        .catch(() => undefined);
     }, 400);
     return () => clearTimeout(timeout);
   }, [active, customTheme, hasUserTheme]);
@@ -531,6 +540,7 @@ export default function IndstillingerPage() {
       }
 
       pushToast("Profil opdateret.", "success");
+      clearMeClientCache();
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
@@ -555,6 +565,7 @@ export default function IndstillingerPage() {
         return;
       }
       setProfileImage(data.url);
+      clearMeClientCache();
       pushToast("Profilbillede opdateret.", "success");
     } finally {
       setUploading(false);
@@ -661,7 +672,7 @@ export default function IndstillingerPage() {
 
   if (sessionStatus === "loading") {
     return (
-      <section className="space-y-6">
+      <section className="w-full min-w-0 space-y-6">
         <header className="card">
           <h2 className="text-2xl font-semibold text-ink">Indstillinger</h2>
           <p className="mt-2 text-ink/70">Indlæser...</p>
@@ -672,7 +683,7 @@ export default function IndstillingerPage() {
 
   if (!session?.user?.id) {
     return (
-      <section className="space-y-6">
+      <section className="w-full min-w-0 space-y-6">
         <header className="card">
           <h2 className="text-2xl font-semibold text-ink">Indstillinger</h2>
           <p className="mt-2 text-ink/70">Du skal være logget ind for at se indstillinger.</p>
@@ -682,7 +693,7 @@ export default function IndstillingerPage() {
   }
 
   return (
-    <section className="space-y-6">
+    <section className="w-full min-w-0 space-y-6">
       <header className="card">
         <h2 className="text-2xl font-semibold text-ink">Indstillinger</h2>
         <p className="mt-2 text-ink/70">Team, roller og integrationsindstillinger.</p>
@@ -693,12 +704,11 @@ export default function IndstillingerPage() {
         ) : null}
       </header>
 
-      <div className="card-soft">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h3 className="text-lg font-semibold text-ink">Profil</h3>
-            <p className="mt-2 text-sm text-ink/70">Opdater dine oplysninger og adgangskode.</p>
-          </div>
+      <CollapsibleCard
+        title="Profil"
+        description="Opdater dine oplysninger og adgangskode."
+        storageKey={`holdbold:settings:${session.user.id}:profil`}
+        headerEnd={
           <LoadingButton
             type="button"
             className="btn-ghost"
@@ -707,8 +717,9 @@ export default function IndstillingerPage() {
             idleContent="Log ud"
             loadingContent="Logger ud..."
           />
-        </div>
-        <form className="mt-4 grid gap-4 lg:grid-cols-2" onSubmit={handleProfileSave}>
+        }
+      >
+        <form className="grid gap-4 lg:grid-cols-2" onSubmit={handleProfileSave}>
           <div className="space-y-2 lg:col-span-2">
             <label className="label" htmlFor="profile-avatar">Profilbillede</label>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -804,15 +815,19 @@ export default function IndstillingerPage() {
             />
           </div>
         </form>
-      </div>
+      </CollapsibleCard>
 
-      <PushSettings />
+      <CollapsibleCard title="Push-notifikationer" storageKey={`holdbold:settings:${session.user.id}:push`}>
+        <PushSettings />
+      </CollapsibleCard>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <div className="card-soft">
-          <h3 className="text-lg font-semibold text-ink">Hold</h3>
-          <p className="mt-2 text-sm text-ink/70">Vælg hvilket hold du arbejder i.</p>
-          <div className="mt-4 grid gap-3">
+      <div className="grid w-full min-w-0 gap-6 lg:grid-cols-2">
+        <CollapsibleCard
+          title="Hold"
+          description="Vælg hvilket hold du arbejder i."
+          storageKey={`holdbold:settings:${session.user.id}:hold:${teamId || "none"}`}
+        >
+          <div className="grid gap-3">
             <select value={teamId} onChange={(event) => handleTeamChange(event.target.value)} className="input">
               <option value="">Vælg hold</option>
               {memberships.map((membership) => (
@@ -913,21 +928,24 @@ export default function IndstillingerPage() {
               )}
             </div>
           </div>
-        </div>
+        </CollapsibleCard>
 
-        <div className="card-soft">
-          <h3 className="text-lg font-semibold text-ink">Tema</h3>
-          <p className="mt-2 text-sm text-ink/70">Vælg en farveprofil for dashboardet.</p>
-          <p className="mt-1 text-xs text-ink/60">
+        <CollapsibleCard
+          title="Tema"
+          description="Vælg en farveprofil for dashboardet."
+          storageKey={`holdbold:settings:${session.user.id}:tema:${teamId || "none"}`}
+        >
+          <p className="text-xs text-ink/60">
             {hasUserTheme ? "Du bruger dit personlige tema." : "Du bruger holdets standardtema."}
           </p>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <div className="mt-4 grid w-full min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
             {presets.map((preset) => (
               <button
                 key={preset.id}
+                type="button"
                 onClick={() => handleTheme(preset.id)}
                 disabled={themeApplyingId !== null}
-                className={`rounded-2xl border px-4 py-3 text-left text-sm font-semibold ${
+                className={`w-full min-w-0 rounded-2xl border px-4 py-3 text-left text-sm font-semibold ${
                   active === preset.id ? "border-ink bg-white" : "border-ink/10 bg-white/70"
                 }`}
               >
@@ -936,10 +954,10 @@ export default function IndstillingerPage() {
             ))}
           </div>
           {hasUserTheme ? (
-            <div className="mt-4">
+            <div className="mt-4 w-full">
               <LoadingButton
                 type="button"
-                className="btn-ghost"
+                className="btn-ghost w-full min-[480px]:w-auto"
                 onClick={handleUseTeamTheme}
                 isLoading={usingTeamTheme}
                 idleContent="Brug holdets standardtema"
@@ -948,10 +966,10 @@ export default function IndstillingerPage() {
             </div>
           ) : null}
           {isAdmin ? (
-            <div className="mt-3">
+            <div className="mt-3 w-full">
               <button
                 type="button"
-                className="btn-ghost"
+                className="btn-ghost w-full min-[480px]:w-auto"
                 onClick={handleSaveTeamTheme}
                 disabled={savingTeamTheme || !teamId}
               >
@@ -974,7 +992,10 @@ export default function IndstillingerPage() {
                   { key: "gradientMid", label: "Baggrund midt" },
                   { key: "gradientEnd", label: "Baggrund slut" }
                 ].map((item) => (
-                  <label key={item.key} className="flex items-center justify-between rounded-2xl border border-ink/10 bg-white/80 px-4 py-3 text-sm font-semibold text-ink/80">
+                  <label
+                    key={item.key}
+                    className="flex w-full min-w-0 items-center justify-between rounded-2xl border border-ink/10 bg-white/80 px-4 py-3 text-sm font-semibold text-ink/80"
+                  >
                     <span>{item.label}</span>
                     <input
                       type="color"
@@ -989,7 +1010,7 @@ export default function IndstillingerPage() {
               </div>
               <LoadingButton
                 type="button"
-                className="btn-primary"
+                className="btn-primary w-full sm:w-auto"
                 onClick={handleSaveCustomTheme}
                 isLoading={savingCustomTheme}
                 idleContent="Gem tilpasset tema"
@@ -997,13 +1018,16 @@ export default function IndstillingerPage() {
               />
             </div>
           ) : null}
-        </div>
+        </CollapsibleCard>
       </div>
 
-      <div className="card-soft" hidden={!isAdmin}>
-        <h3 className="text-lg font-semibold text-ink">Integrationer</h3>
-        <p className="mt-2 text-sm text-ink/70">Indsæt iCal-link eller upload et Excel-kampprogram.</p>
-        <form className="mt-4 grid gap-3" onSubmit={handleIcalImport}>
+      {isAdmin ? (
+        <CollapsibleCard
+          title="Integrationer"
+          description="Indsæt iCal-link eller upload et Excel-kampprogram."
+          storageKey={`holdbold:settings:${session.user.id}:integrationer:${teamId || "none"}`}
+        >
+          <form className="grid gap-3" onSubmit={handleIcalImport}>
           <div className="space-y-2">
             <label className="label" htmlFor="ical-url">iCal URL</label>
             <input
@@ -1062,7 +1086,8 @@ export default function IndstillingerPage() {
             ))
           )}
         </div>
-      </div>
+        </CollapsibleCard>
+      ) : null}
 
       {selectedMember ? (
         <div className="modal-backdrop" onClick={() => setSelectedMember(null)}>

@@ -118,16 +118,25 @@ export default function PushSettings() {
   }
 
   return (
-    <div className="card-soft">
-      <h3 className="text-lg font-semibold text-ink">Push-notifikationer</h3>
-      <p className="mt-2 text-sm text-ink/70">{statusText}</p>
+    <>
+      <p className="text-sm text-ink/70">{statusText}</p>
       <div className="mt-4 flex flex-wrap gap-2">
         {!subscribed ? (
-          <button type="button" className="btn-primary" onClick={enablePush} disabled={busy || !supported}>
+          <button
+            type="button"
+            className="btn-primary w-full min-[380px]:w-auto"
+            onClick={enablePush}
+            disabled={busy || !supported}
+          >
             {busy ? "Aktiverer..." : "Aktivér push"}
           </button>
         ) : (
-          <button type="button" className="btn-ghost" onClick={disablePush} disabled={busy}>
+          <button
+            type="button"
+            className="btn-ghost w-full min-[380px]:w-auto"
+            onClick={disablePush}
+            disabled={busy}
+          >
             {busy ? "Gemmer..." : "Slå push fra"}
           </button>
         )}
@@ -135,7 +144,7 @@ export default function PushSettings() {
       <p className="mt-2 text-xs text-ink/60">
         På iPhone virker push kun når Holdbold er installeret på hjemmeskærmen.
       </p>
-    </div>
+    </>
   );
 }
 

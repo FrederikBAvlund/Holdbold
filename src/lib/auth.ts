@@ -73,6 +73,9 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
+        token.name = user.name;
+        token.email = user.email;
+        token.picture = user.image;
       }
       if (token.id) {
         const memberships = await prisma.membership.findMany({
@@ -83,6 +86,20 @@ export const authOptions: NextAuthOptions = {
         const hasPendingMembership = !hasActiveMembership && memberships.some((membership) => membership.status === "PENDING");
         token.hasActiveMembership = hasActiveMembership;
         token.hasPendingMembership = hasPendingMembership;
+
+        // Uden navn/e-mail i JWT viser klienten "HB" mens SSR har initialer — hydration-fejl.
+        // Gamle sessions kan mangle felter, fordi jwt-callback tidligere kun satte `id`.
+        if (!token.name || !token.email) {
+          const row = await prisma.user.findUnique({
+            where: { id: token.id as string },
+            select: { name: true, email: true, image: true }
+          });
+          if (row) {
+            if (!token.name) token.name = row.name;
+            if (!token.email) token.email = row.email;
+            if (!token.picture) token.picture = row.image;
+          }
+        }
       }
       return token;
     },
@@ -91,6 +108,9 @@ export const authOptions: NextAuthOptions = {
         session.user.id = token.id as string;
         session.user.hasActiveMembership = Boolean(token.hasActiveMembership);
         session.user.hasPendingMembership = Boolean(token.hasPendingMembership);
+        if (typeof token.name === "string") session.user.name = token.name;
+        if (typeof token.email === "string") session.user.email = token.email;
+        if (typeof token.picture === "string") session.user.image = token.picture;
       }
       return session;
     }

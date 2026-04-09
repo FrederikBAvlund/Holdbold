@@ -1,192 +1,24 @@
 "use client";
 
-import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
 import { getStoredTeamId, setStoredTeamId } from "@/components/appState";
 import { Combobox } from "@/components/ui/combobox";
 import { useToast } from "@/components/ToastProvider";
 import LoadingButton from "@/components/LoadingButton";
-
-type FineTemplate = {
-  id: string;
-  title: string;
-  amount: number;
-  category: "SOME" | "FAELLES" | "SPILLER" | "DIVERSE";
-  description?: string | null;
-  status?: string;
-  createdAt: string;
-  createdById?: string | null;
-  approvedById?: string | null;
-  rejectedById?: string | null;
-  createdBy?: { id: string; name: string | null } | null;
-  approvedBy?: { id: string; name: string | null } | null;
-  rejectedBy?: { id: string; name: string | null } | null;
-};
-
-type Member = {
-  role: string;
-  user: {
-    id: string;
-    name: string;
-    email?: string | null;
-  };
-};
-
-type FineItem = {
-  id: string;
-  amount: number;
-  reason: string;
-  description?: string | null;
-  status: string;
-  createdAt: string;
-  createdById?: string | null;
-  approvedById?: string | null;
-  rejectedById?: string | null;
-  createdByLabel?: string | null;
-  createdBy?: { name: string | null } | null;
-  approvedBy?: { id: string; name: string | null } | null;
-  user?: { id: string; name: string | null } | null;
-  template?: FineTemplate | null;
-};
-
-type PendingPayment = {
-  userId: string;
-  name: string;
-  total: number;
-  count: number;
-  requestedAt: string | null;
-};
-
-type FineCollection = {
-  id: string;
-  deadlineAt: string;
-  intervalHours: number;
-  createdAt: string;
-  template: {
-    id: string;
-    title: string;
-    amount: number;
-  };
-};
-
-const fineRoles = ["BOEDEKASSEFORMAND", "ADMIN"];
-const categoryOptions = [
-  { value: "SOME", label: "SoMe" },
-  { value: "FAELLES", label: "Fælles" },
-  { value: "SPILLER", label: "Spiller" },
-  { value: "DIVERSE", label: "Diverse" }
-] as const;
-
-const categoryLabel: Record<string, string> = {
-  SOME: "SoMe",
-  FAELLES: "Fælles",
-  SPILLER: "Spiller",
-  DIVERSE: "Diverse"
-};
-
-const roleLabel: Record<string, string> = {
-  ADMIN: "Admin",
-  TRAENER: "Træner",
-  SPILLER: "Spiller",
-  SOME: "SoMe",
-  BOEDEKASSEFORMAND: "Bødekasse"
-};
-
-function fineStatusMeta(status: string) {
-  if (status === "UNPAID") {
-    return {
-      label: "Ubetalt",
-      className: "bg-red-100 text-red-700"
-    };
-  }
-  if (status === "PAID_PENDING") {
-    return {
-      label: "Afventer godkendelse",
-      className: "bg-amber-100 text-amber-800"
-    };
-  }
-  if (status === "PAID_APPROVED") {
-    return {
-      label: "Betalt",
-      className: "bg-green-100 text-green-700"
-    };
-  }
-  return {
-    label: status,
-    className: "bg-ink/10 text-ink/70"
-  };
-}
-
-function canDeleteFine(status: string) {
-  return ["UNPAID", "PAID_PENDING", "FORESLAET", "AFVIST"].includes(status);
-}
-
-function CollapsibleCard({
-  title,
-  description,
-  right,
-  storageKey,
-  defaultOpen = true,
-  children
-}: {
-  title: string;
-  description?: string;
-  right?: ReactNode;
-  storageKey: string;
-  defaultOpen?: boolean;
-  children: ReactNode;
-}) {
-  const [open, setOpen] = useState(defaultOpen);
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const stored = window.localStorage.getItem(storageKey);
-    if (stored === "0") setOpen(false);
-    if (stored === "1") setOpen(true);
-    setReady(true);
-  }, [storageKey]);
-
-  useEffect(() => {
-    if (typeof window === "undefined" || !ready) return;
-    window.localStorage.setItem(storageKey, open ? "1" : "0");
-  }, [open, ready, storageKey]);
-
-  return (
-    <div className="card relative">
-      <button
-        type="button"
-        className="absolute right-5 top-5 inline-flex h-9 w-9 items-center justify-center rounded-full border border-ink/20 bg-white/80 text-ink transition hover:border-ink/35 hover:bg-white"
-        onClick={() => setOpen((prev) => !prev)}
-        aria-label={open ? "Skjul kort" : "Vis kort"}
-        title={open ? "Skjul" : "Vis"}
-      >
-        <svg
-          viewBox="0 0 24 24"
-          className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`}
-          aria-hidden="true"
-        >
-          <path
-            d="M6 9l6 6 6-6"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      </button>
-      <div className="pr-14">
-        <div>
-          <h3 className="text-lg font-semibold text-ink">{title}</h3>
-          {description ? <p className="mt-2 text-sm text-ink/70">{description}</p> : null}
-        </div>
-      </div>
-      {right ? <div className="mt-3 pr-14">{right}</div> : null}
-      {open ? <div className="mt-6">{children}</div> : null}
-    </div>
-  );
-}
+import { TrashIcon } from "@/components/TrashIcon";
+import { fetchMeCached } from "@/lib/meClientCache";
+import { CollapsibleCard } from "@/components/CollapsibleCard";
+import { FineEventLink } from "./FineEventLink";
+import { categoryLabel, categoryOptions, fineRoles, roleLabel } from "./boderConstants";
+import type { FineCollection, FineItem, FineTemplate, Member, PendingPayment } from "./boderTypes";
+import {
+  canDeleteFine,
+  fineAmountClass,
+  formatFineKr,
+  fineStatusMeta,
+  parseIntegerAmountInput
+} from "./boderUtils";
 
 export default function BoderPage() {
   const { pushToast } = useToast();
@@ -211,13 +43,13 @@ export default function BoderPage() {
   const [collections, setCollections] = useState<FineCollection[]>([]);
 
   const [templateTitle, setTemplateTitle] = useState("");
-  const [templateAmount, setTemplateAmount] = useState(20);
+  const [templateAmount, setTemplateAmount] = useState("20");
   const [templateCategory, setTemplateCategory] = useState<"SOME" | "FAELLES" | "SPILLER" | "DIVERSE">("SPILLER");
   const [templateDescription, setTemplateDescription] = useState("");
   const [templateSearch, setTemplateSearch] = useState("");
 
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
-  const [fineAmount, setFineAmount] = useState(50);
+  const [fineAmount, setFineAmount] = useState("50");
   const [fineTitle, setFineTitle] = useState("");
   const [fineDescription, setFineDescription] = useState("");
 
@@ -227,7 +59,7 @@ export default function BoderPage() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<FineTemplate | null>(null);
   const [editTitle, setEditTitle] = useState("");
-  const [editAmount, setEditAmount] = useState(20);
+  const [editAmount, setEditAmount] = useState("20");
   const [editCategory, setEditCategory] = useState<"SOME" | "FAELLES" | "SPILLER" | "DIVERSE">("SPILLER");
   const [editDescription, setEditDescription] = useState("");
   const [showCreateTemplateModal, setShowCreateTemplateModal] = useState(false);
@@ -268,16 +100,13 @@ export default function BoderPage() {
       if (defaultTeamLoadedForUserRef.current === sessionUserId) return;
       defaultTeamLoadedForUserRef.current = sessionUserId;
 
-      const response = await fetch("/api/me");
-      if (!response.ok) return;
-      const data = await response.json();
+      const { ok, data } = await fetchMeCached();
+      if (!ok) return;
       const memberships = data.memberships ?? [];
       const firstTeam = memberships[0]?.team?.id;
       if (!firstTeam) return;
       const currentTeamId = teamId || getStoredTeamId();
-      const isCurrentValid = memberships.some(
-        (membership: { team?: { id?: string } }) => membership.team?.id === currentTeamId
-      );
+      const isCurrentValid = memberships.some((membership) => membership.team?.id === currentTeamId);
       if (!currentTeamId || !isCurrentValid) {
         setTeamId(firstTeam);
         setStoredTeamId(firstTeam);
@@ -452,6 +281,11 @@ export default function BoderPage() {
   async function handleCreateTemplate(event: React.FormEvent) {
     event.preventDefault();
     if (createTemplateSubmitting) return;
+    const parsedAmount = parseIntegerAmountInput(templateAmount);
+    if (!parsedAmount.ok || parsedAmount.value === 0) {
+      pushToast("Ugyldigt beløb (heltal, ikke 0)", "error");
+      return;
+    }
     setCreateTemplateSubmitting(true);
 
     try {
@@ -461,10 +295,9 @@ export default function BoderPage() {
         body: JSON.stringify({
           teamId,
           title: templateTitle,
-          amount: Number(templateAmount),
+          amount: parsedAmount.value,
           category: templateCategory,
-          description: templateDescription || undefined,
-          createdById: userId || undefined
+          description: templateDescription || undefined
         })
       });
 
@@ -476,7 +309,7 @@ export default function BoderPage() {
 
       pushToast("Bødeskabelon oprettet", "success");
       setTemplateTitle("");
-      setTemplateAmount(20);
+      setTemplateAmount("20");
       setTemplateCategory("SPILLER");
       setTemplateDescription("");
       setTemplates((prev) => [data.template, ...prev]);
@@ -498,14 +331,18 @@ export default function BoderPage() {
     try {
       const recipients = selectedUserIds;
       const payloadBase: Record<string, unknown> = {
-        teamId,
-        createdById: userId || undefined
+        teamId
       };
 
       if (selectedTemplateId) {
         payloadBase.templateId = selectedTemplateId;
       } else {
-        payloadBase.amount = Number(fineAmount);
+        const parsedFine = parseIntegerAmountInput(fineAmount);
+        if (!parsedFine.ok || parsedFine.value === 0) {
+          pushToast("Ugyldigt beløb (heltal, ikke 0 — negativt tilladt som kredit)", "error");
+          return;
+        }
+        payloadBase.amount = parsedFine.value;
         payloadBase.title = fineTitle;
         payloadBase.description = fineDescription || undefined;
       }
@@ -531,7 +368,7 @@ export default function BoderPage() {
       setSelectedUserIds([]);
       setMemberSearch("");
       setSelectedTemplateId("");
-      setFineAmount(20);
+      setFineAmount("50");
       setFineTitle("");
       setFineDescription("");
       await refreshFinesAndApprovals();
@@ -788,14 +625,14 @@ export default function BoderPage() {
   const templateOptions = approvedTemplates.map((template) => ({
       value: template.id,
       label: `${categoryLabel[template.category] ?? template.category} · ${template.title}`,
-      rightLabel: `${template.amount} kr`,
+      rightLabel: formatFineKr(template.amount),
       searchLabel: `${categoryLabel[template.category] ?? template.category} ${template.title} ${template.amount} ${
         template.description ?? ""
       }`
     }));
   const collectionTemplateOptions = approvedTemplates.map((template) => ({
     value: template.id,
-    label: `${template.title} (${template.amount} kr)`
+    label: `${template.title} (${formatFineKr(template.amount)})`
   }));
 
   const myFineRequests = teamFines
@@ -907,7 +744,7 @@ export default function BoderPage() {
   function openEditTemplate(template: FineTemplate) {
     setEditingTemplate(template);
     setEditTitle(template.title);
-    setEditAmount(template.amount);
+    setEditAmount(String(template.amount));
     setEditCategory(template.category ?? "SPILLER");
     setEditDescription(template.description ?? "");
     setShowEditModal(true);
@@ -917,6 +754,11 @@ export default function BoderPage() {
     event.preventDefault();
     if (!editingTemplate) return;
     if (updateTemplateSubmitting || deleteTemplateSubmitting) return;
+    const parsedEdit = parseIntegerAmountInput(editAmount);
+    if (!parsedEdit.ok) {
+      pushToast("Ugyldigt beløb (heltal)", "error");
+      return;
+    }
     setUpdateTemplateSubmitting(true);
     try {
       const response = await fetch(`/api/fine-templates/${editingTemplate.id}`, {
@@ -924,7 +766,7 @@ export default function BoderPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title: editTitle,
-          amount: Number(editAmount),
+          amount: parsedEdit.value,
           category: editCategory,
           description: editDescription || undefined
         })
@@ -1038,9 +880,12 @@ export default function BoderPage() {
                     <p className="text-xs text-ink/60">
                       {new Date(fine.createdAt).toLocaleDateString("da-DK")} · {creatorLabel(fine)}
                     </p>
+                    {fine.event ? <FineEventLink event={fine.event} /> : null}
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-semibold text-ink">{fine.amount} kr</p>
+                    <p className={`text-sm font-semibold ${fineAmountClass(fine.amount)}`}>
+                      {formatFineKr(fine.amount)}
+                    </p>
                     <span
                       className={`mt-1 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${fineStatusMeta(fine.status).className}`}
                     >
@@ -1116,8 +961,11 @@ export default function BoderPage() {
                     <p className="text-xs text-ink/60">
                       {fine.user?.name ?? "Ukendt"} · {creatorLabel(fine)}
                     </p>
+                    {fine.event ? <FineEventLink event={fine.event} /> : null}
                   </div>
-                  <div className="text-sm font-semibold text-ink">{fine.amount} kr</div>
+                  <div className={`text-sm font-semibold ${fineAmountClass(fine.amount)}`}>
+                    {formatFineKr(fine.amount)}
+                  </div>
                 </div>
                 <div className="mt-3 flex gap-2">
                   <LoadingButton
@@ -1151,16 +999,7 @@ export default function BoderPage() {
                           aria-hidden="true"
                         />
                       ) : (
-                        <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5">
-                          <path
-                            d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M8 7l1 12a1 1 0 0 0 1 .92h4a1 1 0 0 0 1-.92L16 7"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="1.7"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                        </svg>
+                        <TrashIcon />
                       )}
                     </button>
                   ) : null}
@@ -1206,7 +1045,9 @@ export default function BoderPage() {
                       ) : null}
                     </div>
                     <div className="text-right">
-                      <div className="text-sm font-semibold text-ink">{requestItem.amount} kr</div>
+                      <div className={`text-sm font-semibold ${fineAmountClass(requestItem.amount)}`}>
+                        {formatFineKr(requestItem.amount)}
+                      </div>
                       <span className={`mt-1 inline-block rounded-full px-2.5 py-1 text-xs font-semibold ${badgeClass}`}>
                         {requestItem.statusLabel}
                       </span>
@@ -1278,10 +1119,10 @@ export default function BoderPage() {
             : "Foreslå nye bødeskabeloner til godkendelse."
         }
         storageKey={`holdbold:boder:${teamId}:${userId}:skabeloner`}
-        right={
+        headerEnd={
           <button
             type="button"
-            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-ink/20 bg-white/80 text-xl font-semibold text-ink transition hover:border-ink/35 hover:bg-white"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-ink/20 bg-white/80 text-lg font-semibold leading-none text-ink transition hover:border-ink/35 hover:bg-white"
             onClick={() => setShowCreateTemplateModal(true)}
             aria-label={canManageFines ? "Opret bødeskabelon" : "Foreslå bødeskabelon"}
             title={canManageFines ? "Opret bødeskabelon" : "Foreslå bødeskabelon"}
@@ -1299,7 +1140,7 @@ export default function BoderPage() {
                   <p className="text-sm font-semibold text-ink">{collection.template.title}</p>
                   <p className="text-xs text-ink/60">
                     Fra {new Date(collection.deadlineAt).toLocaleString("da-DK")} · hver {collection.intervalHours}. time ·{" "}
-                    {collection.template.amount} kr
+                    {formatFineKr(collection.template.amount)}
                   </p>
                 </div>
               ))}
@@ -1335,7 +1176,9 @@ export default function BoderPage() {
                       <p className="text-xs text-ink/60">{template.description}</p>
                     ) : null}
                   </div>
-                  <div className="text-sm font-semibold text-ink">{template.amount} kr</div>
+                  <div className={`text-sm font-semibold ${fineAmountClass(template.amount)}`}>
+                    {formatFineKr(template.amount)}
+                  </div>
                 </div>
                 <div className="mt-3 flex gap-2">
                   <LoadingButton
@@ -1380,7 +1223,9 @@ export default function BoderPage() {
                       <p className="text-xs text-ink/60">{template.description}</p>
                     ) : null}
                   </div>
-                  <div className="text-sm font-semibold text-ink">{template.amount} kr</div>
+                  <div className={`text-sm font-semibold ${fineAmountClass(template.amount)}`}>
+                    {formatFineKr(template.amount)}
+                  </div>
                 </div>
                 {canManageFines ? (
                   <div className="mt-3 flex flex-wrap gap-2">
@@ -1551,9 +1396,14 @@ export default function BoderPage() {
                         <p className="text-xs text-ink/60">
                           {new Date(fine.createdAt).toLocaleString("da-DK")} · {creatorLabel(fine)}
                         </p>
+                        {fine.event ? <FineEventLink event={fine.event} /> : null}
                       </div>
                       <div className="flex items-center gap-3">
-                        <p className="text-sm font-semibold text-ink whitespace-nowrap">{fine.amount} kr</p>
+                        <p
+                          className={`text-sm font-semibold whitespace-nowrap ${fineAmountClass(fine.amount)}`}
+                        >
+                          {formatFineKr(fine.amount)}
+                        </p>
                         <span
                           className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold whitespace-nowrap ${fineStatusMeta(fine.status).className}`}
                         >
@@ -1574,16 +1424,7 @@ export default function BoderPage() {
                                 aria-hidden="true"
                               />
                             ) : (
-                              <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5">
-                                <path
-                                  d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M8 7l1 12a1 1 0 0 0 1 .92h4a1 1 0 0 0 1-.92L16 7"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  strokeWidth="1.7"
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                />
-                              </svg>
+                              <TrashIcon />
                             )}
                           </button>
                         ) : null}
@@ -1641,10 +1482,11 @@ export default function BoderPage() {
                 <label className="label" htmlFor="template-amount">Beløb</label>
                 <input
                   id="template-amount"
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
                   value={templateAmount}
-                  onChange={(event) => setTemplateAmount(Number(event.target.value))}
-                  placeholder="Beløb"
+                  onChange={(event) => setTemplateAmount(event.target.value)}
+                  placeholder="Beløb (fx 20 eller -10)"
                   className="input"
                   required
                 />
@@ -1697,7 +1539,7 @@ export default function BoderPage() {
             setSelectedUserIds([]);
             setMemberSearch("");
             setSelectedTemplateId("");
-            setFineAmount(20);
+            setFineAmount("50");
             setFineTitle("");
             setFineDescription("");
           }}
@@ -1718,7 +1560,7 @@ export default function BoderPage() {
                   setSelectedUserIds([]);
                   setMemberSearch("");
                   setSelectedTemplateId("");
-                  setFineAmount(20);
+                  setFineAmount("50");
                   setFineTitle("");
                   setFineDescription("");
                 }}
@@ -1817,10 +1659,11 @@ export default function BoderPage() {
                     <label className="label" htmlFor="fine-amount">Beløb</label>
                     <input
                       id="fine-amount"
-                      type="number"
+                      type="text"
+                      inputMode="numeric"
                       value={fineAmount}
-                      onChange={(event) => setFineAmount(Number(event.target.value))}
-                      placeholder="Beløb"
+                      onChange={(event) => setFineAmount(event.target.value)}
+                      placeholder="Beløb (heltal, negativt = kredit)"
                       className="input"
                       required
                     />
@@ -1883,16 +1726,7 @@ export default function BoderPage() {
                       aria-hidden="true"
                     />
                   ) : (
-                    <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5">
-                      <path
-                        d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M8 7l1 12a1 1 0 0 0 1 .92h4a1 1 0 0 0 1-.92L16 7"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.7"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
+                    <TrashIcon />
                   )}
                 </button>
                 <button
@@ -1919,9 +1753,10 @@ export default function BoderPage() {
                 <label className="label" htmlFor="edit-amount">Beløb</label>
                 <input
                   id="edit-amount"
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
                   value={editAmount}
-                  onChange={(event) => setEditAmount(Number(event.target.value))}
+                  onChange={(event) => setEditAmount(event.target.value)}
                   className="input"
                   required
                 />
