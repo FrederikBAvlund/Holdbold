@@ -7,6 +7,7 @@ import { getStoredTeamId, setStoredTeamId } from "@/components/appState";
 import { useToast } from "@/components/ToastProvider";
 import PushSettings from "@/components/PushSettings";
 import LoadingButton from "@/components/LoadingButton";
+import { clearMeClientCache } from "@/lib/meClientCache";
 
 type Membership = {
   role: string;
@@ -242,7 +243,7 @@ export default function IndstillingerPage() {
       setTheme(theme);
     }
     try {
-      await fetch("/api/me", {
+      const response = await fetch("/api/me", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -250,6 +251,7 @@ export default function IndstillingerPage() {
           ...(theme === "custom" ? { themeConfig: customTheme } : {})
         })
       });
+      if (response.ok) clearMeClientCache();
     } catch {
       pushToast("Kunne ikke gemme tema", "error");
     } finally {
@@ -263,11 +265,12 @@ export default function IndstillingerPage() {
     setHasUserTheme(true);
     setCustomTheme(customTheme);
     try {
-      await fetch("/api/me", {
+      const response = await fetch("/api/me", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ themePreset: "custom", themeConfig: customTheme })
       });
+      if (response.ok) clearMeClientCache();
     } finally {
       setSavingCustomTheme(false);
     }
@@ -286,6 +289,7 @@ export default function IndstillingerPage() {
         pushToast("Kunne ikke skifte til holdets tema", "error");
         return;
       }
+      clearMeClientCache();
       setHasUserTheme(false);
       if (!teamId) return;
       const teamResponse = await fetch(`/api/team/${teamId}`);
@@ -319,7 +323,11 @@ export default function IndstillingerPage() {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ themePreset: "custom", themeConfig: customTheme })
-      }).catch(() => undefined);
+      })
+        .then((r) => {
+          if (r.ok) clearMeClientCache();
+        })
+        .catch(() => undefined);
     }, 400);
     return () => clearTimeout(timeout);
   }, [active, customTheme, hasUserTheme]);
@@ -531,6 +539,7 @@ export default function IndstillingerPage() {
       }
 
       pushToast("Profil opdateret.", "success");
+      clearMeClientCache();
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
@@ -555,6 +564,7 @@ export default function IndstillingerPage() {
         return;
       }
       setProfileImage(data.url);
+      clearMeClientCache();
       pushToast("Profilbillede opdateret.", "success");
     } finally {
       setUploading(false);

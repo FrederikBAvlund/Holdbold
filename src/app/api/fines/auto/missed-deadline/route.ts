@@ -40,10 +40,13 @@ export async function POST(request: Request) {
     include: { user: true }
   });
 
+  const deadlineAt = event.signupDeadline;
+
   const signupMap = new Map(event.signups.map((signup) => [signup.userId, signup.status]));
 
   let created = 0;
   for (const member of members) {
+    if (member.createdAt > deadlineAt) continue;
     const status = signupMap.get(member.userId);
     if (status === "IN" || status === "OUT") continue;
 

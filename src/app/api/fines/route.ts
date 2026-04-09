@@ -13,7 +13,7 @@ const listSchema = z.object({
 const createSchema = z.object({
   teamId: z.string().min(1),
   userId: z.string().min(1),
-  amount: z.number().int().positive().optional(),
+  amount: z.number().int().optional(),
   title: z.string().min(1).optional(),
   reason: z.string().min(1).optional(),
   description: z.string().trim().optional(),
@@ -62,7 +62,8 @@ export async function GET(request: Request) {
       user: true,
       createdBy: true,
       approvedBy: true,
-      template: true
+      template: true,
+      event: { select: { id: true, title: true, date: true } }
     },
     orderBy: { createdAt: "desc" },
     take: 200
@@ -80,7 +81,12 @@ export async function POST(request: Request) {
   const json = await request.json();
   const body = createSchema.parse(json);
 
-  if (!body.templateId && (!body.amount || (!body.title && !body.reason))) {
+  if (
+    !body.templateId &&
+    (body.amount === undefined ||
+      body.amount === 0 ||
+      (!body.title?.trim() && !body.reason?.trim()))
+  ) {
     return NextResponse.json({ error: "Der mangler beløb eller titel" }, { status: 400 });
   }
 

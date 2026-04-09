@@ -1,11 +1,13 @@
 "use client";
 
+import Link from "next/link";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
 import { getStoredTeamId, setStoredTeamId } from "@/components/appState";
 import { Combobox } from "@/components/ui/combobox";
 import { useToast } from "@/components/ToastProvider";
 import LoadingButton from "@/components/LoadingButton";
+import { fetchMeCached } from "@/lib/meClientCache";
 
 type FineTemplate = {
   id: string;
@@ -47,6 +49,7 @@ type FineItem = {
   approvedBy?: { id: string; name: string | null } | null;
   user?: { id: string; name: string | null } | null;
   template?: FineTemplate | null;
+  event?: { id: string; title: string; date: string } | null;
 };
 
 type PendingPayment = {
@@ -91,6 +94,46 @@ const roleLabel: Record<string, string> = {
   SOME: "SoMe",
   BOEDEKASSEFORMAND: "Bødekasse"
 };
+
+function formatFineKr(amount: number) {
+  return `${amount} kr`;
+}
+
+function fineAmountClass(amount: number) {
+  return amount < 0 ? "text-moss" : "text-ink";
+}
+
+function fineEventHref(event: { id: string; title: string; date: string }) {
+  const params = new URLSearchParams();
+  params.set("focusEvent", event.id);
+  params.set("focusTitle", event.title);
+  const dateIso =
+    typeof event.date === "string" && event.date.includes("T")
+      ? event.date
+      : new Date(event.date).toISOString();
+  params.set("focusDate", dateIso);
+  params.set("focusLocation", "");
+  return `/dashboard/kalender?${params.toString()}`;
+}
+
+function parseIntegerAmountInput(raw: string): { ok: true; value: number } | { ok: false } {
+  const t = raw.trim().replace(/\s/g, "");
+  if (!t || t === "-" || t === "+") return { ok: false };
+  if (!/^-?\d+$/.test(t)) return { ok: false };
+  const value = parseInt(t, 10);
+  if (!Number.isFinite(value)) return { ok: false };
+  return { ok: true, value };
+}
+
+function FineEventLink({ event }: { event: { id: string; title: string; date: string } }) {
+  return (
+    <p className="mt-1 text-xs text-ink/60">
+      <Link href={fineEventHref(event)} className="font-medium text-moss underline-offset-2 hover:underline">
+        {event.title} · {new Date(event.date).toLocaleDateString("da-DK")}
+      </Link>
+    </p>
+  );
+}
 
 function fineStatusMeta(status: string) {
   if (status === "UNPAID") {
@@ -211,13 +254,13 @@ export default function BoderPage() {
   const [collections, setCollections] = useState<FineCollection[]>([]);
 
   const [templateTitle, setTemplateTitle] = useState("");
-  const [templateAmount, setTemplateAmount] = useState(20);
+  const [templateAmount, setTemplateAmount] = useState("20");
   const [templateCategory, setTemplateCategory] = useState<"SOME" | "FAELLES" | "SPILLER" | "DIVERSE">("SPILLER");
   const [templateDescription, setTemplateDescription] = useState("");
   const [templateSearch, setTemplateSearch] = useState("");
 
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
-  const [fineAmount, setFineAmount] = useState(50);
+  const [fineAmount, setFineAmount] = useState("50");
   const [fineTitle, setFineTitle] = useState("");
   const [fineDescription, setFineDescription] = useState("");
 
@@ -227,7 +270,7 @@ export default function BoderPage() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<FineTemplate | null>(null);
   const [editTitle, setEditTitle] = useState("");
-  const [editAmount, setEditAmount] = useState(20);
+  const [editAmount, setEditAmount] = useState("20");
   const [editCategory, setEditCategory] = useState<"SOME" | "FAELLES" | "SPILLER" | "DIVERSE">("SPILLER");
   const [editDescription, setEditDescription] = useState("");
   const [showCreateTemplateModal, setShowCreateTemplateModal] = useState(false);
@@ -268,16 +311,13 @@ export default function BoderPage() {
       if (defaultTeamLoadedForUserRef.current === sessionUserId) return;
       defaultTeamLoadedForUserRef.current = sessionUserId;
 
-      const response = await fetch("/api/me");
-      if (!response.ok) return;
-      const data = await response.json();
+      const { ok, data } = await fetchMeCached();
+      if (!ok) return;
       const memberships = data.memberships ?? [];
       const firstTeam = memberships[0]?.team?.id;
       if (!firstTeam) return;
       const currentTeamId = teamId || getStoredTeamId();
-      const isCurrentValid = memberships.some(
-        (membership: { team?: { id?: string } }) => membership.team?.id === currentTeamId
-      );
+      const isCurrentValid = memberships.some((membership) => membership.team?.id === currentTeamId);
       if (!currentTeamId || !isCurrentValid) {
         setTeamId(firstTeam);
         setStoredTeamId(firstTeam);
@@ -452,6 +492,11 @@ export default function BoderPage() {
   async function handleCreateTemplate(event: React.FormEvent) {
     event.preventDefault();
     if (createTemplateSubmitting) return;
+    const parsedAmount = parseIntegerAmountInput(templateAmount);
+    if (!parsedAmount.ok || parsedAmount.value === 0) {
+      pushToast("Ugyldigt beløb (heltal, ikke 0)", "error");
+      return;
+    }
     setCreateTemplateSubmitting(true);
 
     try {
@@ -461,7 +506,7 @@ export default function BoderPage() {
         body: JSON.stringify({
           teamId,
           title: templateTitle,
-          amount: Number(templateAmount),
+          amount: parsedAmount.value,
           category: templateCategory,
           description: templateDescription || undefined,
           createdById: userId || undefined
@@ -476,7 +521,7 @@ export default function BoderPage() {
 
       pushToast("Bødeskabelon oprettet", "success");
       setTemplateTitle("");
-      setTemplateAmount(20);
+      setTemplateAmount("20");
       setTemplateCategory("SPILLER");
       setTemplateDescription("");
       setTemplates((prev) => [data.template, ...prev]);
@@ -505,7 +550,12 @@ export default function BoderPage() {
       if (selectedTemplateId) {
         payloadBase.templateId = selectedTemplateId;
       } else {
-        payloadBase.amount = Number(fineAmount);
+        const parsedFine = parseIntegerAmountInput(fineAmount);
+        if (!parsedFine.ok || parsedFine.value === 0) {
+          pushToast("Ugyldigt beløb (heltal, ikke 0 — negativt tilladt som kredit)", "error");
+          return;
+        }
+        payloadBase.amount = parsedFine.value;
         payloadBase.title = fineTitle;
         payloadBase.description = fineDescription || undefined;
       }
@@ -531,7 +581,7 @@ export default function BoderPage() {
       setSelectedUserIds([]);
       setMemberSearch("");
       setSelectedTemplateId("");
-      setFineAmount(20);
+      setFineAmount("50");
       setFineTitle("");
       setFineDescription("");
       await refreshFinesAndApprovals();
@@ -788,14 +838,14 @@ export default function BoderPage() {
   const templateOptions = approvedTemplates.map((template) => ({
       value: template.id,
       label: `${categoryLabel[template.category] ?? template.category} · ${template.title}`,
-      rightLabel: `${template.amount} kr`,
+      rightLabel: formatFineKr(template.amount),
       searchLabel: `${categoryLabel[template.category] ?? template.category} ${template.title} ${template.amount} ${
         template.description ?? ""
       }`
     }));
   const collectionTemplateOptions = approvedTemplates.map((template) => ({
     value: template.id,
-    label: `${template.title} (${template.amount} kr)`
+    label: `${template.title} (${formatFineKr(template.amount)})`
   }));
 
   const myFineRequests = teamFines
@@ -907,7 +957,7 @@ export default function BoderPage() {
   function openEditTemplate(template: FineTemplate) {
     setEditingTemplate(template);
     setEditTitle(template.title);
-    setEditAmount(template.amount);
+    setEditAmount(String(template.amount));
     setEditCategory(template.category ?? "SPILLER");
     setEditDescription(template.description ?? "");
     setShowEditModal(true);
@@ -917,6 +967,11 @@ export default function BoderPage() {
     event.preventDefault();
     if (!editingTemplate) return;
     if (updateTemplateSubmitting || deleteTemplateSubmitting) return;
+    const parsedEdit = parseIntegerAmountInput(editAmount);
+    if (!parsedEdit.ok) {
+      pushToast("Ugyldigt beløb (heltal)", "error");
+      return;
+    }
     setUpdateTemplateSubmitting(true);
     try {
       const response = await fetch(`/api/fine-templates/${editingTemplate.id}`, {
@@ -924,7 +979,7 @@ export default function BoderPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title: editTitle,
-          amount: Number(editAmount),
+          amount: parsedEdit.value,
           category: editCategory,
           description: editDescription || undefined
         })
@@ -1038,9 +1093,12 @@ export default function BoderPage() {
                     <p className="text-xs text-ink/60">
                       {new Date(fine.createdAt).toLocaleDateString("da-DK")} · {creatorLabel(fine)}
                     </p>
+                    {fine.event ? <FineEventLink event={fine.event} /> : null}
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-semibold text-ink">{fine.amount} kr</p>
+                    <p className={`text-sm font-semibold ${fineAmountClass(fine.amount)}`}>
+                      {formatFineKr(fine.amount)}
+                    </p>
                     <span
                       className={`mt-1 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${fineStatusMeta(fine.status).className}`}
                     >
@@ -1116,8 +1174,11 @@ export default function BoderPage() {
                     <p className="text-xs text-ink/60">
                       {fine.user?.name ?? "Ukendt"} · {creatorLabel(fine)}
                     </p>
+                    {fine.event ? <FineEventLink event={fine.event} /> : null}
                   </div>
-                  <div className="text-sm font-semibold text-ink">{fine.amount} kr</div>
+                  <div className={`text-sm font-semibold ${fineAmountClass(fine.amount)}`}>
+                    {formatFineKr(fine.amount)}
+                  </div>
                 </div>
                 <div className="mt-3 flex gap-2">
                   <LoadingButton
@@ -1206,7 +1267,9 @@ export default function BoderPage() {
                       ) : null}
                     </div>
                     <div className="text-right">
-                      <div className="text-sm font-semibold text-ink">{requestItem.amount} kr</div>
+                      <div className={`text-sm font-semibold ${fineAmountClass(requestItem.amount)}`}>
+                        {formatFineKr(requestItem.amount)}
+                      </div>
                       <span className={`mt-1 inline-block rounded-full px-2.5 py-1 text-xs font-semibold ${badgeClass}`}>
                         {requestItem.statusLabel}
                       </span>
@@ -1299,7 +1362,7 @@ export default function BoderPage() {
                   <p className="text-sm font-semibold text-ink">{collection.template.title}</p>
                   <p className="text-xs text-ink/60">
                     Fra {new Date(collection.deadlineAt).toLocaleString("da-DK")} · hver {collection.intervalHours}. time ·{" "}
-                    {collection.template.amount} kr
+                    {formatFineKr(collection.template.amount)}
                   </p>
                 </div>
               ))}
@@ -1335,7 +1398,9 @@ export default function BoderPage() {
                       <p className="text-xs text-ink/60">{template.description}</p>
                     ) : null}
                   </div>
-                  <div className="text-sm font-semibold text-ink">{template.amount} kr</div>
+                  <div className={`text-sm font-semibold ${fineAmountClass(template.amount)}`}>
+                    {formatFineKr(template.amount)}
+                  </div>
                 </div>
                 <div className="mt-3 flex gap-2">
                   <LoadingButton
@@ -1380,7 +1445,9 @@ export default function BoderPage() {
                       <p className="text-xs text-ink/60">{template.description}</p>
                     ) : null}
                   </div>
-                  <div className="text-sm font-semibold text-ink">{template.amount} kr</div>
+                  <div className={`text-sm font-semibold ${fineAmountClass(template.amount)}`}>
+                    {formatFineKr(template.amount)}
+                  </div>
                 </div>
                 {canManageFines ? (
                   <div className="mt-3 flex flex-wrap gap-2">
@@ -1551,9 +1618,14 @@ export default function BoderPage() {
                         <p className="text-xs text-ink/60">
                           {new Date(fine.createdAt).toLocaleString("da-DK")} · {creatorLabel(fine)}
                         </p>
+                        {fine.event ? <FineEventLink event={fine.event} /> : null}
                       </div>
                       <div className="flex items-center gap-3">
-                        <p className="text-sm font-semibold text-ink whitespace-nowrap">{fine.amount} kr</p>
+                        <p
+                          className={`text-sm font-semibold whitespace-nowrap ${fineAmountClass(fine.amount)}`}
+                        >
+                          {formatFineKr(fine.amount)}
+                        </p>
                         <span
                           className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold whitespace-nowrap ${fineStatusMeta(fine.status).className}`}
                         >
@@ -1641,10 +1713,11 @@ export default function BoderPage() {
                 <label className="label" htmlFor="template-amount">Beløb</label>
                 <input
                   id="template-amount"
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
                   value={templateAmount}
-                  onChange={(event) => setTemplateAmount(Number(event.target.value))}
-                  placeholder="Beløb"
+                  onChange={(event) => setTemplateAmount(event.target.value)}
+                  placeholder="Beløb (fx 20 eller -10)"
                   className="input"
                   required
                 />
@@ -1697,7 +1770,7 @@ export default function BoderPage() {
             setSelectedUserIds([]);
             setMemberSearch("");
             setSelectedTemplateId("");
-            setFineAmount(20);
+            setFineAmount("50");
             setFineTitle("");
             setFineDescription("");
           }}
@@ -1718,7 +1791,7 @@ export default function BoderPage() {
                   setSelectedUserIds([]);
                   setMemberSearch("");
                   setSelectedTemplateId("");
-                  setFineAmount(20);
+                  setFineAmount("50");
                   setFineTitle("");
                   setFineDescription("");
                 }}
@@ -1817,10 +1890,11 @@ export default function BoderPage() {
                     <label className="label" htmlFor="fine-amount">Beløb</label>
                     <input
                       id="fine-amount"
-                      type="number"
+                      type="text"
+                      inputMode="numeric"
                       value={fineAmount}
-                      onChange={(event) => setFineAmount(Number(event.target.value))}
-                      placeholder="Beløb"
+                      onChange={(event) => setFineAmount(event.target.value)}
+                      placeholder="Beløb (heltal, negativt = kredit)"
                       className="input"
                       required
                     />
@@ -1919,9 +1993,10 @@ export default function BoderPage() {
                 <label className="label" htmlFor="edit-amount">Beløb</label>
                 <input
                   id="edit-amount"
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
                   value={editAmount}
-                  onChange={(event) => setEditAmount(Number(event.target.value))}
+                  onChange={(event) => setEditAmount(event.target.value)}
                   className="input"
                   required
                 />

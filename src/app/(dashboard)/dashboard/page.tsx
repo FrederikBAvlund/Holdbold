@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { getStoredTeamId, setStoredTeamId } from "@/components/appState";
+import { fetchMeCached } from "@/lib/meClientCache";
 
 type CalendarEvent = {
   id: string;
@@ -93,16 +94,13 @@ export default function DashboardHome() {
       if (defaultTeamLoadedForUserRef.current === sessionUserId) return;
       defaultTeamLoadedForUserRef.current = sessionUserId;
 
-      const response = await fetch("/api/me");
-      if (!response.ok) return;
-      const data = await response.json();
+      const { ok, data } = await fetchMeCached();
+      if (!ok) return;
       const memberships = data.memberships ?? [];
       const firstTeam = memberships[0]?.team?.id;
       if (!firstTeam) return;
       const currentTeamId = teamId || getStoredTeamId();
-      const isCurrentValid = memberships.some(
-        (membership: { team?: { id?: string } }) => membership.team?.id === currentTeamId
-      );
+      const isCurrentValid = memberships.some((membership) => membership.team?.id === currentTeamId);
       if (!currentTeamId || !isCurrentValid) {
         setTeamId(firstTeam);
         setStoredTeamId(firstTeam);
@@ -179,23 +177,30 @@ export default function DashboardHome() {
           return;
         }
 
+        // Brug altid frisk medlemsantal her — state `memberCount` er ofte stadig 0 i denne effekt
+        // (stale closure + race med loadMembers), så "mangler svar" blev 0 indtil genindlæsning.
+        const membersResponse = await fetch(`/api/team-members?teamId=${teamId}`);
+        const membersData = membersResponse.ok ? await membersResponse.json() : { members: [] };
+        const membersLen = (membersData.members ?? []).length;
+        setMemberCount(membersLen);
+
         const nextCounts: Record<string, { in: number; out: number; missing: number }> = {};
         await Promise.all(
           firstTwo.map(async (eventItem) => {
             if (eventItem.id.startsWith("series:")) {
-              nextCounts[eventItem.id] = { in: 0, out: 0, missing: memberCount };
+              nextCounts[eventItem.id] = { in: 0, out: 0, missing: membersLen };
               return;
             }
             const signupsResponse = await fetch(`/api/events/${eventItem.id}/signups`, { cache: "no-store" });
             if (!signupsResponse.ok) {
-              nextCounts[eventItem.id] = { in: 0, out: 0, missing: memberCount };
+              nextCounts[eventItem.id] = { in: 0, out: 0, missing: membersLen };
               return;
             }
             const signupsData = await signupsResponse.json();
             const signups = signupsData.signups ?? [];
             const inCount = signups.filter((signup: { status: string }) => signup.status === "IN").length;
             const outCount = signups.filter((signup: { status: string }) => signup.status === "OUT").length;
-            const missingCount = Math.max(memberCount - inCount - outCount, 0);
+            const missingCount = Math.max(membersLen - inCount - outCount, 0);
             nextCounts[eventItem.id] = { in: inCount, out: outCount, missing: missingCount };
           })
         );
