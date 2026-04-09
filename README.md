@@ -17,6 +17,11 @@ npm run prisma:seed
 npm run dev
 ```
 
+## API og sikkerhed
+
+- Beskyttede API-ruter kraever en gyldig NextAuth-session (cookie). `middleware` afviser uautentificerede kald til `/api/*` undtagen `api/auth`, `api/health` og `api/cron` (cron bruger `CRON_SECRET` i route-handleren).
+- Sæt `CRON_SECRET` i produktion til Vercel Cron / manuelle kald til `/api/cron/fines` med header `Authorization: Bearer <CRON_SECRET>`.
+
 ## Rollemodel (MVP)
 
 - Admin

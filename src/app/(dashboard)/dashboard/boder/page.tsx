@@ -1,235 +1,24 @@
 "use client";
 
-import Link from "next/link";
-import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
 import { getStoredTeamId, setStoredTeamId } from "@/components/appState";
 import { Combobox } from "@/components/ui/combobox";
 import { useToast } from "@/components/ToastProvider";
 import LoadingButton from "@/components/LoadingButton";
+import { TrashIcon } from "@/components/TrashIcon";
 import { fetchMeCached } from "@/lib/meClientCache";
-
-type FineTemplate = {
-  id: string;
-  title: string;
-  amount: number;
-  category: "SOME" | "FAELLES" | "SPILLER" | "DIVERSE";
-  description?: string | null;
-  status?: string;
-  createdAt: string;
-  createdById?: string | null;
-  approvedById?: string | null;
-  rejectedById?: string | null;
-  createdBy?: { id: string; name: string | null } | null;
-  approvedBy?: { id: string; name: string | null } | null;
-  rejectedBy?: { id: string; name: string | null } | null;
-};
-
-type Member = {
-  role: string;
-  user: {
-    id: string;
-    name: string;
-    email?: string | null;
-  };
-};
-
-type FineItem = {
-  id: string;
-  amount: number;
-  reason: string;
-  description?: string | null;
-  status: string;
-  createdAt: string;
-  createdById?: string | null;
-  approvedById?: string | null;
-  rejectedById?: string | null;
-  createdByLabel?: string | null;
-  createdBy?: { name: string | null } | null;
-  approvedBy?: { id: string; name: string | null } | null;
-  user?: { id: string; name: string | null } | null;
-  template?: FineTemplate | null;
-  event?: { id: string; title: string; date: string } | null;
-};
-
-type PendingPayment = {
-  userId: string;
-  name: string;
-  total: number;
-  count: number;
-  requestedAt: string | null;
-};
-
-type FineCollection = {
-  id: string;
-  deadlineAt: string;
-  intervalHours: number;
-  createdAt: string;
-  template: {
-    id: string;
-    title: string;
-    amount: number;
-  };
-};
-
-const fineRoles = ["BOEDEKASSEFORMAND", "ADMIN"];
-const categoryOptions = [
-  { value: "SOME", label: "SoMe" },
-  { value: "FAELLES", label: "Fælles" },
-  { value: "SPILLER", label: "Spiller" },
-  { value: "DIVERSE", label: "Diverse" }
-] as const;
-
-const categoryLabel: Record<string, string> = {
-  SOME: "SoMe",
-  FAELLES: "Fælles",
-  SPILLER: "Spiller",
-  DIVERSE: "Diverse"
-};
-
-const roleLabel: Record<string, string> = {
-  ADMIN: "Admin",
-  TRAENER: "Træner",
-  SPILLER: "Spiller",
-  SOME: "SoMe",
-  BOEDEKASSEFORMAND: "Bødekasse"
-};
-
-function formatFineKr(amount: number) {
-  return `${amount} kr`;
-}
-
-function fineAmountClass(amount: number) {
-  return amount < 0 ? "text-moss" : "text-ink";
-}
-
-function fineEventHref(event: { id: string; title: string; date: string }) {
-  const params = new URLSearchParams();
-  params.set("focusEvent", event.id);
-  params.set("focusTitle", event.title);
-  const dateIso =
-    typeof event.date === "string" && event.date.includes("T")
-      ? event.date
-      : new Date(event.date).toISOString();
-  params.set("focusDate", dateIso);
-  params.set("focusLocation", "");
-  return `/dashboard/kalender?${params.toString()}`;
-}
-
-function parseIntegerAmountInput(raw: string): { ok: true; value: number } | { ok: false } {
-  const t = raw.trim().replace(/\s/g, "");
-  if (!t || t === "-" || t === "+") return { ok: false };
-  if (!/^-?\d+$/.test(t)) return { ok: false };
-  const value = parseInt(t, 10);
-  if (!Number.isFinite(value)) return { ok: false };
-  return { ok: true, value };
-}
-
-function FineEventLink({ event }: { event: { id: string; title: string; date: string } }) {
-  return (
-    <p className="mt-1 text-xs text-ink/60">
-      <Link href={fineEventHref(event)} className="font-medium text-moss underline-offset-2 hover:underline">
-        {event.title} · {new Date(event.date).toLocaleDateString("da-DK")}
-      </Link>
-    </p>
-  );
-}
-
-function fineStatusMeta(status: string) {
-  if (status === "UNPAID") {
-    return {
-      label: "Ubetalt",
-      className: "bg-red-100 text-red-700"
-    };
-  }
-  if (status === "PAID_PENDING") {
-    return {
-      label: "Afventer godkendelse",
-      className: "bg-amber-100 text-amber-800"
-    };
-  }
-  if (status === "PAID_APPROVED") {
-    return {
-      label: "Betalt",
-      className: "bg-green-100 text-green-700"
-    };
-  }
-  return {
-    label: status,
-    className: "bg-ink/10 text-ink/70"
-  };
-}
-
-function canDeleteFine(status: string) {
-  return ["UNPAID", "PAID_PENDING", "FORESLAET", "AFVIST"].includes(status);
-}
-
-function CollapsibleCard({
-  title,
-  description,
-  right,
-  storageKey,
-  defaultOpen = true,
-  children
-}: {
-  title: string;
-  description?: string;
-  right?: ReactNode;
-  storageKey: string;
-  defaultOpen?: boolean;
-  children: ReactNode;
-}) {
-  const [open, setOpen] = useState(defaultOpen);
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const stored = window.localStorage.getItem(storageKey);
-    if (stored === "0") setOpen(false);
-    if (stored === "1") setOpen(true);
-    setReady(true);
-  }, [storageKey]);
-
-  useEffect(() => {
-    if (typeof window === "undefined" || !ready) return;
-    window.localStorage.setItem(storageKey, open ? "1" : "0");
-  }, [open, ready, storageKey]);
-
-  return (
-    <div className="card relative">
-      <button
-        type="button"
-        className="absolute right-5 top-5 inline-flex h-9 w-9 items-center justify-center rounded-full border border-ink/20 bg-white/80 text-ink transition hover:border-ink/35 hover:bg-white"
-        onClick={() => setOpen((prev) => !prev)}
-        aria-label={open ? "Skjul kort" : "Vis kort"}
-        title={open ? "Skjul" : "Vis"}
-      >
-        <svg
-          viewBox="0 0 24 24"
-          className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`}
-          aria-hidden="true"
-        >
-          <path
-            d="M6 9l6 6 6-6"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      </button>
-      <div className="pr-14">
-        <div>
-          <h3 className="text-lg font-semibold text-ink">{title}</h3>
-          {description ? <p className="mt-2 text-sm text-ink/70">{description}</p> : null}
-        </div>
-      </div>
-      {right ? <div className="mt-3 pr-14">{right}</div> : null}
-      {open ? <div className="mt-6">{children}</div> : null}
-    </div>
-  );
-}
+import { CollapsibleCard } from "@/components/CollapsibleCard";
+import { FineEventLink } from "./FineEventLink";
+import { categoryLabel, categoryOptions, fineRoles, roleLabel } from "./boderConstants";
+import type { FineCollection, FineItem, FineTemplate, Member, PendingPayment } from "./boderTypes";
+import {
+  canDeleteFine,
+  fineAmountClass,
+  formatFineKr,
+  fineStatusMeta,
+  parseIntegerAmountInput
+} from "./boderUtils";
 
 export default function BoderPage() {
   const { pushToast } = useToast();
@@ -508,8 +297,7 @@ export default function BoderPage() {
           title: templateTitle,
           amount: parsedAmount.value,
           category: templateCategory,
-          description: templateDescription || undefined,
-          createdById: userId || undefined
+          description: templateDescription || undefined
         })
       });
 
@@ -543,8 +331,7 @@ export default function BoderPage() {
     try {
       const recipients = selectedUserIds;
       const payloadBase: Record<string, unknown> = {
-        teamId,
-        createdById: userId || undefined
+        teamId
       };
 
       if (selectedTemplateId) {
@@ -1212,16 +999,7 @@ export default function BoderPage() {
                           aria-hidden="true"
                         />
                       ) : (
-                        <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5">
-                          <path
-                            d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M8 7l1 12a1 1 0 0 0 1 .92h4a1 1 0 0 0 1-.92L16 7"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="1.7"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                        </svg>
+                        <TrashIcon />
                       )}
                     </button>
                   ) : null}
@@ -1341,10 +1119,10 @@ export default function BoderPage() {
             : "Foreslå nye bødeskabeloner til godkendelse."
         }
         storageKey={`holdbold:boder:${teamId}:${userId}:skabeloner`}
-        right={
+        headerEnd={
           <button
             type="button"
-            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-ink/20 bg-white/80 text-xl font-semibold text-ink transition hover:border-ink/35 hover:bg-white"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-ink/20 bg-white/80 text-lg font-semibold leading-none text-ink transition hover:border-ink/35 hover:bg-white"
             onClick={() => setShowCreateTemplateModal(true)}
             aria-label={canManageFines ? "Opret bødeskabelon" : "Foreslå bødeskabelon"}
             title={canManageFines ? "Opret bødeskabelon" : "Foreslå bødeskabelon"}
@@ -1646,16 +1424,7 @@ export default function BoderPage() {
                                 aria-hidden="true"
                               />
                             ) : (
-                              <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5">
-                                <path
-                                  d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M8 7l1 12a1 1 0 0 0 1 .92h4a1 1 0 0 0 1-.92L16 7"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  strokeWidth="1.7"
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                />
-                              </svg>
+                              <TrashIcon />
                             )}
                           </button>
                         ) : null}
@@ -1957,16 +1726,7 @@ export default function BoderPage() {
                       aria-hidden="true"
                     />
                   ) : (
-                    <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5">
-                      <path
-                        d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M8 7l1 12a1 1 0 0 0 1 .92h4a1 1 0 0 0 1-.92L16 7"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.7"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
+                    <TrashIcon />
                   )}
                 </button>
                 <button

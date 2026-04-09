@@ -434,8 +434,7 @@ export default function KalenderPage() {
                 title,
                 location,
                 date: new Date(startIso).toISOString(),
-                signupDeadline: new Date(new Date(startIso).getTime() - deadlineHours * 60 * 60 * 1000).toISOString(),
-                createdById: userId
+                signupDeadline: new Date(new Date(startIso).getTime() - deadlineHours * 60 * 60 * 1000).toISOString()
               })
             })
           : await fetch("/api/event-series", {
@@ -449,8 +448,7 @@ export default function KalenderPage() {
                 recurrence,
                 interval,
                 endDate: toIsoEndOfLocalDay(endDate) ?? undefined,
-                signupDeadlineHoursBefore: deadlineHours,
-                createdById: userId
+                signupDeadlineHoursBefore: deadlineHours
               })
             });
 
@@ -505,8 +503,7 @@ export default function KalenderPage() {
           body: JSON.stringify({
             teamId,
             seriesId: eventItem.seriesId,
-            date: eventItem.date,
-            createdById: userId
+            date: eventItem.date
           })
         });
         const data = await response.json();
@@ -1042,7 +1039,6 @@ export default function KalenderPage() {
               teamId,
               userId: targetUserId,
               templateId: selectedLateFineTemplateId,
-              createdById: userId,
               eventId: eventIdForSignup
             })
           })

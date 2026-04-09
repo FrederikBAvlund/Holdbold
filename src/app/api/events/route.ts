@@ -2,6 +2,12 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createNotifications } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
+import {
+  EVENT_MANAGER_ROLES,
+  requireActiveTeamMember,
+  requireActiveTeamMemberWithRoles,
+  requireSession
+} from "@/lib/apiAuth";
 
 const listSchema = z.object({
   teamId: z.string().min(1)
@@ -12,14 +18,19 @@ const createSchema = z.object({
   title: z.string().min(1),
   date: z.string().datetime(),
   location: z.string().min(1),
-  signupDeadline: z.string().datetime(),
-  createdById: z.string().min(1)
+  signupDeadline: z.string().datetime()
 });
 
 export async function GET(request: Request) {
+  const session = await requireSession();
+  if (!session.ok) return session.response;
+
   const { searchParams } = new URL(request.url);
   const teamId = searchParams.get("teamId") ?? "";
   const { teamId: parsedTeamId } = listSchema.parse({ teamId });
+
+  const member = await requireActiveTeamMember(session.userId, parsedTeamId);
+  if (!member.ok) return member.response;
 
   const events = await prisma.event.findMany({
     where: { teamId: parsedTeamId },
@@ -31,8 +42,16 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const session = await requireSession();
+  if (!session.ok) return session.response;
+
   const json = await request.json();
   const body = createSchema.parse(json);
+
+  const member = await requireActiveTeamMemberWithRoles(session.userId, body.teamId, EVENT_MANAGER_ROLES);
+  if (!member.ok) return member.response;
+
+  const createdById = session.userId;
 
   const event = await prisma.event.create({
     data: {
@@ -42,7 +61,7 @@ export async function POST(request: Request) {
       location: body.location,
       signupDeadline: new Date(body.signupDeadline),
       source: "MANUAL",
-      createdById: body.createdById
+      createdById
     }
   });
 
@@ -52,9 +71,9 @@ export async function POST(request: Request) {
   });
 
   const notifications = members
-    .filter((member) => member.userId !== body.createdById)
-    .map((member) => ({
-      userId: member.userId,
+    .filter((m) => m.userId !== createdById)
+    .map((m) => ({
+      userId: m.userId,
       teamId: body.teamId,
       type: "EVENT" as const,
       title: `Ny begivenhed: ${event.title}`,

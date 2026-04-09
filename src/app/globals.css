@@ -116,7 +116,7 @@ a {
 
 @layer components {
   .card {
-    @apply p-6 backdrop-blur-sm;
+    @apply w-full min-w-0 p-6 backdrop-blur-sm;
     border-radius: 1.9rem;
     background: linear-gradient(160deg, var(--surface-glass), color-mix(in srgb, white 84%, transparent));
     border: 1px solid var(--surface-border);
@@ -124,7 +124,7 @@ a {
   }
 
   .card-soft {
-    @apply p-5 backdrop-blur-sm;
+    @apply w-full min-w-0 p-5 backdrop-blur-sm;
     border-radius: 1.65rem;
     background: linear-gradient(160deg, var(--surface-soft), color-mix(in srgb, white 70%, transparent));
     border: 1px solid color-mix(in srgb, var(--color-ink) 10%, transparent);
