@@ -8,6 +8,7 @@ import { useToast } from "@/components/ToastProvider";
 import PushSettings from "@/components/PushSettings";
 import { CollapsibleCard } from "@/components/CollapsibleCard";
 import LoadingButton from "@/components/LoadingButton";
+import { invalidateDashboardTeam } from "@/components/DashboardTeamProvider";
 import { clearMeClientCache } from "@/lib/meClientCache";
 
 type Membership = {
@@ -199,6 +200,7 @@ export default function IndstillingerPage() {
       if (!firstTeamId) return;
       setTeamId(firstTeamId);
       setStoredTeamId(firstTeamId);
+      invalidateDashboardTeam();
       pushToast("Du er blevet godkendt og sat på holdet automatisk.", "success");
       window.clearInterval(interval);
     }, 15000);
@@ -435,6 +437,7 @@ export default function IndstillingerPage() {
       }
       setTeamMembers((prev) => prev.map((m) => (m.id === selectedMember.id ? { ...m, role: data.membership.role } : m)));
       setSelectedMember((prev) => (prev ? { ...prev, role: data.membership.role } : prev));
+      invalidateDashboardTeam();
       pushToast("Rolle opdateret", "success");
     } finally {
       setMemberActionSubmitting(null);
@@ -472,6 +475,7 @@ export default function IndstillingerPage() {
             }
           : prev
       );
+      invalidateDashboardTeam();
       pushToast("Medlem godkendt", "success");
     } finally {
       setMemberActionSubmitting(null);
@@ -491,6 +495,7 @@ export default function IndstillingerPage() {
       }
       setTeamMembers((prev) => prev.filter((m) => m.id !== selectedMember.id));
       setSelectedMember(null);
+      invalidateDashboardTeam();
       pushToast(data.warning ?? "Bruger fjernet", "success");
     } finally {
       setMemberActionSubmitting(null);
