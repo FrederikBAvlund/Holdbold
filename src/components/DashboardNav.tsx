@@ -189,7 +189,7 @@ export default function DashboardNav({
 
   const mobileNavBar = (
     <nav
-      className="pointer-events-none fixed inset-x-0 bottom-0 z-50 flex justify-center px-3 pb-[max(0.65rem,env(safe-area-inset-bottom,0px))] lg:hidden"
+      className="pointer-events-none fixed inset-x-0 bottom-0 z-50 flex justify-center px-3 pb-[max(0.78rem,calc(env(safe-area-inset-bottom,0px)+2px))] lg:hidden"
       aria-label="Hovednavigation"
     >
       <div className="pointer-events-auto w-full max-w-md">
