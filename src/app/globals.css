@@ -55,7 +55,6 @@ body {
 main {
   min-height: 100vh;
   position: relative;
-  z-index: 1;
 }
 
 a {
@@ -233,23 +232,34 @@ a {
 }
 
 @media (max-width: 640px) {
-  .assign-backdrop {
+  .assign-backdrop,
+  .modal-backdrop {
     align-items: flex-end;
     padding-left: 0;
     padding-right: 0;
+    padding-bottom: 0;
+  }
+
+  .modal-panel,
+  .assign-panel {
+    width: 100%;
+    max-width: none;
+    max-height: min(94dvh, calc(100dvh - env(safe-area-inset-top, 0px) - 2.5rem));
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    animation-name: modal-sheet-in;
+  }
+
+  .modal-panel {
+    overflow-y: auto;
+    padding-bottom: max(1.25rem, env(safe-area-inset-bottom, 0px));
   }
 
   .assign-panel {
     display: flex;
     flex-direction: column;
-    width: 100%;
-    max-width: none;
-    max-height: min(94dvh, calc(100dvh - env(safe-area-inset-top, 0px) - 2.5rem));
     overflow: hidden;
-    border-bottom-left-radius: 0;
-    border-bottom-right-radius: 0;
-    padding-bottom: env(safe-area-inset-bottom, 0px);
-    animation-name: modal-sheet-in;
+    padding-bottom: max(1.25rem, env(safe-area-inset-bottom, 0px));
   }
 }
 
@@ -459,41 +469,43 @@ a {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.65rem;
 }
 
 .fc .fc-toolbar-title {
   font-weight: 700;
-  font-size: clamp(1.2rem, 3.5vw, 1.65rem);
+  font-size: clamp(0.98rem, 2.55vw, 1.28rem);
   text-transform: capitalize;
   letter-spacing: -0.025em;
   line-height: 1.2;
 }
 
 .fc .fc-button {
-  border-radius: 999px;
+  border-radius: var(--radius-control);
   text-transform: none;
   font-weight: 600;
-  font-size: 0.8125rem;
+  font-size: 0.84rem;
   line-height: 1.2;
   transition:
     background 0.15s ease,
     border-color 0.15s ease,
-    color 0.15s ease;
+    color 0.15s ease,
+    transform 0.15s ease;
 }
 
 .fc .fc-button.fc-button-primary {
-  background: color-mix(in srgb, white 88%, var(--color-fog));
-  border: 1px solid color-mix(in srgb, var(--color-ink) 12%, transparent);
+  background: color-mix(in srgb, white 96%, var(--color-fog));
+  border: 1px solid color-mix(in srgb, var(--color-ink) 9%, transparent);
   color: var(--color-ink);
-  padding: 0.45rem 0.95rem;
-  box-shadow: none;
+  padding: 0.56rem 1.1rem;
+  box-shadow: 0 8px 18px -12px color-mix(in srgb, var(--color-ink) 28%, transparent);
 }
 
 .fc .fc-button.fc-button-primary:not(:disabled):hover {
   background: color-mix(in srgb, var(--color-fog) 55%, white);
   border-color: color-mix(in srgb, var(--color-ink) 20%, transparent);
   color: var(--color-ink);
+  transform: translateY(-1px);
 }
 
 .fc .fc-button.fc-button-primary:not(:disabled).fc-button-active,
@@ -512,14 +524,35 @@ a {
 
 .fc .fc-prev-button,
 .fc .fc-next-button {
-  min-width: 2.75rem;
-  min-height: 2.75rem;
+  min-width: 3rem;
+  min-height: 3rem;
   padding: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.05rem;
+  font-size: 1.2rem;
   line-height: 1;
+}
+
+.fc .fc-button-group {
+  border-radius: 0.95rem;
+  overflow: hidden;
+  box-shadow: 0 10px 22px -16px color-mix(in srgb, var(--color-ink) 45%, transparent);
+}
+
+.fc .fc-button-group .fc-button {
+  border-radius: 0;
+}
+
+.fc .fc-today-button {
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--color-button) 92%, black),
+    color-mix(in srgb, var(--color-button) 74%, var(--color-moss))
+  ) !important;
+  border-color: color-mix(in srgb, var(--color-button) 78%, black) !important;
+  color: var(--color-button-text) !important;
+  box-shadow: 0 10px 20px -14px color-mix(in srgb, var(--color-button) 70%, transparent);
 }
 
 .fc .fc-scrollgrid,
@@ -586,14 +619,15 @@ a {
 
 @media (max-width: 768px) {
   .fc .fc-toolbar {
-    gap: 0.55rem;
+    gap: 0.75rem;
   }
 
   .fc .fc-toolbar-title {
-    font-size: 1.1rem;
+    font-size: 0.92rem;
+    letter-spacing: -0.015em;
   }
 
-  /* Række 1: forrige/næste + visning (Uge/Måned), række 2: titel centreret */
+  /* Række 1: forrige/næste + i dag, række 2: titel centreret */
   .fc .fc-toolbar .fc-toolbar-chunk:nth-child(1) {
     order: 1;
   }
@@ -612,15 +646,15 @@ a {
   }
 
   .fc .fc-button.fc-button-primary {
-    padding: 0.42rem 0.75rem;
-    font-size: 0.78rem;
+    padding: 0.5rem 0.95rem;
+    font-size: 0.9rem;
   }
 
   .fc .fc-prev-button,
   .fc .fc-next-button {
-    min-width: 3rem;
-    min-height: 3rem;
-    font-size: 1.15rem;
+    min-width: 3.3rem;
+    min-height: 3.3rem;
+    font-size: 1.35rem;
   }
 
   .fc-dayGridMonth-view .fc-daygrid-day {

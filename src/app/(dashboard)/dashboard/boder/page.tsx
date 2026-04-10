@@ -1096,7 +1096,7 @@ export default function BoderPage() {
       >
         {canManageFines && collections.length > 0 ? (
           <div className="space-y-2">
-            <p className="label">Aktive indsamlingsflows</p>
+            <p className="text-xs font-medium text-ink/70">Aktive indsamlingsflows</p>
             <div className="space-y-2">
               {collections.map((collection) => (
                 <div key={collection.id} className="rounded-2xl border border-ink/10 bg-white/80 px-4 py-3">
@@ -1112,19 +1112,19 @@ export default function BoderPage() {
         ) : null}
 
         <div className="mt-4 space-y-2">
-          <label className="label" htmlFor="template-search">Søg i skabeloner</label>
+          <label className="text-xs font-medium text-ink/70" htmlFor="template-search">Søg i skabeloner</label>
           <input
             id="template-search"
             value={templateSearch}
             onChange={(event) => setTemplateSearch(event.target.value)}
             placeholder="Søg på titel eller beskrivelse..."
-            className="input"
+            className="input text-[14px] sm:text-[15px]"
           />
         </div>
 
         {canManageFines && pendingTemplates.length > 0 ? (
           <div className="mt-6 space-y-3">
-            <p className="label">Afventer godkendelse (skabeloner)</p>
+            <p className="text-xs font-medium text-ink/70">Afventer godkendelse (skabeloner)</p>
             {pendingTemplates.map((template) => (
               <div key={template.id} className="rounded-2xl border border-amber-200 bg-amber-50/80 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -1191,13 +1191,17 @@ export default function BoderPage() {
                   </div>
                 </div>
                 {canManageFines ? (
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <button type="button" className="btn-ghost" onClick={() => openEditTemplate(template)}>
+                  <div className="mt-3 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-center">
+                    <button
+                      type="button"
+                      className="btn-ghost w-full justify-center sm:w-auto"
+                      onClick={() => openEditTemplate(template)}
+                    >
                       Rediger
                     </button>
                     <button
                       type="button"
-                      className="btn-primary"
+                      className="btn-primary w-full justify-center sm:w-auto"
                       onClick={() => {
                         setSelectedTemplateId(template.id);
                         setShowAssignModal(true);
@@ -1299,10 +1303,10 @@ export default function BoderPage() {
             </div>
             <form className="mt-4 grid gap-3" onSubmit={createCollectionRule}>
               <div className="space-y-2">
-                <label className="label" htmlFor="collection-template">Bødeskabelon</label>
+                <label className="text-xs font-medium text-ink/70" htmlFor="collection-template">Bødeskabelon</label>
                 <select
                   id="collection-template"
-                  className="input"
+                  className="input text-[14px] sm:text-[15px]"
                   value={collectionTemplateId}
                   onChange={(event) => setCollectionTemplateId(event.target.value)}
                   required
@@ -1316,11 +1320,11 @@ export default function BoderPage() {
                 </select>
               </div>
               <div className="space-y-2">
-                <label className="label" htmlFor="collection-deadline">Deadline</label>
+                <label className="text-xs font-medium text-ink/70" htmlFor="collection-deadline">Deadline</label>
                 <input
                   id="collection-deadline"
                   type="datetime-local"
-                  className="input"
+                  className="input text-[14px] sm:text-[15px]"
                   value={collectionDeadline}
                   onChange={(event) => setCollectionDeadline(event.target.value)}
                   required
@@ -1431,18 +1435,18 @@ export default function BoderPage() {
             </div>
             <form onSubmit={handleCreateTemplate} className="mt-4 grid gap-3 sm:grid-cols-2">
               <div className="space-y-2">
-                <label className="label" htmlFor="template-title">Titel</label>
+                <label className="text-xs font-medium text-ink/70" htmlFor="template-title">Titel</label>
                 <input
                   id="template-title"
                   value={templateTitle}
                   onChange={(event) => setTemplateTitle(event.target.value)}
                   placeholder="Titel"
-                  className="input"
+                  className="input text-[14px] sm:text-[15px]"
                   required
                 />
               </div>
               <div className="space-y-2">
-                <label className="label" htmlFor="template-amount">Beløb</label>
+                <label className="text-xs font-medium text-ink/70" htmlFor="template-amount">Beløb</label>
                 <input
                   id="template-amount"
                   type="text"
@@ -1450,19 +1454,19 @@ export default function BoderPage() {
                   value={templateAmount}
                   onChange={(event) => setTemplateAmount(event.target.value)}
                   placeholder="Beløb (fx 20 eller -10)"
-                  className="input"
+                  className="input text-[14px] sm:text-[15px]"
                   required
                 />
               </div>
               <div className="space-y-2 sm:col-span-2">
-                <label className="label" htmlFor="template-category">Kategori</label>
+                <label className="text-xs font-medium text-ink/70" htmlFor="template-category">Kategori</label>
                 <select
                   id="template-category"
                   value={templateCategory}
                   onChange={(event) =>
                     setTemplateCategory(event.target.value as "SOME" | "FAELLES" | "SPILLER" | "DIVERSE")
                   }
-                  className="input"
+                  className="input text-[14px] sm:text-[15px]"
                 >
                   {categoryOptions.map((category) => (
                     <option key={category.value} value={category.value}>
@@ -1472,13 +1476,13 @@ export default function BoderPage() {
                 </select>
               </div>
               <div className="space-y-2 sm:col-span-2">
-                <label className="label" htmlFor="template-desc">Beskrivelse</label>
+                <label className="text-xs font-medium text-ink/70" htmlFor="template-desc">Beskrivelse</label>
                 <input
                   id="template-desc"
                   value={templateDescription}
                   onChange={(event) => setTemplateDescription(event.target.value)}
                   placeholder="Beskrivelse (valgfri)"
-                  className="input"
+                  className="input text-[14px] sm:text-[15px]"
                 />
               </div>
               <button className="btn-primary sm:col-span-2" disabled={createTemplateSubmitting}>
@@ -1538,12 +1542,12 @@ export default function BoderPage() {
             <form onSubmit={handleCreateFine} className="mt-4 flex min-h-0 min-w-0 flex-1 flex-col gap-0 sm:block sm:flex-none">
               <div className="min-h-0 min-w-0 flex-1 space-y-3 overflow-y-auto overflow-x-hidden overscroll-contain pb-3 sm:max-h-none sm:overflow-visible sm:pb-0">
                 <div className="space-y-2">
-                  <label className="label">Modtagere</label>
+                  <label className="text-xs font-medium text-ink/70">Modtagere</label>
                   <input
                     value={memberSearch}
                     onChange={(event) => setMemberSearch(event.target.value)}
                     placeholder="Søg spiller..."
-                    className="input"
+                    className="input text-[14px] sm:text-[15px]"
                   />
                   <div className="flex flex-wrap items-center gap-2">
                     <div className="inline-flex rounded-full border border-ink/15 bg-white/70 p-1">
@@ -1608,7 +1612,7 @@ export default function BoderPage() {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <label className="label">Skabelon</label>
+                  <label className="text-xs font-medium text-ink/70">Skabelon</label>
                   <Combobox
                     value={selectedTemplateId}
                     onChange={setSelectedTemplateId}
@@ -1616,12 +1620,13 @@ export default function BoderPage() {
                     placeholder="Vælg skabelon (valgfri)"
                     searchPlaceholder="Søg skabelon..."
                     emptyLabel="Ingen skabeloner matcher"
+                    className="text-[14px] sm:text-[15px]"
                   />
                 </div>
                 {!selectedTemplateId ? (
                   <>
                     <div className="space-y-2">
-                      <label className="label" htmlFor="fine-amount">
+                      <label className="text-xs font-medium text-ink/70" htmlFor="fine-amount">
                         Beløb
                       </label>
                       <input
@@ -1631,12 +1636,12 @@ export default function BoderPage() {
                         value={fineAmount}
                         onChange={(event) => setFineAmount(event.target.value)}
                         placeholder="Beløb (heltal, negativt = kredit)"
-                        className="input"
+                        className="input text-[14px] sm:text-[15px]"
                         required
                       />
                     </div>
                     <div className="space-y-2">
-                      <label className="label" htmlFor="fine-title">
+                      <label className="text-xs font-medium text-ink/70" htmlFor="fine-title">
                         Titel
                       </label>
                       <input
@@ -1644,12 +1649,12 @@ export default function BoderPage() {
                         value={fineTitle}
                         onChange={(event) => setFineTitle(event.target.value)}
                         placeholder="Titel"
-                        className="input"
+                        className="input text-[14px] sm:text-[15px]"
                         required
                       />
                     </div>
                     <div className="space-y-2">
-                      <label className="label" htmlFor="fine-description">
+                      <label className="text-xs font-medium text-ink/70" htmlFor="fine-description">
                         Beskrivelse
                       </label>
                       <input
@@ -1657,13 +1662,13 @@ export default function BoderPage() {
                         value={fineDescription}
                         onChange={(event) => setFineDescription(event.target.value)}
                         placeholder="Beskrivelse (valgfri)"
-                        className="input"
+                        className="input text-[14px] sm:text-[15px]"
                       />
                     </div>
                   </>
                 ) : null}
               </div>
-              <div className="shrink-0 border-t border-ink/10 bg-fog/95 pt-3 max-[639px]:pb-[calc(0.65rem+env(safe-area-inset-bottom,0px)+4.75rem)] sm:border-0 sm:bg-transparent sm:pb-0 sm:pt-4">
+              <div className="shrink-0 border-t border-ink/10 bg-fog/95 pt-3  sm:border-0 sm:bg-transparent sm:pb-0 sm:pt-4">
                 <button type="submit" className="btn-primary w-full" disabled={assignFineSubmitting}>
                   {assignFineSubmitting
                     ? "Gemmer..."
@@ -1714,36 +1719,36 @@ export default function BoderPage() {
             </div>
             <form onSubmit={handleUpdateTemplate} className="mt-4 grid gap-3">
               <div className="space-y-2">
-                <label className="label" htmlFor="edit-title">Titel</label>
+                <label className="text-xs font-medium text-ink/70" htmlFor="edit-title">Titel</label>
                 <input
                   id="edit-title"
                   value={editTitle}
                   onChange={(event) => setEditTitle(event.target.value)}
-                  className="input"
+                  className="input text-[14px] sm:text-[15px]"
                   required
                 />
               </div>
               <div className="space-y-2">
-                <label className="label" htmlFor="edit-amount">Beløb</label>
+                <label className="text-xs font-medium text-ink/70" htmlFor="edit-amount">Beløb</label>
                 <input
                   id="edit-amount"
                   type="text"
                   inputMode="numeric"
                   value={editAmount}
                   onChange={(event) => setEditAmount(event.target.value)}
-                  className="input"
+                  className="input text-[14px] sm:text-[15px]"
                   required
                 />
               </div>
               <div className="space-y-2">
-                <label className="label" htmlFor="edit-category">Kategori</label>
+                <label className="text-xs font-medium text-ink/70" htmlFor="edit-category">Kategori</label>
                 <select
                   id="edit-category"
                   value={editCategory}
                   onChange={(event) =>
                     setEditCategory(event.target.value as "SOME" | "FAELLES" | "SPILLER" | "DIVERSE")
                   }
-                  className="input"
+                  className="input text-[14px] sm:text-[15px]"
                 >
                   {categoryOptions.map((category) => (
                     <option key={category.value} value={category.value}>
@@ -1753,12 +1758,12 @@ export default function BoderPage() {
                 </select>
               </div>
               <div className="space-y-2">
-                <label className="label" htmlFor="edit-desc">Beskrivelse</label>
+                <label className="text-xs font-medium text-ink/70" htmlFor="edit-desc">Beskrivelse</label>
                 <input
                   id="edit-desc"
                   value={editDescription}
                   onChange={(event) => setEditDescription(event.target.value)}
-                  className="input"
+                  className="input text-[14px] sm:text-[15px]"
                 />
               </div>
               <LoadingButton

@@ -6,13 +6,12 @@ import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ToastProvider";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
-import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin from "@fullcalendar/interaction";
 import daLocale from "@fullcalendar/core/locales/da";
 import "@fullcalendar/common/main.css";
 import "@fullcalendar/daygrid/main.css";
-import "@fullcalendar/timegrid/main.css";
 import { useDashboardTeam, type DashboardTeamMember } from "@/components/DashboardTeamProvider";
+import { CollapsibleCard } from "@/components/CollapsibleCard";
 
 type CalendarEvent = {
   id: string;
@@ -118,7 +117,6 @@ export default function KalenderPage() {
   const [cancelSubmitting, setCancelSubmitting] = useState(false);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [reopenSubmitting, setReopenSubmitting] = useState(false);
-  const [copyingLocation, setCopyingLocation] = useState(false);
   const [lateFineSubmitting, setLateFineSubmitting] = useState(false);
   const [updatingSeriesId, setUpdatingSeriesId] = useState<string | null>(null);
 
@@ -341,6 +339,8 @@ export default function KalenderPage() {
   const [matchStatRows, setMatchStatRows] = useState<Record<string, { goals: string; assists: string }>>({});
   const [savingMatchStats, setSavingMatchStats] = useState(false);
   const [matchStatSearch, setMatchStatSearch] = useState("");
+  const [showMatchStatsEditor, setShowMatchStatsEditor] = useState(false);
+  const [copyingLocation, setCopyingLocation] = useState(false);
   const [newEventKind, setNewEventKind] = useState<"TRAINING" | "MATCH">("TRAINING");
   const [savingEventKind, setSavingEventKind] = useState(false);
   const [draftEventKind, setDraftEventKind] = useState<"TRAINING" | "MATCH">("TRAINING");
@@ -678,16 +678,9 @@ export default function KalenderPage() {
   const signupLockedPastStart = Boolean(
     selectedEvent?.date && new Date(selectedEvent.date).getTime() <= Date.now()
   );
-
   const locationMapUrl = selectedEvent?.location?.trim()
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedEvent.location.trim())}`
     : null;
-
-  const filteredMatchMembers = (() => {
-    const needle = matchStatSearch.trim().toLowerCase();
-    if (!needle) return members;
-    return members.filter((m) => (m.user.name ?? "").toLowerCase().includes(needle));
-  })();
 
   async function copyLocationToClipboard() {
     if (!selectedEvent?.location?.trim() || copyingLocation) return;
@@ -875,6 +868,8 @@ export default function KalenderPage() {
         );
       }
       eventDetailsCacheRef.current.delete(eventIdForSignup);
+      setShowMatchStatsEditor(false);
+      setMatchStatSearch("");
       pushToast("Kampstatistik gemt", "success");
     } finally {
       setSavingMatchStats(false);
@@ -964,13 +959,13 @@ export default function KalenderPage() {
       setSelectedEvent((prev) =>
         prev ? { ...prev, canceledAt, canceledByName } : prev
       );
+      setShowCancelConfirm(false);
       setEvents((prev) =>
         prev.map((eventItem) =>
           eventItem.id === eventIdForSignup ? { ...eventItem, canceledAt, canceledByName } : eventItem
         )
       );
       eventDetailsCacheRef.current.delete(eventIdForSignup);
-      setShowCancelConfirm(false);
       pushToast("Begivenhed aflyst", "success");
     } finally {
       setCancelSubmitting(false);
@@ -991,6 +986,7 @@ export default function KalenderPage() {
       setSelectedEvent((prev) =>
         prev ? { ...prev, canceledAt: null, canceledByName: null } : prev
       );
+      setShowCancelConfirm(false);
       setEvents((prev) =>
         prev.map((eventItem) =>
           eventItem.id === eventIdForSignup ? { ...eventItem, canceledAt: null, canceledByName: null } : eventItem
@@ -1083,6 +1079,26 @@ export default function KalenderPage() {
       new Set([...lateGroups.lateResponses, ...lateGroups.missingAfterDeadline].map((member) => member.user.id))
     );
   }, [lateGroups]);
+
+  const filteredMatchMembers = useMemo(() => {
+    const needle = matchStatSearch.trim().toLowerCase();
+    if (!needle) return members;
+    return members.filter((member) => (member.user.name ?? "").toLowerCase().includes(needle));
+  }, [members, matchStatSearch]);
+
+  const matchStatSummaryEntries = useMemo(() => {
+    return members
+      .map((member) => {
+        const goals = Math.max(0, parseInt(matchStatRows[member.user.id]?.goals ?? "0", 10) || 0);
+        const assists = Math.max(0, parseInt(matchStatRows[member.user.id]?.assists ?? "0", 10) || 0);
+        if (goals === 0 && assists === 0) return null;
+        const parts: string[] = [];
+        if (goals > 0) parts.push(`${goals}x mål`);
+        if (assists > 0) parts.push(`${assists}x assist${assists === 1 ? "" : "s"}`);
+        return { userId: member.user.id, name: member.user.name ?? "Ukendt", summary: parts.join(" · ") };
+      })
+      .filter((entry): entry is { userId: string; name: string; summary: string } => Boolean(entry));
+  }, [members, matchStatRows]);
 
   useEffect(() => {
     setSelectedLateFineUserIds((prev) => {
@@ -1296,20 +1312,13 @@ export default function KalenderPage() {
         {viewMode === "calendar" ? (
           <div className="overflow-hidden rounded-app-soft bg-white/40">
             <FullCalendar
-              plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-              initialView={isMobile ? "dayGridWeek" : "dayGridMonth"}
+              plugins={[dayGridPlugin, interactionPlugin]}
+              initialView="dayGridMonth"
               locales={[daLocale]}
               locale="da"
-              headerToolbar={
-                isMobile
-                  ? { left: "prev,next", center: "title", right: "dayGridWeek,dayGridMonth" }
-                  : { left: "prev,next today", center: "title", right: "dayGridMonth,timeGridWeek,dayGridDay" }
-              }
+              headerToolbar={{ left: "prev,next today", center: "title", right: "" }}
               buttonText={{
-                today: "I dag",
-                month: "Måned",
-                week: "Uge",
-                day: "Dag"
+                today: "I dag"
               }}
               height="auto"
               aspectRatio={isMobile ? 0.9 : 1.35}
@@ -1602,14 +1611,16 @@ export default function KalenderPage() {
       ) : null}
 
       {selectedEvent ? (
+        <>
         <div
           className="modal-backdrop"
           onClick={() => {
             setShowCancelConfirm(false);
+            setShowMatchStatsEditor(false);
             setSelectedEvent(null);
           }}
         >
-          <div className="modal-panel max-w-xl pb-[calc(2rem+env(safe-area-inset-bottom,0px))] sm:pb-6" onClick={(event) => event.stopPropagation()}>
+          <div className="modal-panel max-w-xl" onClick={(event) => event.stopPropagation()}>
             <div className="flex items-start justify-between">
               <div>
                 <h3 className={`text-lg font-semibold text-ink ${selectedEvent.canceledAt ? "line-through" : ""}`}>
@@ -1617,7 +1628,7 @@ export default function KalenderPage() {
                 </h3>
                 <p className="mt-2 text-sm text-ink/70">{formatTimestamp(selectedEvent.date)}</p>
                 {selectedEvent.location ? (
-                  <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
                     {locationMapUrl ? (
                       <a
                         href={locationMapUrl}
@@ -1629,11 +1640,11 @@ export default function KalenderPage() {
                         {selectedEvent.location}
                       </a>
                     ) : (
-                      <span className="text-sm text-ink/70">{selectedEvent.location}</span>
+                      <p className="text-sm text-ink/70">{selectedEvent.location}</p>
                     )}
                     <button
                       type="button"
-                      className="btn-ghost px-3 py-1 text-xs"
+                      className="btn-ghost px-3 py-1.5 text-xs"
                       onClick={copyLocationToClipboard}
                       disabled={copyingLocation}
                     >
@@ -1651,26 +1662,314 @@ export default function KalenderPage() {
                 className="btn-ghost"
                 onClick={() => {
                   setShowCancelConfirm(false);
+                  setShowMatchStatsEditor(false);
                   setSelectedEvent(null);
                 }}
               >
                 Luk
               </button>
             </div>
-            <div className="mt-4 space-y-3">
-              {/* 1. Din tilmelding */}
-              <div className="rounded-2xl border border-ink/10 bg-white/90 p-4 sm:p-5">
-                <div className="mb-4 border-b border-ink/10 pb-4">
-                  <p className="text-sm font-semibold text-ink">Din tilmelding</p>
-                  <p className="mt-1 max-w-prose text-xs leading-relaxed text-ink/55">
-                    Angiv din deltagelse her.
-                  </p>
-                  {signupLockedPastStart ? (
+            <div className="mt-4 flex flex-col gap-3">
+              {canManageEvents ? (
+                <CollapsibleCard
+                  title="Begivenhed"
+                  storageKey="event-modal-begivenhed"
+                  defaultOpen={!isMobile}
+                  className="order-11"
+                  surface="card"
+                  titleClassName="text-xs font-semibold text-ink/70"
+                >
+                  {selectedEvent.canceledAt ? (
+                    <button className="btn-ghost w-full sm:w-auto sm:min-w-[13rem]" onClick={reopenEvent} disabled={reopenSubmitting}>
+                      {reopenSubmitting ? "Genåbner..." : "Genåbn begivenhed"}
+                    </button>
+                  ) : showCancelConfirm ? (
+                    <div className="space-y-3">
+                      <p className="text-sm font-semibold text-ink">Er du sikker på, at du vil aflyse begivenheden?</p>
+                      <p className="text-xs text-ink/60">Alle deltagere vil stadig kunne se, at begivenheden er aflyst.</p>
+                      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                        <button type="button" className="btn-ghost w-full sm:w-auto" onClick={() => setShowCancelConfirm(false)}>
+                          Annuller
+                        </button>
+                        <button
+                          type="button"
+                          className="w-full rounded-control bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700 sm:w-auto"
+                          onClick={cancelEvent}
+                          disabled={cancelSubmitting}
+                        >
+                          {cancelSubmitting ? "Aflyser..." : "Ja, aflys begivenhed"}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      className="btn-ghost w-full sm:w-auto sm:min-w-[13rem]"
+                      onClick={() => setShowCancelConfirm(true)}
+                      disabled={cancelSubmitting}
+                    >
+                      Aflys begivenhed
+                    </button>
+                  )}
+                </CollapsibleCard>
+              ) : null}
+              {canManageEvents && eventIdForSignup && !selectedEvent.canceledAt ? (
+                <CollapsibleCard
+                  title="Begivenhedstype"
+                  storageKey="event-modal-kind"
+                  defaultOpen={!isMobile}
+                  className="order-6"
+                  surface="card"
+                  titleClassName="text-xs font-semibold text-ink/70"
+                >
+                  <div className="flex flex-wrap items-end justify-center gap-3 sm:justify-start">
+                    <select
+                      className="input min-w-[10rem] flex-1"
+                      value={draftEventKind}
+                      onChange={(event) => setDraftEventKind(event.target.value as "TRAINING" | "MATCH")}
+                    >
+                      <option value="TRAINING">Træning</option>
+                      <option value="MATCH">Kamp</option>
+                    </select>
+                    <button
+                      type="button"
+                      className="btn-primary w-full sm:w-auto sm:min-w-[10rem]"
+                      onClick={saveEventKind}
+                      disabled={savingEventKind}
+                    >
+                      {savingEventKind ? "Gemmer..." : "Gem type"}
+                    </button>
+                  </div>
+                </CollapsibleCard>
+              ) : null}
+              {canViewMatchMeta ? (
+                <CollapsibleCard
+                  title="Kampdetaljer"
+                  storageKey="event-modal-match-meta"
+                  defaultOpen={!isMobile}
+                  className="order-7"
+                  surface="card"
+                  titleClassName="text-xs font-semibold text-ink/70"
+                >
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="min-w-0 space-y-2 overflow-hidden">
+                      <label className="text-xs font-medium text-ink/70" htmlFor="meeting-time">Mødetid</label>
+                      {canEditMatchMeta ? (
+                        <input
+                          id="meeting-time"
+                          type="datetime-local"
+                          className="input min-w-0 w-full max-w-full text-[13px] sm:text-[15px]"
+                          value={editableMeetingAt}
+                          onChange={(event) => setEditableMeetingAt(event.target.value)}
+                        />
+                      ) : (
+                        <div className="input flex items-center justify-between gap-3">
+                          <span className="min-w-0 truncate text-ink/75">{splitLocalDateTime(editableMeetingAt).date}</span>
+                          <span className="rounded-full bg-ember/15 px-3 py-1 text-sm font-bold text-ember">
+                            {splitLocalDateTime(editableMeetingAt).time}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="min-w-0 space-y-2 overflow-hidden">
+                      <label className="text-xs font-medium text-ink/70" htmlFor="deadline-time">Svarfrist</label>
+                      {canEditMatchMeta ? (
+                        <input
+                          id="deadline-time"
+                          type="datetime-local"
+                          className="input min-w-0 w-full max-w-full text-[13px] sm:text-[15px]"
+                          value={editableDeadlineAt}
+                          onChange={(event) => setEditableDeadlineAt(event.target.value)}
+                          readOnly={isDeadlinePassed}
+                          disabled={isDeadlinePassed}
+                        />
+                      ) : (
+                        <div className="input flex items-center justify-between gap-3">
+                          <span className="min-w-0 truncate text-ink/75">{splitLocalDateTime(editableDeadlineAt).date}</span>
+                          <span className="rounded-full bg-amber-100 px-3 py-1 text-sm font-semibold text-amber-800">
+                            {splitLocalDateTime(editableDeadlineAt).time}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  {!canEditMatchMeta ? (
+                    <p className="mt-2 text-xs text-ink/60">
+                      Kun admin og bødekasseformand kan ændre disse værdier.
+                    </p>
+                  ) : null}
+                  {isDeadlinePassed ? (
+                    <p className="mt-2 text-xs font-semibold text-amber-700">
+                      Deadline er passeret og kan ikke længere ændres.
+                    </p>
+                  ) : null}
+                  {canEditMatchMeta ? (
+                    <div className="mt-3 flex items-center justify-center sm:justify-end">
+                      <button
+                        className="btn-primary w-full sm:w-auto sm:min-w-[12rem]"
+                        type="button"
+                        onClick={saveMatchMeta}
+                        disabled={savingMatchMeta}
+                      >
+                        {savingMatchMeta ? "Gemmer..." : "Gem kampdetaljer"}
+                      </button>
+                    </div>
+                  ) : null}
+                </CollapsibleCard>
+              ) : null}
+              {isMatchEvent && eventIdForSignup && !selectedEvent.canceledAt ? (
+                <CollapsibleCard
+                  title="Kampresultat"
+                  storageKey="event-modal-match-result"
+                  defaultOpen={!isMobile}
+                  className="order-8"
+                  surface="card"
+                  titleClassName="text-xs font-semibold text-ink/70"
+                >
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <label className="text-xs font-medium text-ink/70" htmlFor="match-home-goals">
+                        Hold mål
+                      </label>
+                      {canManageEvents ? (
+                        <input
+                          id="match-home-goals"
+                          type="number"
+                          min={0}
+                          className="input"
+                          value={editableMatchHome}
+                          onChange={(event) => setEditableMatchHome(event.target.value)}
+                          placeholder="—"
+                        />
+                      ) : (
+                        <p className="text-sm font-semibold text-ink">{editableMatchHome || "—"}</p>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-medium text-ink/70" htmlFor="match-away-goals">
+                        Modstander mål
+                      </label>
+                      {canManageEvents ? (
+                        <input
+                          id="match-away-goals"
+                          type="number"
+                          min={0}
+                          className="input"
+                          value={editableMatchAway}
+                          onChange={(event) => setEditableMatchAway(event.target.value)}
+                          placeholder="—"
+                        />
+                      ) : (
+                        <p className="text-sm font-semibold text-ink">{editableMatchAway || "—"}</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="mt-4 space-y-2">
+                    <p className="text-xs font-medium text-ink/70">
+                      Mål og assists
+                    </p>
+                    <div className="rounded-xl border border-ink/10 bg-white/70 px-3 py-2.5">
+                      {matchStatSummaryEntries.length === 0 ? (
+                        <p className="text-sm text-ink/60">Ingen registrerede mål eller assists endnu.</p>
+                      ) : (
+                        <ul className="space-y-1.5">
+                          {matchStatSummaryEntries.map((entry) => (
+                            <li key={entry.userId} className="text-sm text-ink/80">
+                              <span className="font-medium text-ink">{entry.name}</span>: {entry.summary}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  </div>
+                  {canManageEvents && !selectedEvent.canceledAt ? (
+                    <div className="mt-3 flex justify-center sm:justify-end">
+                      <button
+                        type="button"
+                        className="btn-primary w-full sm:w-auto sm:min-w-[12rem]"
+                        onClick={() => setShowMatchStatsEditor(true)}
+                      >
+                        Rediger mål og assists
+                      </button>
+                    </div>
+                  ) : null}
+                </CollapsibleCard>
+              ) : null}
+              {canEditEventDuties ? (
+                <CollapsibleCard
+                  title="Praktisk"
+                  description="Hvem tager tingene med og står for øl? Gem når du har fordelt opgaverne."
+                  storageKey="event-modal-praktisk"
+                  defaultOpen={!isMobile}
+                  className="order-9"
+                  surface="card"
+                  titleClassName="text-xs font-semibold text-ink/70"
+                  descriptionClassName="mt-1 max-w-prose text-xs leading-relaxed text-ink/55"
+                >
+                  <div className="mt-5 grid gap-5 sm:grid-cols-2">
+                    <div className="flex min-w-0 flex-col gap-2.5">
+                      <label className="text-xs font-medium text-ink/70" htmlFor="thing-carrier">
+                        Tingene
+                      </label>
+                      <select
+                        id="thing-carrier"
+                        className="input"
+                        value={editableThingCarrierId}
+                        onChange={(event) => setEditableThingCarrierId(event.target.value)}
+                      >
+                        <option value="">Ingen valgt</option>
+                        {members.map((member) => (
+                          <option key={`thing-${member.user.id}`} value={member.user.id}>
+                            {member.user.name ?? "Ukendt"}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="flex min-w-0 flex-col gap-2.5">
+                      <label className="text-xs font-medium text-ink/70" htmlFor="beer-carrier">
+                        Øl
+                      </label>
+                      <select
+                        id="beer-carrier"
+                        className="input"
+                        value={editableBeerCarrierId}
+                        onChange={(event) => setEditableBeerCarrierId(event.target.value)}
+                      >
+                        <option value="">Ingen valgt</option>
+                        {members.map((member) => (
+                          <option key={`beer-${member.user.id}`} value={member.user.id}>
+                            {member.user.name ?? "Ukendt"}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="mt-5 flex border-t border-ink/10 pt-4 sm:justify-end">
+                    <button
+                      className="btn-primary w-full sm:w-auto"
+                      type="button"
+                      onClick={saveMatchMeta}
+                      disabled={savingMatchMeta}
+                    >
+                      {savingMatchMeta ? "Gemmer..." : "Gem opgaver"}
+                    </button>
+                  </div>
+                </CollapsibleCard>
+              ) : null}
+              <CollapsibleCard
+                title="Din tilmelding"
+                storageKey="event-modal-din-tilmelding"
+                defaultOpen
+                className="order-2"
+                surface="card"
+                titleClassName="text-xs font-semibold text-ink/70"
+              >
+                {signupLockedPastStart ? (
+                  <div className="mb-4 border-b border-ink/10 pb-4">
                     <p className="mt-3 rounded-control border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-950">
                       Begivenheden er afviklet — dit svar kan ikke ændres her.
                     </p>
-                  ) : null}
-                </div>
+                  </div>
+                ) : null}
                 <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
                   <button
                     type="button"
@@ -1762,153 +2061,100 @@ export default function KalenderPage() {
                   />
                   {error ? <p className="text-xs text-red-600">{error}</p> : null}
                 </div>
-              </div>
-              {/* 2. Tilmeldinger */}
-              <div className="rounded-2xl border border-ink/10 bg-white/90 p-4">
-                <p className="label">Tilmeldinger</p>
+              </CollapsibleCard>
+              <CollapsibleCard
+                title="Tilmeldinger"
+                storageKey="event-modal-tilmeldinger"
+                defaultOpen
+                className="order-2"
+                surface="card"
+                titleClassName="text-xs font-semibold text-ink/70"
+              >
                 {eventDetailsLoading ? (
                   <p className="mt-3 text-sm text-ink/60">Henter tilmeldinger...</p>
                 ) : (
                   <div className="mt-3 grid gap-4 md:grid-cols-3">
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm font-semibold text-ink">
-                        <span className="flex items-center gap-2">
-                          <span className="h-2.5 w-2.5 rounded-full bg-green-600" />
-                          Tilmeldte
-                        </span>
-                        <span className="text-ink/60">{signupGroups.in.length}</span>
-                      </div>
-                      <div className="space-y-1 text-sm text-ink/70">
-                        {signupGroups.in.length === 0 ? <div>Ingen</div> : null}
-                        {signupGroups.in.map((member) => (
-                          <button
-                            key={member.user.id}
-                            type="button"
-                            onClick={() => openSignupEditor(member)}
-                            className={`block text-left ${canEditOtherSignups ? "hover:underline" : ""}`}
-                            disabled={!canEditOtherSignups}
-                          >
-                            {member.user.name ?? "Ukendt"}
-                          </button>
-                        ))}
-                      </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm font-semibold text-ink">
+                      <span className="flex items-center gap-2">
+                        <span className="h-2.5 w-2.5 rounded-full bg-green-600" />
+                        Tilmeldte
+                      </span>
+                      <span className="text-ink/60">{signupGroups.in.length}</span>
                     </div>
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm font-semibold text-ink">
-                        <span className="flex items-center gap-2">
-                          <span className="h-2.5 w-2.5 rounded-full bg-red-600" />
-                          Frameldte
-                        </span>
-                        <span className="text-ink/60">{signupGroups.out.length}</span>
-                      </div>
-                      <div className="space-y-1 text-sm text-ink/70">
-                        {signupGroups.out.length === 0 ? <div>Ingen</div> : null}
-                        {signupGroups.out.map((member) => (
-                          <button
-                            key={member.user.id}
-                            type="button"
-                            onClick={() => openSignupEditor(member)}
-                            className={`block text-left ${canEditOtherSignups ? "hover:underline" : ""}`}
-                            disabled={!canEditOtherSignups}
-                          >
-                            {member.user.name ?? "Ukendt"}
-                          </button>
-                        ))}
-                      </div>
+                    <div className="space-y-1 text-sm text-ink/70">
+                      {signupGroups.in.length === 0 ? <div>Ingen</div> : null}
+                      {signupGroups.in.map((member) => (
+                        <button
+                          key={member.user.id}
+                          type="button"
+                          onClick={() => openSignupEditor(member)}
+                          className={`block text-left ${canEditOtherSignups ? "hover:underline" : ""}`}
+                          disabled={!canEditOtherSignups}
+                        >
+                          {member.user.name ?? "Ukendt"}
+                        </button>
+                      ))}
                     </div>
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm font-semibold text-ink">
-                        <span className="flex items-center gap-2">
-                          <span className="h-2.5 w-2.5 rounded-full bg-amber-500" />
-                          Mangler at svare
-                        </span>
-                        <span className="text-ink/60">{signupGroups.missing.length}</span>
-                      </div>
-                      <div className="space-y-1 text-sm text-ink/70">
-                        {signupGroups.missing.length === 0 ? <div>Ingen</div> : null}
-                        {signupGroups.missing.map((member) => (
-                          <button
-                            key={member.user.id}
-                            type="button"
-                            onClick={() => openSignupEditor(member)}
-                            className={`block text-left ${canEditOtherSignups ? "hover:underline" : ""}`}
-                            disabled={!canEditOtherSignups}
-                          >
-                            {member.user.name ?? "Ukendt"}
-                          </button>
-                        ))}
-                      </div>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm font-semibold text-ink">
+                      <span className="flex items-center gap-2">
+                        <span className="h-2.5 w-2.5 rounded-full bg-red-600" />
+                        Frameldte
+                      </span>
+                      <span className="text-ink/60">{signupGroups.out.length}</span>
                     </div>
+                    <div className="space-y-1 text-sm text-ink/70">
+                      {signupGroups.out.length === 0 ? <div>Ingen</div> : null}
+                      {signupGroups.out.map((member) => (
+                        <button
+                          key={member.user.id}
+                          type="button"
+                          onClick={() => openSignupEditor(member)}
+                          className={`block text-left ${canEditOtherSignups ? "hover:underline" : ""}`}
+                          disabled={!canEditOtherSignups}
+                        >
+                          {member.user.name ?? "Ukendt"}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm font-semibold text-ink">
+                      <span className="flex items-center gap-2">
+                        <span className="h-2.5 w-2.5 rounded-full bg-amber-500" />
+                        Mangler at svare
+                      </span>
+                      <span className="text-ink/60">{signupGroups.missing.length}</span>
+                    </div>
+                    <div className="space-y-1 text-sm text-ink/70">
+                      {signupGroups.missing.length === 0 ? <div>Ingen</div> : null}
+                      {signupGroups.missing.map((member) => (
+                        <button
+                          key={member.user.id}
+                          type="button"
+                          onClick={() => openSignupEditor(member)}
+                          className={`block text-left ${canEditOtherSignups ? "hover:underline" : ""}`}
+                          disabled={!canEditOtherSignups}
+                        >
+                          {member.user.name ?? "Ukendt"}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                   </div>
                 )}
-              </div>
-              {/* 3. Historik */}
-              {canManageEvents && !eventDetailsLoading && (logs.length > 0 || eventLogs.length > 0) ? (
-                <div className="rounded-2xl border border-ink/10 bg-white/90 p-4">
-                  <p className="label">Historik</p>
-                  <div className="mt-2 space-y-2">
-                    {[
-                      ...logs.map((log) => ({
-                        id: `signup-${log.id}`,
-                        createdAt: log.createdAt,
-                        type: "SIGNUP",
-                        status: log.status,
-                        name: log.user?.name ?? "Ukendt",
-                        reason: log.reason,
-                        deadlineAt: log.deadlineAt
-                      })),
-                      ...eventLogs
-                        .filter((entry) => entry.type !== "SIGNUP")
-                        .map((entry) => ({
-                          id: `event-${entry.id}`,
-                          createdAt: entry.createdAt,
-                          type: entry.type,
-                          message: entry.message,
-                          name: entry.actor?.name ?? "System"
-                        }))
-                    ]
-                      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-                      .map((entry) => (
-                        <div key={entry.id} className="flex items-start gap-2 text-sm text-ink/70">
-                          <span
-                            className={`mt-1 inline-block h-2.5 w-2.5 rounded-full ${
-                              "status" in entry
-                                ? entry.status === "IN"
-                                  ? "bg-green-600"
-                                  : entry.status === "OUT"
-                                  ? "bg-red-600"
-                                  : "bg-ink/40"
-                                : entry.type === "CANCEL"
-                                ? "bg-red-600"
-                                : entry.type === "REOPEN"
-                                ? "bg-green-600"
-                                : "bg-ink/40"
-                            }`}
-                          />
-                          <div>
-                            <div>
-                              <span className="font-semibold text-ink">{entry.name}</span> ·{" "}
-                              {formatTimestamp(entry.createdAt)}
-                            </div>
-                            {"deadlineAt" in entry && entry.deadlineAt && new Date(entry.createdAt) > new Date(entry.deadlineAt) ? (
-                              <div className="text-xs font-semibold text-red-600">For sent efter deadline</div>
-                            ) : null}
-                            {"reason" in entry && entry.reason ? (
-                              <div className="text-xs text-ink/60">{entry.reason}</div>
-                            ) : null}
-                            {"message" in entry && entry.message ? (
-                              <div className="text-xs text-ink/60">{entry.message}</div>
-                            ) : null}
-                          </div>
-                        </div>
-                      ))}
-                  </div>
-                </div>
-              ) : null}
-              {/* 4. Rediger tilmelding (admin) */}
+              </CollapsibleCard>
               {editingSignupMember ? (
-                <div className="rounded-2xl border border-ink/10 bg-white/90 p-4">
-                  <p className="label">Rediger tilmelding</p>
+                <CollapsibleCard
+                  title="Rediger tilmelding"
+                  storageKey="event-modal-rediger-tilmelding"
+                  defaultOpen={!isMobile}
+                  className="order-5"
+                  surface="card"
+                  titleClassName="text-xs font-semibold text-ink/70"
+                >
                   <p className="mt-1 text-sm text-ink/70">{editingSignupMember.user.name ?? "Ukendt"}</p>
                   <div className="mt-3 grid gap-3 sm:grid-cols-3">
                     <button
@@ -1973,14 +2219,19 @@ export default function KalenderPage() {
                       Annuller
                     </button>
                   </div>
-                </div>
+                </CollapsibleCard>
               ) : null}
-              {/* 5. Efter deadline */}
               {(lateGroups.lateResponses.length > 0 || lateGroups.missingAfterDeadline.length > 0) &&
               activeDeadlineAt ? (
-                <div className="rounded-2xl border border-red-200 bg-red-50/70 p-4">
+                <CollapsibleCard
+                  title="Efter deadline"
+                  storageKey="event-modal-efter-deadline"
+                  defaultOpen={!isMobile}
+                  className="order-10"
+                  surface="card"
+                  titleClassName="text-xs font-medium text-red-700"
+                >
                   <div>
-                    <p className="label text-red-700">Efter deadline</p>
                     <p className="mt-1 text-xs text-red-700/80">
                       Deadline: {formatTimestamp(activeDeadlineAt)}
                     </p>
@@ -2026,7 +2277,7 @@ export default function KalenderPage() {
                             </button>
                           </div>
                           <button
-                            className="btn-primary mt-1 w-full"
+                            className="btn-primary w-full mt-1"
                             type="button"
                             onClick={assignLateSignupFine}
                             disabled={
@@ -2089,334 +2340,201 @@ export default function KalenderPage() {
                       </div>
                     </div>
                   </div>
-                </div>
+                </CollapsibleCard>
               ) : null}
-              {/* 6. Begivenhedstype (admin) */}
-              {canManageEvents && eventIdForSignup && !selectedEvent.canceledAt ? (
-                <div className="rounded-2xl border border-ink/10 bg-white/90 p-4">
-                  <p className="label">Begivenhedstype</p>
-                  <div className="mt-3 flex flex-wrap items-end justify-center gap-3 sm:justify-start">
-                    <select
-                      className="input min-w-[10rem] flex-1"
-                      value={draftEventKind}
-                      onChange={(event) => setDraftEventKind(event.target.value as "TRAINING" | "MATCH")}
-                    >
-                      <option value="TRAINING">Træning</option>
-                      <option value="MATCH">Kamp</option>
-                    </select>
-                    <button
-                      type="button"
-                      className="btn-primary w-full sm:w-auto sm:min-w-[10rem]"
-                      onClick={saveEventKind}
-                      disabled={savingEventKind}
-                    >
-                      {savingEventKind ? "Gemmer..." : "Gem type"}
-                    </button>
-                  </div>
-                </div>
-              ) : null}
-              {/* 7. Kampdetaljer */}
-              {canViewMatchMeta ? (
-                <div className="rounded-2xl border border-ink/10 bg-white/90 p-4">
-                  <p className="label">Kampdetaljer</p>
-                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                    <div className="min-w-0 space-y-2">
-                      <label className="label" htmlFor="meeting-time">Mødetid</label>
-                      {canEditMatchMeta ? (
-                        <input
-                          id="meeting-time"
-                          type="datetime-local"
-                          className="input min-w-0 w-full max-w-full text-[14px] sm:text-[15px]"
-                          value={editableMeetingAt}
-                          onChange={(event) => setEditableMeetingAt(event.target.value)}
-                        />
-                      ) : (
-                        <div className="input flex items-center justify-between gap-3">
-                          <span className="text-ink/75">{splitLocalDateTime(editableMeetingAt).date}</span>
-                          <span className="rounded-full bg-ember/15 px-3 py-1 text-sm font-bold text-ember">
-                            {splitLocalDateTime(editableMeetingAt).time}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                    <div className="min-w-0 space-y-2">
-                      <label className="label" htmlFor="deadline-time">Svarfrist</label>
-                      {canEditMatchMeta ? (
-                        <input
-                          id="deadline-time"
-                          type="datetime-local"
-                          className="input min-w-0 w-full max-w-full text-[14px] sm:text-[15px]"
-                          value={editableDeadlineAt}
-                          onChange={(event) => setEditableDeadlineAt(event.target.value)}
-                          readOnly={isDeadlinePassed}
-                          disabled={isDeadlinePassed}
-                        />
-                      ) : (
-                        <div className="input flex items-center justify-between gap-3">
-                          <span className="text-ink/75">{splitLocalDateTime(editableDeadlineAt).date}</span>
-                          <span className="rounded-full bg-amber-100 px-3 py-1 text-sm font-semibold text-amber-800">
-                            {splitLocalDateTime(editableDeadlineAt).time}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  {!canEditMatchMeta ? (
-                    <p className="mt-2 text-xs text-ink/60">
-                      Kun admin og bødekasseformand kan ændre disse værdier.
-                    </p>
-                  ) : null}
-                  {isDeadlinePassed ? (
-                    <p className="mt-2 text-xs font-semibold text-amber-700">
-                      Deadline er passeret og kan ikke længere ændres.
-                    </p>
-                  ) : null}
-                  {canEditMatchMeta ? (
-                    <div className="mt-3 flex items-center justify-center sm:justify-end">
-                      <button
-                        className="btn-primary w-full sm:w-auto sm:min-w-[12rem]"
-                        type="button"
-                        onClick={saveMatchMeta}
-                        disabled={savingMatchMeta}
-                      >
-                        {savingMatchMeta ? "Gemmer..." : "Gem kampdetaljer"}
-                      </button>
-                    </div>
-                  ) : null}
-                </div>
-              ) : null}
-              {/* 8. Kampresultat */}
-              {isMatchEvent && eventIdForSignup && !selectedEvent.canceledAt ? (
-                <div className="rounded-2xl border border-ink/10 bg-white/90 p-4">
-                  <p className="label">Kampresultat</p>
-                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                    <div className="space-y-2">
-                      <label className="label" htmlFor="match-home-goals">Hold mål</label>
-                      {canManageEvents ? (
-                        <input
-                          id="match-home-goals"
-                          type="number"
-                          min={0}
-                          className="input"
-                          value={editableMatchHome}
-                          onChange={(event) => setEditableMatchHome(event.target.value)}
-                          placeholder="—"
-                        />
-                      ) : (
-                        <p className="text-sm font-semibold text-ink">{editableMatchHome || "—"}</p>
-                      )}
-                    </div>
-                    <div className="space-y-2">
-                      <label className="label" htmlFor="match-away-goals">Modstander mål</label>
-                      {canManageEvents ? (
-                        <input
-                          id="match-away-goals"
-                          type="number"
-                          min={0}
-                          className="input"
-                          value={editableMatchAway}
-                          onChange={(event) => setEditableMatchAway(event.target.value)}
-                          placeholder="—"
-                        />
-                      ) : (
-                        <p className="text-sm font-semibold text-ink">{editableMatchAway || "—"}</p>
-                      )}
-                    </div>
-                  </div>
-                  <div className="mt-4 space-y-2">
-                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-ink/55">
-                      Mål og assists
-                    </p>
-                    <input
-                      type="search"
-                      className="input min-h-0 h-11"
-                      placeholder="Søg spiller..."
-                      value={matchStatSearch}
-                      onChange={(event) => setMatchStatSearch(event.target.value)}
-                    />
-                    <div className="max-h-44 space-y-2 overflow-y-auto overscroll-contain pr-1 sm:max-h-52">
-                      {filteredMatchMembers.length === 0 ? (
-                        <p className="text-sm text-ink/60">Ingen spillere matcher søgningen.</p>
-                      ) : null}
-                      {filteredMatchMembers.map((member) => (
-                        <div
-                          key={`stat-${member.user.id}`}
-                          className="rounded-xl border border-ink/10 bg-white/70 p-2.5 text-sm sm:grid sm:grid-cols-[1fr_auto_auto] sm:items-center sm:gap-2 sm:border-0 sm:bg-transparent sm:p-0"
-                        >
-                          <span className="mb-2 block font-medium text-ink sm:mb-0">{member.user.name ?? "Ukendt"}</span>
-                          {canManageEvents ? (
-                            <div className="grid grid-cols-2 gap-2 sm:contents">
-                              <div className="flex items-center gap-1 sm:justify-end">
-                                <label className="sr-only" htmlFor={`g-${member.user.id}`}>Mål</label>
-                                <span className="text-xs text-ink/55">M</span>
-                                <input
-                                  id={`g-${member.user.id}`}
-                                  type="number"
-                                  min={0}
-                                  className="input min-h-0 h-10 w-full max-w-[5.2rem] px-2 py-1 text-center"
-                                  value={matchStatRows[member.user.id]?.goals ?? "0"}
-                                  onChange={(event) =>
-                                    setMatchStatRows((prev) => ({
-                                      ...prev,
-                                      [member.user.id]: {
-                                        goals: event.target.value,
-                                        assists: prev[member.user.id]?.assists ?? "0"
-                                      }
-                                    }))
-                                  }
-                                />
-                              </div>
-                              <div className="flex items-center gap-1 sm:justify-end">
-                                <label className="sr-only" htmlFor={`a-${member.user.id}`}>Assists</label>
-                                <span className="text-xs text-ink/55">A</span>
-                                <input
-                                  id={`a-${member.user.id}`}
-                                  type="number"
-                                  min={0}
-                                  className="input min-h-0 h-10 w-full max-w-[5.2rem] px-2 py-1 text-center"
-                                  value={matchStatRows[member.user.id]?.assists ?? "0"}
-                                  onChange={(event) =>
-                                    setMatchStatRows((prev) => ({
-                                      ...prev,
-                                      [member.user.id]: {
-                                        goals: prev[member.user.id]?.goals ?? "0",
-                                        assists: event.target.value
-                                      }
-                                    }))
-                                  }
-                                />
-                              </div>
+              {canManageEvents && !eventDetailsLoading && (logs.length > 0 || eventLogs.length > 0) ? (
+                <CollapsibleCard
+                  title="Historik"
+                  storageKey="event-modal-historik"
+                  defaultOpen
+                  className="order-3"
+                  surface="card"
+                  titleClassName="text-xs font-semibold text-ink/70"
+                >
+                  <div className="mt-2 space-y-2">
+                    {[
+                      ...logs.map((log) => ({
+                        id: `signup-${log.id}`,
+                        createdAt: log.createdAt,
+                        type: "SIGNUP",
+                        status: log.status,
+                        name: log.user?.name ?? "Ukendt",
+                        reason: log.reason,
+                        deadlineAt: log.deadlineAt
+                      })),
+                      ...eventLogs
+                        .filter((entry) => entry.type !== "SIGNUP")
+                        .map((entry) => ({
+                          id: `event-${entry.id}`,
+                          createdAt: entry.createdAt,
+                          type: entry.type,
+                          message: entry.message,
+                          name: entry.actor?.name ?? "System"
+                        }))
+                    ]
+                      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                      .map((entry) => (
+                        <div key={entry.id} className="flex items-start gap-2 text-sm text-ink/70">
+                          <span
+                            className={`mt-1 inline-block h-2.5 w-2.5 rounded-full ${
+                              "status" in entry
+                                ? entry.status === "IN"
+                                  ? "bg-green-600"
+                                  : entry.status === "OUT"
+                                  ? "bg-red-600"
+                                  : "bg-ink/40"
+                                : entry.type === "CANCEL"
+                                ? "bg-red-600"
+                                : entry.type === "REOPEN"
+                                ? "bg-green-600"
+                                : "bg-ink/40"
+                            }`}
+                          />
+                          <div>
+                            <div>
+                              <span className="font-semibold text-ink">{entry.name}</span> ·{" "}
+                              {formatTimestamp(entry.createdAt)}
                             </div>
-                          ) : (
-                            <span className="text-ink/75 sm:col-span-2">
-                              {matchStatRows[member.user.id]?.goals ?? "0"} mål ·{" "}
-                              {matchStatRows[member.user.id]?.assists ?? "0"} assists
-                            </span>
-                          )}
+                            {"deadlineAt" in entry && entry.deadlineAt && new Date(entry.createdAt) > new Date(entry.deadlineAt) ? (
+                              <div className="text-xs font-semibold text-red-600">For sent efter deadline</div>
+                            ) : null}
+                            {"reason" in entry && entry.reason ? (
+                              <div className="text-xs text-ink/60">{entry.reason}</div>
+                            ) : null}
+                            {"message" in entry && entry.message ? (
+                              <div className="text-xs text-ink/60">{entry.message}</div>
+                            ) : null}
+                          </div>
                         </div>
                       ))}
-                    </div>
                   </div>
-                  {canManageEvents ? (
-                    <div className="mt-3 flex justify-center sm:justify-end">
-                      <button
-                        type="button"
-                        className="btn-primary w-full sm:w-auto sm:min-w-[12rem]"
-                        onClick={saveMatchStats}
-                        disabled={savingMatchStats}
-                      >
-                        {savingMatchStats ? "Gemmer..." : "Gem kampstatistik"}
-                      </button>
-                    </div>
-                  ) : null}
-                </div>
-              ) : null}
-              {/* 9. Praktisk */}
-              {canEditEventDuties ? (
-                <div className="rounded-2xl border border-ink/10 bg-white/90 p-4 sm:p-5">
-                  <div className="border-b border-ink/10 pb-4">
-                    <p className="text-sm font-semibold text-ink">Praktisk</p>
-                    <p className="mt-1 max-w-prose text-xs leading-relaxed text-ink/55">
-                      Hvem tager tingene med og står for øl? Gem når du har fordelt opgaverne.
-                    </p>
-                  </div>
-                  <div className="mt-5 grid gap-5 sm:grid-cols-2">
-                    <div className="flex min-w-0 flex-col gap-2.5">
-                      <label className="text-xs font-medium text-ink/70" htmlFor="thing-carrier">
-                        Tingene
-                      </label>
-                      <select
-                        id="thing-carrier"
-                        className="input"
-                        value={editableThingCarrierId}
-                        onChange={(event) => setEditableThingCarrierId(event.target.value)}
-                      >
-                        <option value="">Ingen valgt</option>
-                        {members.map((member) => (
-                          <option key={`thing-${member.user.id}`} value={member.user.id}>
-                            {member.user.name ?? "Ukendt"}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="flex min-w-0 flex-col gap-2.5">
-                      <label className="text-xs font-medium text-ink/70" htmlFor="beer-carrier">
-                        Øl
-                      </label>
-                      <select
-                        id="beer-carrier"
-                        className="input"
-                        value={editableBeerCarrierId}
-                        onChange={(event) => setEditableBeerCarrierId(event.target.value)}
-                      >
-                        <option value="">Ingen valgt</option>
-                        {members.map((member) => (
-                          <option key={`beer-${member.user.id}`} value={member.user.id}>
-                            {member.user.name ?? "Ukendt"}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                  <div className="mt-5 flex border-t border-ink/10 pt-4 sm:justify-end">
-                    <button
-                      className="btn-primary w-full sm:w-auto"
-                      type="button"
-                      onClick={saveMatchMeta}
-                      disabled={savingMatchMeta}
-                    >
-                      {savingMatchMeta ? "Gemmer..." : "Gem opgaver"}
-                    </button>
-                  </div>
-                </div>
-              ) : null}
-              {/* 10. Aflys / Genåbn begivenhed (admin) */}
-              {canManageEvents ? (
-                <div className="rounded-2xl border border-ink/10 bg-white/90 p-4">
-                  {selectedEvent.canceledAt ? (
-                    <button
-                      className="btn-ghost w-full sm:w-auto sm:min-w-[13rem]"
-                      onClick={reopenEvent}
-                      disabled={reopenSubmitting}
-                    >
-                      {reopenSubmitting ? "Genåbner..." : "Genåbn begivenhed"}
-                    </button>
-                  ) : showCancelConfirm ? (
-                    <div className="space-y-3">
-                      <p className="text-sm font-semibold text-ink">Er du sikker på, at du vil aflyse begivenheden?</p>
-                      <p className="text-xs text-ink/60">Alle deltagere vil stadig kunne se, at begivenheden er aflyst.</p>
-                      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-                        <button
-                          type="button"
-                          className="btn-ghost w-full sm:w-auto"
-                          onClick={() => setShowCancelConfirm(false)}
-                        >
-                          Annuller
-                        </button>
-                        <button
-                          type="button"
-                          className="w-full rounded-control bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700 sm:w-auto"
-                          onClick={cancelEvent}
-                          disabled={cancelSubmitting}
-                        >
-                          {cancelSubmitting ? "Aflyser..." : "Ja, aflys begivenhed"}
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <button
-                      className="btn-ghost w-full sm:w-auto sm:min-w-[13rem]"
-                      onClick={() => setShowCancelConfirm(true)}
-                      disabled={cancelSubmitting}
-                    >
-                      Aflys begivenhed
-                    </button>
-                  )}
-                </div>
+                </CollapsibleCard>
               ) : null}
             </div>
           </div>
         </div>
+        {showMatchStatsEditor && canManageEvents && isMatchEvent && !selectedEvent.canceledAt ? (
+          <div
+            className="modal-backdrop"
+            onClick={() => {
+              if (savingMatchStats) return;
+              setShowMatchStatsEditor(false);
+              setMatchStatSearch("");
+            }}
+          >
+            <div className="modal-panel max-w-lg" style={{ overflowY: "hidden" }} onClick={(event) => event.stopPropagation()}>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="label">Kampresultat</p>
+                  <h4 className="mt-1 text-base font-semibold text-ink">Mål og assists</h4>
+                </div>
+                <button
+                  type="button"
+                  className="btn-ghost"
+                  onClick={() => {
+                    if (savingMatchStats) return;
+                    setShowMatchStatsEditor(false);
+                    setMatchStatSearch("");
+                  }}
+                  disabled={savingMatchStats}
+                >
+                  Luk
+                </button>
+              </div>
+              <div className="mt-4 space-y-2">
+                <input
+                  type="search"
+                  className="input min-h-0 h-11"
+                  placeholder="Søg spiller..."
+                  value={matchStatSearch}
+                  onChange={(event) => setMatchStatSearch(event.target.value)}
+                />
+                <div className="max-h-[52dvh] space-y-2 overflow-y-auto overscroll-contain pr-1">
+                  {filteredMatchMembers.length === 0 ? (
+                    <p className="text-sm text-ink/60">Ingen spillere matcher søgningen.</p>
+                  ) : null}
+                  {filteredMatchMembers.map((member) => (
+                    <div
+                      key={`stat-modal-${member.user.id}`}
+                      className="rounded-xl border border-ink/10 bg-white/70 p-2.5 text-sm"
+                    >
+                      <span className="mb-2 block font-medium text-ink">{member.user.name ?? "Ukendt"}</span>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="flex items-center gap-1">
+                          <label className="sr-only" htmlFor={`modal-g-${member.user.id}`}>
+                            Mål
+                          </label>
+                          <span className="text-xs text-ink/55">M</span>
+                          <input
+                            id={`modal-g-${member.user.id}`}
+                            type="number"
+                            min={0}
+                            className="input min-h-0 h-10 w-full px-2 py-1 text-center"
+                            value={matchStatRows[member.user.id]?.goals ?? "0"}
+                            onChange={(event) =>
+                              setMatchStatRows((prev) => ({
+                                ...prev,
+                                [member.user.id]: {
+                                  goals: event.target.value,
+                                  assists: prev[member.user.id]?.assists ?? "0"
+                                }
+                              }))
+                            }
+                          />
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <label className="sr-only" htmlFor={`modal-a-${member.user.id}`}>
+                            Assists
+                          </label>
+                          <span className="text-xs text-ink/55">A</span>
+                          <input
+                            id={`modal-a-${member.user.id}`}
+                            type="number"
+                            min={0}
+                            className="input min-h-0 h-10 w-full px-2 py-1 text-center"
+                            value={matchStatRows[member.user.id]?.assists ?? "0"}
+                            onChange={(event) =>
+                              setMatchStatRows((prev) => ({
+                                ...prev,
+                                [member.user.id]: {
+                                  goals: prev[member.user.id]?.goals ?? "0",
+                                  assists: event.target.value
+                                }
+                              }))
+                            }
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  className="btn-ghost w-full sm:w-auto"
+                  onClick={() => {
+                    if (savingMatchStats) return;
+                    setShowMatchStatsEditor(false);
+                    setMatchStatSearch("");
+                  }}
+                  disabled={savingMatchStats}
+                >
+                  Annuller
+                </button>
+                <button
+                  type="button"
+                  className="btn-primary w-full sm:w-auto sm:min-w-[12rem]"
+                  onClick={saveMatchStats}
+                  disabled={savingMatchStats}
+                >
+                  {savingMatchStats ? "Gemmer..." : "Gem kampstatistik"}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+        </>
       ) : null}
     </section>
   );

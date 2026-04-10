@@ -943,14 +943,14 @@ export default function IndstillingerPage() {
           <p className="text-xs text-ink/60">
             {hasUserTheme ? "Du bruger dit personlige tema." : "Du bruger holdets standardtema."}
           </p>
-          <div className="mt-4 grid w-full min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="mt-4 grid w-full min-w-0 grid-cols-2 gap-2.5 sm:grid-cols-2">
             {presets.map((preset) => (
               <button
                 key={preset.id}
                 type="button"
                 onClick={() => handleTheme(preset.id)}
                 disabled={themeApplyingId !== null}
-                className={`w-full min-w-0 rounded-2xl border px-4 py-3 text-left text-sm font-semibold ${
+                className={`w-full min-w-0 rounded-2xl border px-3 py-2.5 text-center text-sm font-semibold ${
                   active === preset.id ? "border-ink bg-white" : "border-ink/10 bg-white/70"
                 }`}
               >

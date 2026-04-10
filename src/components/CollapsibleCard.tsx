@@ -51,7 +51,7 @@ export function CollapsibleCard({
     <div className={`${surfaceClass} relative w-full min-w-0 ${className}`.trim()}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <h3 className={titleClassName ?? "text-lg font-semibold text-ink"}>{title}</h3>
+          <h3 className={titleClassName ?? "text-lg font-bold text-ink"}>{title}</h3>
           {description ? (
             <p className={descriptionClassName ?? "mt-2 text-sm text-ink/70"}>{description}</p>
           ) : null}
