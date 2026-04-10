@@ -1191,13 +1191,17 @@ export default function BoderPage() {
                   </div>
                 </div>
                 {canManageFines ? (
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <button type="button" className="btn-ghost" onClick={() => openEditTemplate(template)}>
+                  <div className="mt-3 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-center">
+                    <button
+                      type="button"
+                      className="btn-ghost w-full justify-center sm:w-auto"
+                      onClick={() => openEditTemplate(template)}
+                    >
                       Rediger
                     </button>
                     <button
                       type="button"
-                      className="btn-primary"
+                      className="btn-primary w-full justify-center sm:w-auto"
                       onClick={() => {
                         setSelectedTemplateId(template.id);
                         setShowAssignModal(true);
@@ -1663,7 +1667,7 @@ export default function BoderPage() {
                   </>
                 ) : null}
               </div>
-              <div className="shrink-0 border-t border-ink/10 bg-fog/95 pt-3 max-[639px]:pb-[calc(0.65rem+env(safe-area-inset-bottom,0px)+4.75rem)] sm:border-0 sm:bg-transparent sm:pb-0 sm:pt-4">
+              <div className="shrink-0 border-t border-ink/10 bg-fog/95 pt-3  sm:border-0 sm:bg-transparent sm:pb-0 sm:pt-4">
                 <button type="submit" className="btn-primary w-full" disabled={assignFineSubmitting}>
                   {assignFineSubmitting
                     ? "Gemmer..."

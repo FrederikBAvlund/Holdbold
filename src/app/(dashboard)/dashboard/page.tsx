@@ -377,14 +377,6 @@ export default function DashboardHome() {
 
   return (
     <section className="space-y-6">
-      <div className="flex flex-wrap items-center justify-end gap-2">
-        <button type="button" className="btn-ghost text-sm" onClick={collapseAllCards}>
-          Skjul alle kort
-        </button>
-        <button type="button" className="btn-ghost text-sm" onClick={expandAllCards}>
-          Vis alle kort
-        </button>
-      </div>
 
       <CollapsibleCard
         key={`welcome-${collapseVersion}`}
