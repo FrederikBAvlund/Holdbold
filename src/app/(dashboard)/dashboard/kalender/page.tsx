@@ -1677,7 +1677,7 @@ export default function KalenderPage() {
                   defaultOpen={!isMobile}
                   className="order-11"
                   surface="card"
-                  titleClassName="text-sm font-semibold text-ink"
+                  titleClassName="text-xs font-semibold text-ink/70"
                 >
                   {selectedEvent.canceledAt ? (
                     <button className="btn-ghost w-full sm:w-auto sm:min-w-[13rem]" onClick={reopenEvent} disabled={reopenSubmitting}>
@@ -1719,7 +1719,7 @@ export default function KalenderPage() {
                   defaultOpen={!isMobile}
                   className="order-6"
                   surface="card"
-                  titleClassName="text-sm font-semibold text-ink"
+                  titleClassName="text-xs font-semibold text-ink/70"
                 >
                   <div className="flex flex-wrap items-end justify-center gap-3 sm:justify-start">
                     <select
@@ -1748,35 +1748,35 @@ export default function KalenderPage() {
                   defaultOpen={!isMobile}
                   className="order-7"
                   surface="card"
-                  titleClassName="text-sm font-semibold text-ink"
+                  titleClassName="text-xs font-semibold text-ink/70"
                 >
                   <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="min-w-0 space-y-2">
-                      <label className="label" htmlFor="meeting-time">Mødetid</label>
+                    <div className="min-w-0 space-y-2 overflow-hidden">
+                      <label className="text-xs font-medium text-ink/70" htmlFor="meeting-time">Mødetid</label>
                       {canEditMatchMeta ? (
                         <input
                           id="meeting-time"
                           type="datetime-local"
-                          className="input min-w-0 w-full max-w-full text-[14px] sm:text-[15px]"
+                          className="input min-w-0 w-full max-w-full text-[13px] sm:text-[15px]"
                           value={editableMeetingAt}
                           onChange={(event) => setEditableMeetingAt(event.target.value)}
                         />
                       ) : (
                         <div className="input flex items-center justify-between gap-3">
-                          <span className="text-ink/75">{splitLocalDateTime(editableMeetingAt).date}</span>
+                          <span className="min-w-0 truncate text-ink/75">{splitLocalDateTime(editableMeetingAt).date}</span>
                           <span className="rounded-full bg-ember/15 px-3 py-1 text-sm font-bold text-ember">
                             {splitLocalDateTime(editableMeetingAt).time}
                           </span>
                         </div>
                       )}
                     </div>
-                    <div className="min-w-0 space-y-2">
-                      <label className="label" htmlFor="deadline-time">Svarfrist</label>
+                    <div className="min-w-0 space-y-2 overflow-hidden">
+                      <label className="text-xs font-medium text-ink/70" htmlFor="deadline-time">Svarfrist</label>
                       {canEditMatchMeta ? (
                         <input
                           id="deadline-time"
                           type="datetime-local"
-                          className="input min-w-0 w-full max-w-full text-[14px] sm:text-[15px]"
+                          className="input min-w-0 w-full max-w-full text-[13px] sm:text-[15px]"
                           value={editableDeadlineAt}
                           onChange={(event) => setEditableDeadlineAt(event.target.value)}
                           readOnly={isDeadlinePassed}
@@ -1784,7 +1784,7 @@ export default function KalenderPage() {
                         />
                       ) : (
                         <div className="input flex items-center justify-between gap-3">
-                          <span className="text-ink/75">{splitLocalDateTime(editableDeadlineAt).date}</span>
+                          <span className="min-w-0 truncate text-ink/75">{splitLocalDateTime(editableDeadlineAt).date}</span>
                           <span className="rounded-full bg-amber-100 px-3 py-1 text-sm font-semibold text-amber-800">
                             {splitLocalDateTime(editableDeadlineAt).time}
                           </span>
@@ -1823,11 +1823,11 @@ export default function KalenderPage() {
                   defaultOpen={!isMobile}
                   className="order-8"
                   surface="card"
-                  titleClassName="text-sm font-semibold text-ink"
+                  titleClassName="text-xs font-semibold text-ink/70"
                 >
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div className="space-y-2">
-                      <label className="label" htmlFor="match-home-goals">
+                      <label className="text-xs font-medium text-ink/70" htmlFor="match-home-goals">
                         Hold mål
                       </label>
                       {canManageEvents ? (
@@ -1845,7 +1845,7 @@ export default function KalenderPage() {
                       )}
                     </div>
                     <div className="space-y-2">
-                      <label className="label" htmlFor="match-away-goals">
+                      <label className="text-xs font-medium text-ink/70" htmlFor="match-away-goals">
                         Modstander mål
                       </label>
                       {canManageEvents ? (
@@ -1864,7 +1864,7 @@ export default function KalenderPage() {
                     </div>
                   </div>
                   <div className="mt-4 space-y-2">
-                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-ink/55">
+                    <p className="text-xs font-medium text-ink/70">
                       Mål og assists
                     </p>
                     <div className="rounded-xl border border-ink/10 bg-white/70 px-3 py-2.5">
@@ -1902,7 +1902,7 @@ export default function KalenderPage() {
                   defaultOpen={!isMobile}
                   className="order-9"
                   surface="card"
-                  titleClassName="text-sm font-semibold text-ink"
+                  titleClassName="text-xs font-semibold text-ink/70"
                   descriptionClassName="mt-1 max-w-prose text-xs leading-relaxed text-ink/55"
                 >
                   <div className="mt-5 grid gap-5 sm:grid-cols-2">
@@ -1961,7 +1961,7 @@ export default function KalenderPage() {
                 defaultOpen
                 className="order-2"
                 surface="card"
-                titleClassName="text-sm font-semibold text-ink"
+                titleClassName="text-xs font-semibold text-ink/70"
               >
                 {signupLockedPastStart ? (
                   <div className="mb-4 border-b border-ink/10 pb-4">
@@ -2068,7 +2068,7 @@ export default function KalenderPage() {
                 defaultOpen
                 className="order-2"
                 surface="card"
-                titleClassName="text-sm font-semibold text-ink"
+                titleClassName="text-xs font-semibold text-ink/70"
               >
                 {eventDetailsLoading ? (
                   <p className="mt-3 text-sm text-ink/60">Henter tilmeldinger...</p>
@@ -2153,7 +2153,7 @@ export default function KalenderPage() {
                   defaultOpen={!isMobile}
                   className="order-5"
                   surface="card"
-                  titleClassName="text-sm font-semibold text-ink"
+                  titleClassName="text-xs font-semibold text-ink/70"
                 >
                   <p className="mt-1 text-sm text-ink/70">{editingSignupMember.user.name ?? "Ukendt"}</p>
                   <div className="mt-3 grid gap-3 sm:grid-cols-3">
@@ -2229,7 +2229,7 @@ export default function KalenderPage() {
                   defaultOpen={!isMobile}
                   className="order-10"
                   surface="card"
-                  titleClassName="text-sm font-semibold text-red-700"
+                  titleClassName="text-xs font-medium text-red-700"
                 >
                   <div>
                     <p className="mt-1 text-xs text-red-700/80">
@@ -2349,7 +2349,7 @@ export default function KalenderPage() {
                   defaultOpen
                   className="order-3"
                   surface="card"
-                  titleClassName="text-sm font-semibold text-ink"
+                  titleClassName="text-xs font-semibold text-ink/70"
                 >
                   <div className="mt-2 space-y-2">
                     {[
