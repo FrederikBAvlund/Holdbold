@@ -15,7 +15,8 @@ const createSchema = z.object({
   recurrence: z.enum(["DAILY", "WEEKLY", "MONTHLY", "YEARLY"]),
   interval: z.number().int().positive().optional(),
   endDate: z.string().datetime().optional(),
-  signupDeadlineHoursBefore: z.number().int().positive().optional()
+  signupDeadlineHoursBefore: z.number().int().positive().optional(),
+  kind: z.enum(["TRAINING", "MATCH"]).optional()
 });
 
 export async function GET(request: Request) {
@@ -60,7 +61,8 @@ export async function POST(request: Request) {
       interval: body.interval ?? 1,
       endDate: body.endDate ? new Date(body.endDate) : null,
       signupDeadlineHoursBefore: body.signupDeadlineHoursBefore ?? 24,
-      createdById: session.userId
+      createdById: session.userId,
+      ...(body.kind ? { kind: body.kind } : {})
     }
   });
 

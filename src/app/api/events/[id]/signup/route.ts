@@ -36,10 +36,18 @@ export async function GET(request: Request, { params }: { params: { id: string }
       title: true,
       date: true,
       source: true,
+      kind: true,
       meetingTime: true,
       signupDeadline: true,
       thingCarrierId: true,
-      beerCarrierId: true
+      beerCarrierId: true,
+      matchHomeGoals: true,
+      matchAwayGoals: true,
+      matchPlayerStats: {
+        include: {
+          user: { select: { id: true, name: true } }
+        }
+      }
     }
   });
 

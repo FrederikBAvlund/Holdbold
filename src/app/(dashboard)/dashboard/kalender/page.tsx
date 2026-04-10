@@ -23,6 +23,9 @@ type CalendarEvent = {
   signupDeadline?: string | null;
   source: string;
   seriesId?: string | null;
+  kind?: string | null;
+  matchHomeGoals?: number | null;
+  matchAwayGoals?: number | null;
   thingCarrierId?: string | null;
   beerCarrierId?: string | null;
   signupStatus?: string | null;
@@ -38,6 +41,7 @@ type SeriesItem = {
   recurrence: string;
   interval: number;
   endDate?: string | null;
+  kind?: string | null;
 };
 
 type SignupLog = {
@@ -71,6 +75,10 @@ type CachedEventDetails = {
   editableDeadlineAt: string;
   editableThingCarrierId: string;
   editableBeerCarrierId: string;
+  eventKind?: string | null;
+  editableMatchHome?: string;
+  editableMatchAway?: string;
+  matchStatRows?: Record<string, { goals: string; assists: string }>;
   eventSignups: EventSignup[];
   logs: SignupLog[];
   eventLogs: EventLog[];
@@ -298,6 +306,9 @@ export default function KalenderPage() {
         signupDeadline: eventItem.signupDeadline ?? null,
         source: eventItem.source,
         seriesId: eventItem.seriesId ?? null,
+        kind: eventItem.kind ?? null,
+        matchHomeGoals: eventItem.matchHomeGoals ?? null,
+        matchAwayGoals: eventItem.matchAwayGoals ?? null,
         thingCarrierId: eventItem.thingCarrierId ?? null,
         beerCarrierId: eventItem.beerCarrierId ?? null,
         signupStatus: eventItem.signupStatus ?? null,
@@ -323,6 +334,13 @@ export default function KalenderPage() {
   const [editableThingCarrierId, setEditableThingCarrierId] = useState("");
   const [editableBeerCarrierId, setEditableBeerCarrierId] = useState("");
   const [savingMatchMeta, setSavingMatchMeta] = useState(false);
+  const [editableMatchHome, setEditableMatchHome] = useState("");
+  const [editableMatchAway, setEditableMatchAway] = useState("");
+  const [matchStatRows, setMatchStatRows] = useState<Record<string, { goals: string; assists: string }>>({});
+  const [savingMatchStats, setSavingMatchStats] = useState(false);
+  const [newEventKind, setNewEventKind] = useState<"TRAINING" | "MATCH">("TRAINING");
+  const [savingEventKind, setSavingEventKind] = useState(false);
+  const [draftEventKind, setDraftEventKind] = useState<"TRAINING" | "MATCH">("TRAINING");
   const [selectedLateFineUserIds, setSelectedLateFineUserIds] = useState<string[]>([]);
   const [editingSignupMember, setEditingSignupMember] = useState<DashboardTeamMember | null>(null);
   const [editingSignupStatus, setEditingSignupStatus] = useState<"IN" | "OUT" | "UNKNOWN">("UNKNOWN");
@@ -357,6 +375,29 @@ export default function KalenderPage() {
     return { date: safeDate, time: safeTime };
   };
 
+  function buildMatchStatRows(
+    stats: Array<{ userId: string; goals: number; assists: number }> | undefined
+  ) {
+    const rows: Record<string, { goals: string; assists: string }> = {};
+    for (const m of members) {
+      const stat = stats?.find((s) => s.userId === m.user.id);
+      rows[m.user.id] = { goals: String(stat?.goals ?? 0), assists: String(stat?.assists ?? 0) };
+    }
+    return rows;
+  }
+
+  function applyEventDetailPayload(apiEvent: {
+    kind?: string | null;
+    matchHomeGoals?: number | null;
+    matchAwayGoals?: number | null;
+    matchPlayerStats?: Array<{ userId: string; goals: number; assists: number }>;
+  }) {
+    setDraftEventKind(apiEvent.kind === "MATCH" ? "MATCH" : "TRAINING");
+    setEditableMatchHome(apiEvent.matchHomeGoals != null ? String(apiEvent.matchHomeGoals) : "");
+    setEditableMatchAway(apiEvent.matchAwayGoals != null ? String(apiEvent.matchAwayGoals) : "");
+    setMatchStatRows(buildMatchStatRows(apiEvent.matchPlayerStats));
+  }
+
   async function handleCreateSeries(event: React.FormEvent) {
     event.preventDefault();
     if (!teamId || !userId) return;
@@ -378,7 +419,8 @@ export default function KalenderPage() {
                 title,
                 location,
                 date: new Date(startIso).toISOString(),
-                signupDeadline: new Date(new Date(startIso).getTime() - deadlineHours * 60 * 60 * 1000).toISOString()
+                signupDeadline: new Date(new Date(startIso).getTime() - deadlineHours * 60 * 60 * 1000).toISOString(),
+                kind: newEventKind
               })
             })
           : await fetch("/api/event-series", {
@@ -392,7 +434,8 @@ export default function KalenderPage() {
                 recurrence,
                 interval,
                 endDate: toIsoEndOfLocalDay(endDate) ?? undefined,
-                signupDeadlineHoursBefore: deadlineHours
+                signupDeadlineHoursBefore: deadlineHours,
+                kind: newEventKind
               })
             });
 
@@ -409,6 +452,7 @@ export default function KalenderPage() {
       setStartDate("");
       setEndDate("");
       setDeadlineHours(24);
+      setNewEventKind("TRAINING");
       loadedSeriesKeyRef.current = null;
       loadedCalendarKeyRef.current = null;
     } finally {
@@ -451,8 +495,18 @@ export default function KalenderPage() {
           })
         });
         const data = await response.json();
-        if (response.ok) {
+        if (response.ok && data.event) {
           eventId = data.event.id;
+          setSelectedEvent((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  id: data.event.id,
+                  kind: data.event.kind ?? prev.kind,
+                  seriesId: data.event.seriesId ?? prev.seriesId
+                }
+              : prev
+          );
         }
       }
 
@@ -466,6 +520,10 @@ export default function KalenderPage() {
         setEditableDeadlineAt(cachedDetails.editableDeadlineAt);
         setEditableThingCarrierId(cachedDetails.editableThingCarrierId);
         setEditableBeerCarrierId(cachedDetails.editableBeerCarrierId);
+        setDraftEventKind(cachedDetails.eventKind === "MATCH" ? "MATCH" : "TRAINING");
+        setEditableMatchHome(cachedDetails.editableMatchHome ?? "");
+        setEditableMatchAway(cachedDetails.editableMatchAway ?? "");
+        setMatchStatRows(cachedDetails.matchStatRows ?? {});
         setEventSignups(cachedDetails.eventSignups);
         setLogs(cachedDetails.logs);
         setEventLogs(canManageEvents ? cachedDetails.eventLogs : []);
@@ -502,12 +560,16 @@ export default function KalenderPage() {
       setEditableMeetingAt(toDateTimeLocalValue(meetingValue));
       setEditableThingCarrierId(statusData.event?.thingCarrierId ?? "");
       setEditableBeerCarrierId(statusData.event?.beerCarrierId ?? "");
-      if (statusData.event?.source) {
+      if (statusData.event) {
+        applyEventDetailPayload(statusData.event);
         setSelectedEvent((prev) =>
           prev
             ? {
                 ...prev,
                 source: statusData.event.source,
+                kind: statusData.event.kind ?? prev.kind,
+                matchHomeGoals: statusData.event.matchHomeGoals ?? prev.matchHomeGoals ?? null,
+                matchAwayGoals: statusData.event.matchAwayGoals ?? prev.matchAwayGoals ?? null,
                 thingCarrierId: statusData.event?.thingCarrierId ?? prev.thingCarrierId ?? null,
                 beerCarrierId: statusData.event?.beerCarrierId ?? prev.beerCarrierId ?? null
               }
@@ -540,6 +602,14 @@ export default function KalenderPage() {
         editableDeadlineAt: toDateTimeLocalValue(statusData.event?.signupDeadline ?? null),
         editableThingCarrierId: statusData.event?.thingCarrierId ?? "",
         editableBeerCarrierId: statusData.event?.beerCarrierId ?? "",
+        eventKind: statusData.event?.kind ?? null,
+        editableMatchHome:
+          statusData.event?.matchHomeGoals != null ? String(statusData.event.matchHomeGoals) : "",
+        editableMatchAway:
+          statusData.event?.matchAwayGoals != null ? String(statusData.event.matchAwayGoals) : "",
+        matchStatRows: buildMatchStatRows(
+          statusData.event?.matchPlayerStats as Array<{ userId: string; goals: number; assists: number }> | undefined
+        ),
         eventSignups: signupsData.signups ?? [],
         logs: logData.logs ?? [],
         eventLogs: logData.eventLogs ?? []
@@ -593,7 +663,9 @@ export default function KalenderPage() {
     });
   }, [router, teamId, userId]);
 
-  const isMatchEvent = selectedEvent?.source === "ICAL";
+  const resolvedEventKind =
+    selectedEvent?.kind ?? (selectedEvent?.source === "ICAL" ? "MATCH" : "TRAINING");
+  const isMatchEvent = resolvedEventKind === "MATCH";
   const canViewMatchMeta = Boolean(isMatchEvent);
   const canEditMatchMeta = Boolean(isMatchEvent && canAssignLateFine && eventIdForSignup);
   const canEditEventDuties = Boolean(eventIdForSignup);
@@ -679,14 +751,107 @@ export default function KalenderPage() {
               meetingTime: nextMeeting,
               signupDeadline: nextDeadline,
               thingCarrierId: nextThingCarrierId || null,
-              beerCarrierId: nextBeerCarrierId || null
+              beerCarrierId: nextBeerCarrierId || null,
+              ...(data.event?.kind ? { kind: data.event.kind } : {}),
+              ...(data.event?.matchHomeGoals !== undefined
+                ? { matchHomeGoals: data.event.matchHomeGoals }
+                : {}),
+              ...(data.event?.matchAwayGoals !== undefined
+                ? { matchAwayGoals: data.event.matchAwayGoals }
+                : {})
             }
           : prev
       );
+      if (data.event) {
+        applyEventDetailPayload(data.event);
+      }
       eventDetailsCacheRef.current.delete(eventIdForSignup);
       pushToast("Begivenhed opdateret", "success");
     } finally {
       setSavingMatchMeta(false);
+    }
+  }
+
+  async function saveEventKind() {
+    if (!eventIdForSignup || !canManageEvents) return;
+    setSavingEventKind(true);
+    try {
+      const response = await fetch(`/api/events/${eventIdForSignup}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind: draftEventKind })
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        pushToast(data.error ?? "Kunne ikke gemme type", "error");
+        return;
+      }
+      if (data.event) {
+        applyEventDetailPayload(data.event);
+        setSelectedEvent((prev) =>
+          prev
+            ? {
+                ...prev,
+                kind: data.event.kind,
+                matchHomeGoals: data.event.matchHomeGoals ?? null,
+                matchAwayGoals: data.event.matchAwayGoals ?? null
+              }
+            : prev
+        );
+      }
+      setEvents((prev) =>
+        prev.map((item) =>
+          item.id === eventIdForSignup ? { ...item, kind: draftEventKind } : item
+        )
+      );
+      eventDetailsCacheRef.current.delete(eventIdForSignup);
+      pushToast("Type opdateret", "success");
+    } finally {
+      setSavingEventKind(false);
+    }
+  }
+
+  async function saveMatchStats() {
+    if (!eventIdForSignup || !canManageEvents) return;
+    const homeTrim = editableMatchHome.trim();
+    const awayTrim = editableMatchAway.trim();
+    const matchPlayerStats = members.map((m) => ({
+      userId: m.user.id,
+      goals: Math.max(0, parseInt(matchStatRows[m.user.id]?.goals ?? "0", 10) || 0),
+      assists: Math.max(0, parseInt(matchStatRows[m.user.id]?.assists ?? "0", 10) || 0)
+    }));
+    setSavingMatchStats(true);
+    try {
+      const response = await fetch(`/api/events/${eventIdForSignup}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          matchHomeGoals: homeTrim === "" ? null : Math.max(0, parseInt(homeTrim, 10) || 0),
+          matchAwayGoals: awayTrim === "" ? null : Math.max(0, parseInt(awayTrim, 10) || 0),
+          matchPlayerStats
+        })
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        pushToast(data.error ?? "Kunne ikke gemme kampstatistik", "error");
+        return;
+      }
+      if (data.event) {
+        applyEventDetailPayload(data.event);
+        setSelectedEvent((prev) =>
+          prev
+            ? {
+                ...prev,
+                matchHomeGoals: data.event.matchHomeGoals ?? null,
+                matchAwayGoals: data.event.matchAwayGoals ?? null
+              }
+            : prev
+        );
+      }
+      eventDetailsCacheRef.current.delete(eventIdForSignup);
+      pushToast("Kampstatistik gemt", "success");
+    } finally {
+      setSavingMatchStats(false);
     }
   }
 
@@ -742,6 +907,10 @@ export default function KalenderPage() {
           editableDeadlineAt,
           editableThingCarrierId,
           editableBeerCarrierId,
+          eventKind: draftEventKind,
+          editableMatchHome,
+          editableMatchAway,
+          matchStatRows,
           eventSignups: signupsData.signups ?? [],
           logs: logData.logs ?? [],
           eventLogs: logData.eventLogs ?? []
@@ -956,6 +1125,10 @@ export default function KalenderPage() {
         editableDeadlineAt,
         editableThingCarrierId,
         editableBeerCarrierId,
+        eventKind: draftEventKind,
+        editableMatchHome,
+        editableMatchAway,
+        matchStatRows,
         eventSignups: signupsData.signups ?? [],
         logs: logData.logs ?? [],
         eventLogs: logData.eventLogs ?? []
@@ -1131,6 +1304,9 @@ export default function KalenderPage() {
                     signupDeadline: info.event.extendedProps.signupDeadline ?? null,
                     source: String(info.event.extendedProps.source ?? "MANUAL"),
                     seriesId: info.event.extendedProps.seriesId ?? null,
+                    kind: info.event.extendedProps.kind ?? null,
+                    matchHomeGoals: info.event.extendedProps.matchHomeGoals ?? null,
+                    matchAwayGoals: info.event.extendedProps.matchAwayGoals ?? null,
                     thingCarrierId: info.event.extendedProps.thingCarrierId ?? null,
                     beerCarrierId: info.event.extendedProps.beerCarrierId ?? null,
                     signupStatus: info.event.extendedProps.signupStatus ?? null,
@@ -1306,6 +1482,18 @@ export default function KalenderPage() {
                 />
               </div>
               <div className="space-y-2">
+                <label className="label" htmlFor="event-kind">Type</label>
+                <select
+                  id="event-kind"
+                  className="input"
+                  value={newEventKind}
+                  onChange={(event) => setNewEventKind(event.target.value as "TRAINING" | "MATCH")}
+                >
+                  <option value="TRAINING">Træning</option>
+                  <option value="MATCH">Kamp</option>
+                </select>
+              </div>
+              <div className="space-y-2">
                 <label className="label" htmlFor="event-start">Start</label>
                 <input
                   id="event-start"
@@ -1388,7 +1576,7 @@ export default function KalenderPage() {
 
       {selectedEvent ? (
         <div className="modal-backdrop" onClick={() => setSelectedEvent(null)}>
-          <div className="modal-panel max-w-lg" onClick={(event) => event.stopPropagation()}>
+          <div className="modal-panel max-w-xl" onClick={(event) => event.stopPropagation()}>
             <div className="flex items-start justify-between">
               <div>
                 <h3 className={`text-lg font-semibold text-ink ${selectedEvent.canceledAt ? "line-through" : ""}`}>
@@ -1418,6 +1606,29 @@ export default function KalenderPage() {
                     {cancelSubmitting ? "Aflyser..." : "Aflys begivenhed"}
                   </button>
                 )
+              ) : null}
+              {canManageEvents && eventIdForSignup && !selectedEvent.canceledAt ? (
+                <div className="rounded-2xl border border-ink/10 bg-white/90 p-4">
+                  <p className="label">Begivenhedstype</p>
+                  <div className="mt-3 flex flex-wrap items-end gap-3">
+                    <select
+                      className="input min-w-[10rem] flex-1"
+                      value={draftEventKind}
+                      onChange={(event) => setDraftEventKind(event.target.value as "TRAINING" | "MATCH")}
+                    >
+                      <option value="TRAINING">Træning</option>
+                      <option value="MATCH">Kamp</option>
+                    </select>
+                    <button
+                      type="button"
+                      className="btn-primary"
+                      onClick={saveEventKind}
+                      disabled={savingEventKind}
+                    >
+                      {savingEventKind ? "Gemmer..." : "Gem type"}
+                    </button>
+                  </div>
+                </div>
               ) : null}
               {canViewMatchMeta ? (
                 <div className="rounded-2xl border border-ink/10 bg-white/90 p-4">
@@ -1478,6 +1689,129 @@ export default function KalenderPage() {
                     <div className="mt-3 flex items-center justify-end">
                       <button className="btn-primary" type="button" onClick={saveMatchMeta} disabled={savingMatchMeta}>
                         {savingMatchMeta ? "Gemmer..." : "Gem kampdetaljer"}
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+              {isMatchEvent && eventIdForSignup && !selectedEvent.canceledAt ? (
+                <div className="rounded-2xl border border-ink/10 bg-white/90 p-4">
+                  <p className="label">Kampresultat</p>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <label className="label" htmlFor="match-home-goals">
+                        Hold mål
+                      </label>
+                      {canManageEvents ? (
+                        <input
+                          id="match-home-goals"
+                          type="number"
+                          min={0}
+                          className="input"
+                          value={editableMatchHome}
+                          onChange={(event) => setEditableMatchHome(event.target.value)}
+                          placeholder="—"
+                        />
+                      ) : (
+                        <p className="text-sm font-semibold text-ink">{editableMatchHome || "—"}</p>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <label className="label" htmlFor="match-away-goals">
+                        Modstander mål
+                      </label>
+                      {canManageEvents ? (
+                        <input
+                          id="match-away-goals"
+                          type="number"
+                          min={0}
+                          className="input"
+                          value={editableMatchAway}
+                          onChange={(event) => setEditableMatchAway(event.target.value)}
+                          placeholder="—"
+                        />
+                      ) : (
+                        <p className="text-sm font-semibold text-ink">{editableMatchAway || "—"}</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="mt-4 space-y-2">
+                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-ink/55">
+                      Mål og assists
+                    </p>
+                    <div className="max-h-52 space-y-2 overflow-y-auto pr-1">
+                      {members.map((member) => (
+                        <div
+                          key={`stat-${member.user.id}`}
+                          className="grid grid-cols-1 items-center gap-2 text-sm sm:grid-cols-[1fr_auto_auto]"
+                        >
+                          <span className="font-medium text-ink">{member.user.name ?? "Ukendt"}</span>
+                          {canManageEvents ? (
+                            <>
+                              <div className="flex items-center gap-1 sm:justify-end">
+                                <label className="sr-only" htmlFor={`g-${member.user.id}`}>
+                                  Mål
+                                </label>
+                                <span className="text-xs text-ink/55">M</span>
+                                <input
+                                  id={`g-${member.user.id}`}
+                                  type="number"
+                                  min={0}
+                                  className="input w-16 py-1 text-center"
+                                  value={matchStatRows[member.user.id]?.goals ?? "0"}
+                                  onChange={(event) =>
+                                    setMatchStatRows((prev) => ({
+                                      ...prev,
+                                      [member.user.id]: {
+                                        goals: event.target.value,
+                                        assists: prev[member.user.id]?.assists ?? "0"
+                                      }
+                                    }))
+                                  }
+                                />
+                              </div>
+                              <div className="flex items-center gap-1 sm:justify-end">
+                                <label className="sr-only" htmlFor={`a-${member.user.id}`}>
+                                  Assists
+                                </label>
+                                <span className="text-xs text-ink/55">A</span>
+                                <input
+                                  id={`a-${member.user.id}`}
+                                  type="number"
+                                  min={0}
+                                  className="input w-16 py-1 text-center"
+                                  value={matchStatRows[member.user.id]?.assists ?? "0"}
+                                  onChange={(event) =>
+                                    setMatchStatRows((prev) => ({
+                                      ...prev,
+                                      [member.user.id]: {
+                                        goals: prev[member.user.id]?.goals ?? "0",
+                                        assists: event.target.value
+                                      }
+                                    }))
+                                  }
+                                />
+                              </div>
+                            </>
+                          ) : (
+                            <span className="text-ink/75 sm:col-span-2">
+                              {matchStatRows[member.user.id]?.goals ?? "0"} mål ·{" "}
+                              {matchStatRows[member.user.id]?.assists ?? "0"} assists
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  {canManageEvents ? (
+                    <div className="mt-3 flex justify-end">
+                      <button
+                        type="button"
+                        className="btn-primary"
+                        onClick={saveMatchStats}
+                        disabled={savingMatchStats}
+                      >
+                        {savingMatchStats ? "Gemmer..." : "Gem kampstatistik"}
                       </button>
                     </div>
                   ) : null}

@@ -108,6 +108,7 @@ export async function GET(request: Request) {
     location: string;
     source: string;
     seriesId: string;
+    kind: string;
     thingCarrierId: null;
     beerCarrierId: null;
   }>;
@@ -136,6 +137,7 @@ export async function GET(request: Request) {
           location: series.location,
           source: "SERIES",
           seriesId: series.id,
+          kind: series.kind,
           thingCarrierId: null,
           beerCarrierId: null
         });
@@ -155,8 +157,11 @@ export async function GET(request: Request) {
       signupDeadline: event.signupDeadline,
       source: event.source,
       seriesId: event.seriesId,
+      kind: event.kind,
       thingCarrierId: event.thingCarrierId,
       beerCarrierId: event.beerCarrierId,
+      matchHomeGoals: event.matchHomeGoals,
+      matchAwayGoals: event.matchAwayGoals,
       signupStatus: event.signups?.[0]?.status ?? null,
       canceledAt: event.canceledAt,
       canceledByName: event.canceledBy?.name ?? null

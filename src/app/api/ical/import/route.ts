@@ -315,7 +315,8 @@ export async function POST(request: Request) {
             meetingTime: existing.meetingTime ?? meetingTime,
             feedId: feed.id,
             externalUid: uid,
-            source: "ICAL"
+            source: "ICAL",
+            kind: "MATCH"
           }
         });
         updated += 1;
@@ -330,7 +331,8 @@ export async function POST(request: Request) {
             meetingTime,
             source: "ICAL",
             externalUid: uid,
-            feedId: feed.id
+            feedId: feed.id,
+            kind: "MATCH"
           }
         });
         created += 1;

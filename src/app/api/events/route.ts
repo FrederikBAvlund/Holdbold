@@ -18,7 +18,8 @@ const createSchema = z.object({
   title: z.string().min(1),
   date: z.string().datetime(),
   location: z.string().min(1),
-  signupDeadline: z.string().datetime()
+  signupDeadline: z.string().datetime(),
+  kind: z.enum(["TRAINING", "MATCH"]).optional()
 });
 
 export async function GET(request: Request) {
@@ -61,7 +62,8 @@ export async function POST(request: Request) {
       location: body.location,
       signupDeadline: new Date(body.signupDeadline),
       source: "MANUAL",
-      createdById
+      createdById,
+      ...(body.kind ? { kind: body.kind } : {})
     }
   });
 

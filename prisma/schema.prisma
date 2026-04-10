@@ -39,6 +39,11 @@ enum EventSource {
   ICAL
 }
 
+enum EventKind {
+  TRAINING
+  MATCH
+}
+
 enum FineStatus {
   UNPAID
   PAID_PENDING
@@ -110,6 +115,7 @@ model User {
   eventLogs EventLog[] @relation("EventLogActor")
   createdFineCollections FineCollection[] @relation("FineCollectionCreator")
   pushSubscriptions PushSubscription[]
+  eventMatchPlayerStats EventMatchPlayerStat[]
 }
 
 model Team {
@@ -158,6 +164,7 @@ model EventSeries {
   interval                 Int      @default(1)
   endDate                  DateTime?
   signupDeadlineHoursBefore Int      @default(24)
+  kind                     EventKind @default(TRAINING)
   createdById              String
   createdAt                DateTime @default(now())
 
@@ -183,6 +190,9 @@ model Event {
   canceledById   String?
   thingCarrierId String?
   beerCarrierId  String?
+  kind           EventKind    @default(TRAINING)
+  matchHomeGoals Int?
+  matchAwayGoals Int?
   createdAt      DateTime     @default(now())
 
   team Team @relation(fields: [teamId], references: [id])
@@ -196,12 +206,29 @@ model Event {
   fines Fine[]
   signupLogs SignupLog[]
   eventLogs EventLog[]
+  matchPlayerStats EventMatchPlayerStat[]
 
   @@index([teamId, date])
+  @@index([teamId, kind, date])
   @@index([externalUid])
   @@index([canceledAt])
   @@index([thingCarrierId])
   @@index([beerCarrierId])
+}
+
+model EventMatchPlayerStat {
+  id      String @id @default(cuid())
+  eventId String
+  userId  String
+  goals   Int    @default(0)
+  assists Int    @default(0)
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+  @@index([eventId])
+  @@index([userId])
 }
 
 model EventLog {

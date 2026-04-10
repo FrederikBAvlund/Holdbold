@@ -11,7 +11,10 @@ export function CollapsibleCard({
   storageKey,
   defaultOpen = true,
   children,
-  className = ""
+  className = "",
+  surface = "card",
+  titleClassName,
+  descriptionClassName
 }: {
   title: string;
   description?: string;
@@ -21,6 +24,9 @@ export function CollapsibleCard({
   defaultOpen?: boolean;
   children: ReactNode;
   className?: string;
+  surface?: "card" | "card-soft";
+  titleClassName?: string;
+  descriptionClassName?: string;
 }) {
   const persist = Boolean(storageKey);
   const [open, setOpen] = useState(defaultOpen);
@@ -39,12 +45,16 @@ export function CollapsibleCard({
     window.localStorage.setItem(storageKey!, open ? "1" : "0");
   }, [open, persist, ready, storageKey]);
 
+  const surfaceClass = surface === "card-soft" ? "card-soft" : "card";
+
   return (
-    <div className={`card relative w-full min-w-0 ${className}`.trim()}>
-      <div className="flex flex-wrap items-start justify-between gap-3">
+    <div className={`${surfaceClass} relative w-full min-w-0 ${className}`.trim()}>
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <h3 className="text-lg font-semibold text-ink">{title}</h3>
-          {description ? <p className="mt-2 text-sm text-ink/70">{description}</p> : null}
+          <h3 className={titleClassName ?? "text-lg font-semibold text-ink"}>{title}</h3>
+          {description ? (
+            <p className={descriptionClassName ?? "mt-2 text-sm text-ink/70"}>{description}</p>
+          ) : null}
         </div>
         <div className="flex shrink-0 items-center gap-2 pt-0.5">
           {headerEnd}
