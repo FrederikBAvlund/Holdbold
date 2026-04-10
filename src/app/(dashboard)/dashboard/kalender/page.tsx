@@ -1897,13 +1897,11 @@ export default function KalenderPage() {
               {canEditEventDuties ? (
                 <CollapsibleCard
                   title="Praktisk"
-                  description="Hvem tager tingene med og står for øl? Gem når du har fordelt opgaverne."
                   storageKey="event-modal-praktisk"
                   defaultOpen={!isMobile}
                   className="order-9"
                   surface="card"
                   titleClassName="text-xs font-semibold text-ink/70"
-                  descriptionClassName="mt-1 max-w-prose text-xs leading-relaxed text-ink/55"
                 >
                   <div className="mt-5 grid gap-5 sm:grid-cols-2">
                     <div className="flex min-w-0 flex-col gap-2.5">
