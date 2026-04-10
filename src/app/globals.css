@@ -244,7 +244,7 @@ a {
     flex-direction: column;
     width: 100%;
     max-width: none;
-    max-height: min(88dvh, calc(100dvh - env(safe-area-inset-top, 0px) - 5.25rem));
+    max-height: min(94dvh, calc(100dvh - env(safe-area-inset-top, 0px) - 2.5rem));
     overflow: hidden;
     border-bottom-left-radius: 0;
     border-bottom-right-radius: 0;
