@@ -55,7 +55,8 @@ export async function POST(request: Request) {
       location: series.location,
       signupDeadline: deadline,
       source: "SERIES",
-      createdById
+      createdById,
+      kind: series.kind
     }
   });
 

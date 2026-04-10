@@ -157,7 +157,8 @@ export async function POST(request: Request) {
           location,
           signupDeadline,
           meetingTime: existing.meetingTime ?? meetingTime,
-          source: "ICAL"
+          source: "ICAL",
+          kind: "MATCH"
         }
       });
       updated += 1;
@@ -171,7 +172,8 @@ export async function POST(request: Request) {
           signupDeadline,
           meetingTime,
           source: "ICAL",
-          externalUid
+          externalUid,
+          kind: "MATCH"
         }
       });
       created += 1;

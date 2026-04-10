@@ -4,7 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { EVENT_MANAGER_ROLES, requireActiveTeamMemberWithRoles, requireSession } from "@/lib/apiAuth";
 
 const updateSchema = z.object({
-  endDate: z.string().datetime().nullable().optional()
+  endDate: z.string().datetime().nullable().optional(),
+  kind: z.enum(["TRAINING", "MATCH"]).optional()
 });
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
@@ -28,7 +29,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   const series = await prisma.eventSeries.update({
     where: { id: params.id },
     data: {
-      ...(body.endDate !== undefined ? { endDate: body.endDate ? new Date(body.endDate) : null } : {})
+      ...(body.endDate !== undefined ? { endDate: body.endDate ? new Date(body.endDate) : null } : {}),
+      ...(body.kind !== undefined ? { kind: body.kind } : {})
     }
   });
 
