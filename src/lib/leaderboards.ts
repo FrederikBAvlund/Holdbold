@@ -209,6 +209,28 @@ async function dutyCounts(
   return m;
 }
 
+async function motmWinsCounts(teamId: string, memberIds: Set<string>) {
+  const now = new Date();
+  const rows = await prisma.event.groupBy({
+    by: ["matchMotmUserId"],
+    where: {
+      teamId,
+      kind: "MATCH",
+      canceledAt: null,
+      date: { lt: now },
+      matchMotmUserId: { not: null, in: [...memberIds] }
+    },
+    _count: { _all: true }
+  });
+  const m = new Map<string, number>();
+  for (const id of memberIds) m.set(id, 0);
+  for (const row of rows) {
+    const uid = row.matchMotmUserId;
+    if (uid && memberIds.has(uid)) m.set(uid, row._count._all);
+  }
+  return m;
+}
+
 async function valuesForCategory(
   teamId: string,
   category: LeaderboardCategory,
@@ -234,6 +256,8 @@ async function valuesForCategory(
       return dutyCounts(teamId, "thingCarrierId", memberIds);
     case "beer_duty":
       return dutyCounts(teamId, "beerCarrierId", memberIds);
+    case "motm_wins":
+      return motmWinsCounts(teamId, memberIds);
   }
 }
 

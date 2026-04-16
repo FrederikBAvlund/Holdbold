@@ -49,6 +49,13 @@ export async function GET(_request: Request, { params }: { params: { id: string 
       canceledAt: true,
       matchHomeGoals: true,
       matchAwayGoals: true,
+      matchMotmUser: {
+        select: {
+          id: true,
+          name: true,
+          image: true
+        }
+      },
       matchPlayerStats: {
         include: {
           user: { select: { id: true, name: true } }
@@ -203,6 +210,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   const updated = await prisma.$transaction(async (tx) => {
     if (clearingMatchData) {
       await tx.eventMatchPlayerStat.deleteMany({ where: { eventId: event.id } });
+      await tx.eventMotmPoll.deleteMany({ where: { eventId: event.id } });
     }
 
     if (wantsPlayerStatsUpdate && effectiveKind === "MATCH" && body.matchPlayerStats) {
@@ -229,7 +237,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         ...(body.beerCarrierId !== undefined ? { beerCarrierId: body.beerCarrierId } : {}),
         ...(body.kind !== undefined ? { kind: body.kind } : {}),
         ...(clearingMatchData
-          ? { matchHomeGoals: null, matchAwayGoals: null }
+          ? { matchHomeGoals: null, matchAwayGoals: null, matchMotmUserId: null }
           : {}),
         ...(!clearingMatchData && body.matchHomeGoals !== undefined
           ? { matchHomeGoals: body.matchHomeGoals }
@@ -249,6 +257,13 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         beerCarrierId: true,
         matchHomeGoals: true,
         matchAwayGoals: true,
+        matchMotmUser: {
+          select: {
+            id: true,
+            name: true,
+            image: true
+          }
+        },
         matchPlayerStats: {
           include: {
             user: { select: { id: true, name: true } }
@@ -285,6 +300,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       beerCarrierId: updated.beerCarrierId,
       matchHomeGoals: updated.matchHomeGoals,
       matchAwayGoals: updated.matchAwayGoals,
+      matchMotmUser: updated.matchMotmUser,
       matchPlayerStats: updated.matchPlayerStats
     }
   });

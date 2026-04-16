@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ToastProvider";
+import { MotmRevealOverlay, type MotmRevealRow } from "@/components/MotmRevealOverlay";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import interactionPlugin from "@fullcalendar/interaction";
@@ -88,6 +89,45 @@ type FineTemplate = {
   title: string;
   amount: number;
   status?: string;
+};
+
+type MotmPollVote = {
+  userId: string;
+  weight: number;
+};
+
+type MotmPollVoter = {
+  userId: string;
+  name: string;
+  createdAt: string;
+};
+
+type MotmPollScoreRow = MotmRevealRow & {
+  image?: string | null;
+};
+
+type MotmPoll = {
+  id: string;
+  status: "OPEN" | "CLOSED";
+  createdById: string;
+  votesPerVoter: number;
+  revealCount: number;
+  closedAt: string | null;
+  totalBallots: number;
+  canManage: boolean;
+  isCreator: boolean;
+  myVotes: MotmPollVote[];
+  voters: MotmPollVoter[] | null;
+  scoreboard: MotmPollScoreRow[];
+  revealRows: MotmPollScoreRow[];
+  winner: MotmPollScoreRow | null;
+};
+
+type RevealState = {
+  eventTitle: string;
+  revealRows: MotmRevealRow[];
+  scoreboard: MotmRevealRow[];
+  winner: MotmRevealRow | null;
 };
 
 const adminRoles = ["ADMIN", "TRAENER", "BOEDEKASSEFORMAND"];
@@ -353,8 +393,18 @@ export default function KalenderPage() {
   const [error, setError] = useState<string | null>(null);
   const [logs, setLogs] = useState<SignupLog[]>([]);
   const [eventLogs, setEventLogs] = useState<EventLog[]>([]);
+  const [motmPoll, setMotmPoll] = useState<MotmPoll | null>(null);
+  const [motmWinner, setMotmWinner] = useState<{ id: string; name: string; image?: string | null } | null>(null);
+  const [motmLoading, setMotmLoading] = useState(false);
+  const [motmSubmitting, setMotmSubmitting] = useState(false);
+  const [motmVotesPerVoterDraft, setMotmVotesPerVoterDraft] = useState("3");
+  const [motmRevealCountDraft, setMotmRevealCountDraft] = useState("5");
+  const [motmVoteDraft, setMotmVoteDraft] = useState<Record<string, string>>({});
+  const [revealState, setRevealState] = useState<RevealState | null>(null);
   const handledFocusKeyRef = useRef<string | null>(null);
   const eventDetailsCacheRef = useRef<Map<string, CachedEventDetails>>(new Map());
+  const motmBroadcastRef = useRef<BroadcastChannel | null>(null);
+  const lastMotmPollStatusRef = useRef<"OPEN" | "CLOSED" | null>(null);
 
   const toDateTimeLocalValue = (value: string | null | undefined) => {
     if (!value) return "";
@@ -399,6 +449,269 @@ export default function KalenderPage() {
     setEditableMatchHome(apiEvent.matchHomeGoals != null ? String(apiEvent.matchHomeGoals) : "");
     setEditableMatchAway(apiEvent.matchAwayGoals != null ? String(apiEvent.matchAwayGoals) : "");
     setMatchStatRows(buildMatchStatRows(apiEvent.matchPlayerStats));
+  }
+
+  function openMotmReveal(nextState: RevealState) {
+    setRevealState(nextState);
+    try {
+      motmBroadcastRef.current?.postMessage(nextState);
+    } catch {
+      // BroadcastChannel may be unavailable in some browsers.
+    }
+  }
+
+  function closeEventModal() {
+    setShowCancelConfirm(false);
+    setShowMatchStatsEditor(false);
+    setSelectedEvent(null);
+    setEventIdForSignup(null);
+    setMotmPoll(null);
+    setMotmWinner(null);
+    setMotmVoteDraft({});
+    setMotmLoading(false);
+    lastMotmPollStatusRef.current = null;
+  }
+
+  function motmOpenPollFingerprint(poll: MotmPoll) {
+    return JSON.stringify({
+      id: poll.id,
+      status: poll.status,
+      totalBallots: poll.totalBallots,
+      votesPerVoter: poll.votesPerVoter,
+      revealCount: poll.revealCount,
+      isCreator: poll.isCreator,
+      canManage: poll.canManage,
+      myVotes: poll.myVotes,
+      voters: poll.voters
+    });
+  }
+
+  function applyMotmResponse(
+    data: { poll?: MotmPoll | null; matchMotmUser?: { id: string; name: string; image?: string | null } | null },
+    eventTitle: string,
+    options?: { syncDraft?: boolean }
+  ) {
+    const nextPoll = data.poll ?? null;
+    setMotmPoll((prev) => {
+      if (!nextPoll) return nextPoll;
+      if (
+        prev &&
+        prev.status === "OPEN" &&
+        nextPoll.status === "OPEN" &&
+        prev.id === nextPoll.id &&
+        motmOpenPollFingerprint(prev) === motmOpenPollFingerprint(nextPoll)
+      ) {
+        return prev;
+      }
+      return nextPoll;
+    });
+    setMotmWinner((prev) => {
+      const next = data.matchMotmUser
+        ? { id: data.matchMotmUser.id, name: data.matchMotmUser.name, image: data.matchMotmUser.image ?? null }
+        : null;
+      if (
+        prev?.id === next?.id &&
+        prev?.name === next?.name &&
+        prev?.image === next?.image
+      ) {
+        return prev;
+      }
+      return next;
+    });
+    if (nextPoll) {
+      if (options?.syncDraft) {
+        setMotmVoteDraft(() => {
+          const next: Record<string, string> = {};
+          for (const m of members) {
+            const found = nextPoll.myVotes.find((vote) => vote.userId === m.user.id);
+            next[m.user.id] = found ? String(found.weight) : "0";
+          }
+          return next;
+        });
+      }
+      if (lastMotmPollStatusRef.current === "OPEN" && nextPoll.status === "CLOSED") {
+        openMotmReveal({
+          eventTitle,
+          revealRows: nextPoll.revealRows.map((row) => ({
+            rank: row.rank,
+            userId: row.userId,
+            name: row.name,
+            votes: row.votes
+          })),
+          scoreboard: nextPoll.scoreboard.map((row) => ({
+            rank: row.rank,
+            userId: row.userId,
+            name: row.name,
+            votes: row.votes
+          })),
+          winner: nextPoll.winner
+            ? {
+                rank: nextPoll.winner.rank,
+                userId: nextPoll.winner.userId,
+                name: nextPoll.winner.name,
+                votes: nextPoll.winner.votes
+              }
+            : null
+        });
+      }
+      lastMotmPollStatusRef.current = nextPoll.status;
+      return;
+    }
+    lastMotmPollStatusRef.current = null;
+  }
+
+  async function loadMotmPoll(
+    eventId: string,
+    eventTitle: string,
+    loadOpts?: { showSpinner?: boolean; syncDraftFromServer?: boolean }
+  ) {
+    if (loadOpts?.showSpinner) setMotmLoading(true);
+    try {
+      const response = await fetch(`/api/events/${eventId}/motm-poll`, { cache: "no-store" });
+      const data = await response.json();
+      if (!response.ok) return;
+      applyMotmResponse(data, eventTitle, {
+        syncDraft: loadOpts?.syncDraftFromServer ?? false
+      });
+    } finally {
+      if (loadOpts?.showSpinner) setMotmLoading(false);
+    }
+  }
+
+  async function openMotmPoll() {
+    if (!eventIdForSignup || !canManageEvents) return;
+    const votesParsed = Math.max(1, Math.min(10, parseInt(motmVotesPerVoterDraft, 10) || 1));
+    const revealParsed = Math.max(1, Math.min(10, parseInt(motmRevealCountDraft, 10) || 1));
+    setMotmSubmitting(true);
+    try {
+      const response = await fetch(`/api/events/${eventIdForSignup}/motm-poll`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ votesPerVoter: votesParsed, revealCount: revealParsed })
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        pushToast(data.error ?? "Kunne ikke åbne afstemning", "error");
+        return;
+      }
+      applyMotmResponse(data, selectedEvent?.title ?? "Kampens spiller", { syncDraft: true });
+      pushToast("MOTM-afstemning åbnet", "success");
+    } finally {
+      setMotmSubmitting(false);
+    }
+  }
+
+  async function persistMotmVote(): Promise<{ ok: boolean; totalBallots?: number }> {
+    if (!eventIdForSignup || !motmPoll || motmPoll.status !== "OPEN") {
+      return { ok: true };
+    }
+    const selections = members
+      .map((member) => ({
+        userId: member.user.id,
+        weight: Math.max(0, parseInt(motmVoteDraft[member.user.id] ?? "0", 10) || 0)
+      }))
+      .filter((entry) => entry.weight > 0);
+    const total = members.reduce(
+      (sum, member) => sum + Math.max(0, parseInt(motmVoteDraft[member.user.id] ?? "0", 10) || 0),
+      0
+    );
+    if (total !== motmPoll.votesPerVoter) {
+      return { ok: false };
+    }
+    const response = await fetch(`/api/events/${eventIdForSignup}/motm-poll/vote`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ selections })
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      pushToast(data.error ?? "Kunne ikke gemme stemme", "error");
+      return { ok: false };
+    }
+    applyMotmResponse(data, selectedEvent?.title ?? "Kampens spiller", { syncDraft: true });
+    const totalBallots = typeof data.poll?.totalBallots === "number" ? data.poll.totalBallots : undefined;
+    return { ok: true, totalBallots };
+  }
+
+  async function closeMotmPoll() {
+    if (!eventIdForSignup || !canManageEvents || !motmPoll) return;
+    if (motmVoteTotal > 0 && motmVoteTotal !== motmPoll.votesPerVoter) {
+      pushToast(
+        "Fordel alle dine stemmer, eller sæt alle tilbage til 0, før du lukker afstemningen.",
+        "error"
+      );
+      return;
+    }
+    const revealTitle = selectedEvent?.title ?? "Kampens spiller";
+    setMotmSubmitting(true);
+    try {
+      let totalBallotsHint = motmPoll.totalBallots;
+      if (motmVoteTotal === motmPoll.votesPerVoter) {
+        const saved = await persistMotmVote();
+        if (!saved.ok) return;
+        totalBallotsHint = saved.totalBallots ?? totalBallotsHint;
+      }
+      if (
+        totalBallotsHint === 0 &&
+        !window.confirm(
+          "Ingen har gemt en stemme endnu. Hvis du lukker nu, bliver der ikke registreret nogen stemmer. Vil du lukke alligevel?"
+        )
+      ) {
+        return;
+      }
+      const response = await fetch(`/api/events/${eventIdForSignup}/motm-poll/close`, { method: "POST" });
+      const data = await response.json();
+      if (!response.ok) {
+        pushToast(data.error ?? "Kunne ikke lukke afstemning", "error");
+        return;
+      }
+      applyMotmResponse(data, revealTitle, { syncDraft: true });
+      closeEventModal();
+      pushToast("Afstemning lukket", "success");
+    } finally {
+      setMotmSubmitting(false);
+    }
+  }
+
+  async function submitMotmVote() {
+    if (!eventIdForSignup || !motmPoll || motmPoll.status !== "OPEN") return;
+    if (motmVoteTotal !== motmPoll.votesPerVoter) {
+      pushToast(`Fordel præcis ${motmPoll.votesPerVoter} stemmer før du gemmer.`, "error");
+      return;
+    }
+    setMotmSubmitting(true);
+    try {
+      const result = await persistMotmVote();
+      if (result.ok) {
+        pushToast("Stemme gemt", "success");
+      }
+    } finally {
+      setMotmSubmitting(false);
+    }
+  }
+
+  const motmVoteTotal = members.reduce(
+    (sum, member) => sum + Math.max(0, parseInt(motmVoteDraft[member.user.id] ?? "0", 10) || 0),
+    0
+  );
+
+  function adjustMotmVote(userId: string, delta: 1 | -1) {
+    if (!motmPoll || motmPoll.status !== "OPEN") return;
+    setMotmVoteDraft((prev) => {
+      const current = Math.max(0, parseInt(prev[userId] ?? "0", 10) || 0);
+      const currentTotal = members.reduce(
+        (sum, member) => sum + Math.max(0, parseInt(prev[member.user.id] ?? "0", 10) || 0),
+        0
+      );
+      if (delta > 0 && currentTotal >= motmPoll.votesPerVoter) {
+        return prev;
+      }
+      const nextValue = Math.max(0, current + delta);
+      return {
+        ...prev,
+        [userId]: String(nextValue)
+      };
+    });
   }
 
   async function handleCreateSeries(event: React.FormEvent) {
@@ -466,6 +779,8 @@ export default function KalenderPage() {
   async function openEvent(eventItem: CalendarEvent) {
     if (openingEventId) return;
     if (!teamId || !userId) return;
+    let pollLoadId = "";
+    const pollLoadTitle = eventItem.title;
     setOpeningEventId(eventItem.id);
     setEventDetailsLoading(true);
     try {
@@ -485,6 +800,10 @@ export default function KalenderPage() {
       setEventSignups([]);
       setLogs([]);
       setEventLogs([]);
+      setMotmPoll(null);
+      setMotmWinner(null);
+      setMotmVoteDraft({});
+      lastMotmPollStatusRef.current = null;
 
       let eventId = eventItem.id;
       if (eventItem.id.startsWith("series:")) {
@@ -514,6 +833,7 @@ export default function KalenderPage() {
       }
 
       setEventIdForSignup(eventId);
+      pollLoadId = eventId;
       const cachedDetails = eventDetailsCacheRef.current.get(eventId);
       if (cachedDetails) {
         setSignupStatus(cachedDetails.signupStatus);
@@ -620,6 +940,9 @@ export default function KalenderPage() {
     } finally {
       setEventDetailsLoading(false);
       setOpeningEventId(null);
+      if (pollLoadId) {
+        void loadMotmPoll(pollLoadId, pollLoadTitle, { showSpinner: true, syncDraftFromServer: true });
+      }
     }
   }
 
@@ -669,6 +992,29 @@ export default function KalenderPage() {
   const resolvedEventKind =
     selectedEvent?.kind ?? (selectedEvent?.source === "ICAL" ? "MATCH" : "TRAINING");
   const isMatchEvent = resolvedEventKind === "MATCH";
+
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof BroadcastChannel === "undefined") return;
+    const channel = new BroadcastChannel("holdbold-motm");
+    motmBroadcastRef.current = channel;
+    channel.onmessage = (message) => {
+      const payload = message.data as RevealState | null;
+      if (!payload) return;
+      openMotmReveal(payload);
+    };
+    return () => {
+      channel.close();
+      motmBroadcastRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!selectedEvent || !eventIdForSignup || motmPoll?.status !== "OPEN") return;
+    const timer = window.setInterval(() => {
+      void loadMotmPoll(eventIdForSignup, selectedEvent.title);
+    }, 3000);
+    return () => window.clearInterval(timer);
+  }, [eventIdForSignup, motmPoll?.status, selectedEvent]);
   const canViewMatchMeta = Boolean(isMatchEvent);
   const canEditMatchMeta = Boolean(isMatchEvent && canAssignLateFine && eventIdForSignup);
   const canEditEventDuties = Boolean(eventIdForSignup);
@@ -1615,9 +1961,7 @@ export default function KalenderPage() {
         <div
           className="modal-backdrop"
           onClick={() => {
-            setShowCancelConfirm(false);
-            setShowMatchStatsEditor(false);
-            setSelectedEvent(null);
+            closeEventModal();
           }}
         >
           <div className="modal-panel max-w-xl" onClick={(event) => event.stopPropagation()}>
@@ -1658,14 +2002,7 @@ export default function KalenderPage() {
                   </p>
                 ) : null}
               </div>
-              <button
-                className="btn-ghost"
-                onClick={() => {
-                  setShowCancelConfirm(false);
-                  setShowMatchStatsEditor(false);
-                  setSelectedEvent(null);
-                }}
-              >
+              <button className="btn-ghost" onClick={closeEventModal}>
                 Luk
               </button>
             </div>
@@ -1894,12 +2231,179 @@ export default function KalenderPage() {
                   ) : null}
                 </CollapsibleCard>
               ) : null}
+              {isMatchEvent && eventIdForSignup && !selectedEvent.canceledAt ? (
+                <CollapsibleCard
+                  title="Kampens spiller (MOTM)"
+                  storageKey="event-modal-motm"
+                  defaultOpen={!isMobile}
+                  className="order-9"
+                  surface="card"
+                  titleClassName="text-xs font-semibold text-ink/70"
+                >
+                  {motmLoading ? <p className="text-sm text-ink/60">Indlæser afstemning...</p> : null}
+                  {motmWinner ? (
+                    <p className="text-sm text-ink/80">
+                      <span className="font-semibold text-ink">Kampens spiller:</span> {motmWinner.name}
+                    </p>
+                  ) : null}
+                  {!motmPoll && canManageEvents ? (
+                    <div className="mt-3 space-y-3">
+                      <p className="text-xs text-ink/60">
+                        Fordel stemmer på holdkammerater. Alle aktive spillere kan stemme, når afstemningen er åben.
+                      </p>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="space-y-2">
+                          <label className="text-xs font-medium text-ink/70" htmlFor="motm-votes-per">
+                            Stemmer pr. person
+                          </label>
+                          <input
+                            id="motm-votes-per"
+                            type="number"
+                            min={1}
+                            max={10}
+                            className="input"
+                            value={motmVotesPerVoterDraft}
+                            onChange={(event) => setMotmVotesPerVoterDraft(event.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-xs font-medium text-ink/70" htmlFor="motm-reveal">
+                            Pladser i afsløring
+                          </label>
+                          <input
+                            id="motm-reveal"
+                            type="number"
+                            min={1}
+                            max={10}
+                            className="input"
+                            value={motmRevealCountDraft}
+                            onChange={(event) => setMotmRevealCountDraft(event.target.value)}
+                          />
+                        </div>
+                      </div>
+                      <button type="button" className="btn-primary w-full sm:w-auto" onClick={openMotmPoll} disabled={motmSubmitting}>
+                        {motmSubmitting ? "Åbner..." : "Åbn MOTM-afstemning"}
+                      </button>
+                    </div>
+                  ) : null}
+                  {motmPoll?.status === "OPEN" ? (
+                    <div className="mt-3 space-y-4">
+                      <div className="rounded-xl border border-ink/10 bg-white/70 px-3 py-2 text-xs text-ink/70">
+                        <p>
+                          <span className="font-semibold text-ink">Stemmer pr. person:</span> {motmPoll.votesPerVoter}
+                        </p>
+                        <p className="mt-1">
+                          <span className="font-semibold text-ink">Afsløring:</span> Top {motmPoll.revealCount}
+                        </p>
+                        <p className="mt-1">
+                          <span className="font-semibold text-ink">Har stemt:</span> {motmPoll.totalBallots}
+                        </p>
+                      </div>
+                      {motmPoll.isCreator && motmPoll.voters ? (
+                        <div>
+                          <p className="text-xs font-semibold text-ink/70">Stemmeafgivere</p>
+                          <ul className="mt-2 space-y-1 text-sm text-ink/80">
+                            {motmPoll.voters.length === 0 ? (
+                              <li className="text-ink/60">Ingen har stemt endnu.</li>
+                            ) : (
+                              motmPoll.voters.map((voter) => (
+                                <li key={voter.userId}>{voter.name}</li>
+                              ))
+                            )}
+                          </ul>
+                        </div>
+                      ) : null}
+                      <div className="space-y-3">
+                        <p className="text-xs font-semibold text-ink/70">Fordel dine stemmer</p>
+                        <p className="text-xs text-ink/55">
+                          Brug + og − til at fordele i alt {motmPoll.votesPerVoter} stemmer. Tryk{" "}
+                          <span className="font-semibold">Gem stemme</span> for at gemme til serveren med det samme.
+                        </p>
+                        {canManageEvents ? (
+                          <p className="text-xs text-ink/55">
+                            Lukker du afstemningen selv, gemmes dine egne stemmer automatisk, hvis du allerede har fordelt alle
+                            stemmer.
+                          </p>
+                        ) : null}
+                        <div className="max-h-[40dvh] space-y-2 overflow-y-auto pr-1">
+                          {members.map((member) => (
+                            <div
+                              key={`motm-${member.user.id}`}
+                              className="flex items-center justify-between gap-3 rounded-xl border border-ink/10 bg-white/70 px-3 py-2 text-sm"
+                            >
+                              <span className="min-w-0 flex-1 truncate font-medium text-ink">
+                                {member.user.name ?? "Ukendt"}
+                              </span>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  className="btn-ghost h-9 w-9 px-0 text-base"
+                                  onClick={() => adjustMotmVote(member.user.id, -1)}
+                                  disabled={motmSubmitting || Number(motmVoteDraft[member.user.id] ?? "0") <= 0}
+                                >
+                                  -
+                                </button>
+                                <span className="inline-flex h-9 min-w-[2.75rem] items-center justify-center rounded-control border border-ink/10 bg-white px-3 font-semibold text-ink">
+                                  {motmVoteDraft[member.user.id] ?? "0"}
+                                </span>
+                                <button
+                                  type="button"
+                                  className="btn-ghost h-9 w-9 px-0 text-base"
+                                  onClick={() => adjustMotmVote(member.user.id, 1)}
+                                  disabled={motmSubmitting || motmVoteTotal >= motmPoll.votesPerVoter}
+                                >
+                                  +
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                          <p className="text-xs text-ink/60">
+                            Total:{" "}
+                            <span className="font-semibold text-ink">{motmVoteTotal}</span>{" "}
+                            / {motmPoll.votesPerVoter}
+                          </p>
+                          <button
+                            type="button"
+                            className="btn-primary w-full sm:w-auto"
+                            onClick={submitMotmVote}
+                            disabled={motmSubmitting || motmVoteTotal !== motmPoll.votesPerVoter}
+                          >
+                            {motmSubmitting ? "Gemmer..." : "Gem stemme"}
+                          </button>
+                        </div>
+                      </div>
+                      {canManageEvents ? (
+                        <button type="button" className="btn-ghost w-full sm:w-auto" onClick={closeMotmPoll} disabled={motmSubmitting}>
+                          {motmSubmitting ? "Lukker..." : "Luk afstemning og vis resultat"}
+                        </button>
+                      ) : null}
+                    </div>
+                  ) : null}
+                  {motmPoll?.status === "CLOSED" && motmPoll.scoreboard.length > 0 ? (
+                    <div className="mt-3">
+                      <p className="text-xs font-semibold text-ink/70">Resultat</p>
+                      <ul className="mt-2 space-y-1 text-sm text-ink/80">
+                        {motmPoll.scoreboard.map((row) => (
+                          <li key={row.userId} className="flex items-center justify-between gap-3">
+                            <span>
+                              <span className="font-semibold text-ink/60">{row.rank}.</span> {row.name}
+                            </span>
+                            <span className="font-semibold text-ink">{row.votes}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                </CollapsibleCard>
+              ) : null}
               {canEditEventDuties ? (
                 <CollapsibleCard
                   title="Praktisk"
                   storageKey="event-modal-praktisk"
                   defaultOpen={!isMobile}
-                  className="order-9"
+                  className="order-10"
                   surface="card"
                   titleClassName="text-xs font-semibold text-ink/70"
                 >
@@ -2039,7 +2543,7 @@ export default function KalenderPage() {
                 <div className="mt-5 space-y-2">
                   <div>
                     <label className="text-xs font-medium text-ink/70" htmlFor="reason">
-                      Begrundelse ved framelding <span className="text-red-700">*</span>
+                      Begrundelse ved afbud <span className="text-red-700">*</span>
                     </label>
                     <p id="reason-hint" className="mt-0.5 text-xs text-ink/50">
                       Påkrævet, når du vælger <strong>Jeg kan ikke</strong>.
@@ -2411,7 +2915,7 @@ export default function KalenderPage() {
             </div>
           </div>
         </div>
-        {showMatchStatsEditor && canManageEvents && isMatchEvent && !selectedEvent.canceledAt ? (
+        {showMatchStatsEditor && canManageEvents && isMatchEvent && selectedEvent && !selectedEvent.canceledAt ? (
           <div
             className="modal-backdrop"
             onClick={() => {
@@ -2534,6 +3038,14 @@ export default function KalenderPage() {
         ) : null}
         </>
       ) : null}
+      <MotmRevealOverlay
+        open={Boolean(revealState)}
+        eventTitle={revealState?.eventTitle ?? ""}
+        revealRows={revealState?.revealRows ?? []}
+        scoreboard={revealState?.scoreboard ?? []}
+        winner={revealState?.winner ?? null}
+        onClose={() => setRevealState(null)}
+      />
     </section>
   );
 }

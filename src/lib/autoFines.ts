@@ -2,6 +2,7 @@ import type { FineAutomationAction } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { createNotifications } from "@/lib/notifications";
 import {
+  isPostDeadlineWithdrawal,
   isSameCalendarDayAsEvent,
   resolveAutomationTemplate,
   roleExcludedFromFineAutomation
@@ -79,24 +80,31 @@ export async function processMissedSignupFines(teamId: string) {
       const targetUserId = member.userId;
       const status = statusByUser.get(targetUserId);
       const latestLog = latestLogByUser.get(targetUserId);
+      const eventDate = new Date(event.date);
       const latestLogAt = latestLog?.createdAt.getTime() ?? null;
-      const changedBeforeEventDay =
-        latestLogAt !== null &&
-        latestLog !== undefined &&
-        latestLog.createdAt < new Date(event.date) &&
-        !isSameCalendarDayAsEvent(new Date(event.date), latestLog.createdAt);
+      const previousStatus =
+        latestLog === undefined
+          ? undefined
+          : event.signupLogs.find(
+              (log) => log.userId === targetUserId && log.createdAt < latestLog.createdAt
+            )?.status;
       const sameDayWithdrawal =
         status === "OUT" &&
+        previousStatus === "IN" &&
         latestLog?.status === "OUT" &&
         latestLogAt !== null &&
         latestLogAt > deadlineMs &&
-        isSameCalendarDayAsEvent(new Date(event.date), latestLog.createdAt);
+        isSameCalendarDayAsEvent(eventDate, latestLog.createdAt);
 
       const lateResponse =
-        (status === "IN" || status === "OUT") &&
-        latestLogAt !== null &&
-        latestLogAt > deadlineMs &&
-        changedBeforeEventDay;
+        latestLog !== undefined &&
+        isPostDeadlineWithdrawal(
+          previousStatus,
+          latestLog.status,
+          latestLog.createdAt,
+          deadlineDate,
+          eventDate
+        );
       const missingAfterDeadline = (!status || status === "UNKNOWN") && nowMs > deadlineMs;
 
       if (missingAfterDeadline) missingUserIds.push(targetUserId);
@@ -208,7 +216,7 @@ export async function processMissedSignupFines(teamId: string) {
       userId: manager.userId,
       teamId,
       type: "FINE_PROPOSED" as const,
-      title: "System foreslår bøder",
+      title: "Foreslået bøde",
       body,
       link: "/dashboard/boder"
     }));

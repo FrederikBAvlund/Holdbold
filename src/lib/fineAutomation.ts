@@ -30,6 +30,22 @@ export function roleExcludedFromFineAutomation(role: Role, excludedRoles: Role[]
   return excludedRoles.includes(role);
 }
 
+export function isPostDeadlineWithdrawal(
+  previousStatus: "IN" | "OUT" | "UNKNOWN" | null | undefined,
+  nextStatus: "IN" | "OUT" | "UNKNOWN",
+  changedAt: Date,
+  deadlineAt: Date,
+  eventDate: Date
+): boolean {
+  return (
+    previousStatus === "IN" &&
+    nextStatus === "OUT" &&
+    changedAt > deadlineAt &&
+    changedAt < eventDate &&
+    !isSameCalendarDayAsEvent(eventDate, changedAt)
+  );
+}
+
 type DbClient = Pick<Prisma.TransactionClient, "fineAutomationSetting" | "fineTemplate">;
 
 export async function resolveAutomationTemplate(

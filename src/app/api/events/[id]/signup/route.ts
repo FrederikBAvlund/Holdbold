@@ -5,6 +5,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { createNotifications } from "@/lib/notifications";
 import {
+  isPostDeadlineWithdrawal,
   isSameCalendarDayAsEvent,
   resolveAutomationTemplate,
   roleExcludedFromFineAutomation
@@ -47,6 +48,13 @@ export async function GET(request: Request, { params }: { params: { id: string }
       beerCarrierId: true,
       matchHomeGoals: true,
       matchAwayGoals: true,
+      matchMotmUser: {
+        select: {
+          id: true,
+          name: true,
+          image: true
+        }
+      },
       matchPlayerStats: {
         include: {
           user: { select: { id: true, name: true } }
@@ -186,8 +194,12 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
   const deadlinePassed = new Date(event.signupDeadline).getTime() <= Date.now();
   const wasMemberAtDeadline = targetMembership.createdAt <= event.signupDeadline;
-  const isEventDay = isSameCalendarDayAsEvent(new Date(event.date));
+  const eventDate = new Date(event.date);
+  const changedAt = new Date();
+  const previousStatus = existingSignup?.status ?? null;
+  const isEventDay = isSameCalendarDayAsEvent(eventDate, changedAt);
   const isSameDayWithdrawal =
+    previousStatus === "IN" &&
     body.status === "OUT" &&
     wasMemberAtDeadline &&
     isEventDay;
@@ -195,8 +207,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
   const shouldProposeAfterDeadlineFine =
     deadlinePassed &&
     wasMemberAtDeadline &&
-    (body.status === "IN" || body.status === "OUT") &&
-    !isEventDay &&
+    isPostDeadlineWithdrawal(previousStatus, body.status, changedAt, new Date(event.signupDeadline), eventDate) &&
     !isSameDayWithdrawal;
 
   if (shouldProposeAfterDeadlineFine || isSameDayWithdrawal) {
@@ -251,7 +262,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
             userId: manager.userId,
             teamId: event.teamId,
             type: "FINE_PROPOSED" as const,
-            title: "System foreslår bøde",
+            title: "Foreslået bøde",
             body: `${targetUser?.name ?? "En spiller"} · ${template.title} · ${template.amount} kr (${event.title})`,
             link: "/dashboard/boder"
           }));

@@ -463,7 +463,7 @@ export default function DashboardHome() {
           surface="card-soft"
           storageKey={`${storagePrefix}:fines`}
           headerEnd={
-            <div className="shrink-0 rounded-2xl border border-ink/10 bg-white/90 px-5 py-3 text-2xl font-semibold text-ink shadow-sm">
+            <div className="shrink-0 rounded-2xl border border-ink/10 bg-white/90 px-5 py-3 font-semibold text-ink shadow-sm">
               {loadingFines ? "…" : `${totalFines} kr`}
             </div>
           }

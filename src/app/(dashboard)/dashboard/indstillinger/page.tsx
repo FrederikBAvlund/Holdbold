@@ -60,8 +60,8 @@ const FINE_AUTOMATION_ACTIONS = [
   },
   {
     action: "STATUS_CHANGE_AFTER_DEADLINE" as const,
-    label: "Ændring af status efter deadline",
-    hint: "Når nogen sætter svar efter fristen er passeret."
+    label: "Afbud efter deadline",
+    hint: "Når nogen går fra tilmeldt til frameldt efter fristen, men før begivenhedsdagen."
   },
   {
     action: "SAME_DAY_WITHDRAWAL" as const,
