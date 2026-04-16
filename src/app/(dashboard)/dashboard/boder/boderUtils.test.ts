@@ -17,10 +17,11 @@ describe("parseIntegerAmountInput", () => {
 describe("canDeleteFine", () => {
   it("allows deletable statuses", () => {
     expect(canDeleteFine("UNPAID")).toBe(true);
-    expect(canDeleteFine("FORESLAET")).toBe(true);
+    expect(canDeleteFine("AFVIST")).toBe(true);
   });
 
-  it("rejects paid-approved", () => {
+  it("rejects suggested and paid-approved", () => {
+    expect(canDeleteFine("FORESLAET")).toBe(false);
     expect(canDeleteFine("PAID_APPROVED")).toBe(false);
   });
 });

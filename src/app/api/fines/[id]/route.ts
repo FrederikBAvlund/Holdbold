@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
-const deletableStatuses = new Set(["UNPAID", "PAID_PENDING", "FORESLAET", "AFVIST"]);
+const deletableStatuses = new Set(["UNPAID", "PAID_PENDING", "AFVIST"]);
 
 export async function DELETE(_request: Request, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
@@ -28,7 +28,7 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
   }
 
   if (!deletableStatuses.has(fine.status)) {
-    return NextResponse.json({ error: "Betalte bøder kan ikke slettes" }, { status: 400 });
+    return NextResponse.json({ error: "Foreslåede og betalte bøder kan ikke slettes" }, { status: 400 });
   }
 
   await prisma.fine.delete({ where: { id: fine.id } });

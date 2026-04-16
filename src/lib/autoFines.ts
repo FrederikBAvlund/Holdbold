@@ -1,58 +1,20 @@
+import type { FineAutomationAction } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { createNotifications } from "@/lib/notifications";
-
-const MISSED_SIGNUP_TEMPLATE_TITLE = "Ikke skrive sig til/fra på opslag";
-const MISSED_SIGNUP_TEMPLATE_AMOUNT = 20;
-
-export async function getOrCreateMissedSignupTemplate(teamId: string) {
-  const existing = await prisma.fineTemplate.findFirst({
-    where: {
-      teamId,
-      status: "APPROVED",
-      title: {
-        equals: MISSED_SIGNUP_TEMPLATE_TITLE,
-        mode: "insensitive"
-      }
-    },
-    select: {
-      id: true,
-      title: true,
-      amount: true,
-      description: true
-    }
-  });
-
-  if (existing) return existing;
-
-  const created = await prisma.fineTemplate.create({
-    data: {
-      teamId,
-      title: MISSED_SIGNUP_TEMPLATE_TITLE,
-      amount: MISSED_SIGNUP_TEMPLATE_AMOUNT,
-      category: "SPILLER",
-      description: "Systembøde for manglende svar eller ændring efter deadline",
-      status: "APPROVED"
-    },
-    select: {
-      id: true,
-      title: true,
-      amount: true,
-      description: true
-    }
-  });
-
-  return created;
-}
+import {
+  isSameCalendarDayAsEvent,
+  resolveAutomationTemplate,
+  roleExcludedFromFineAutomation
+} from "@/lib/fineAutomation";
 
 export async function processMissedSignupFines(teamId: string) {
   const now = new Date();
   const nowMs = now.getTime();
 
-  const [template, players, managers, dueEvents] = await Promise.all([
-    getOrCreateMissedSignupTemplate(teamId),
+  const [players, managers, dueEvents] = await Promise.all([
     prisma.membership.findMany({
-      where: { teamId, status: "ACTIVE", role: { not: "SOME" } },
-      select: { userId: true, role: true, createdAt: true }
+      where: { teamId, status: "ACTIVE" },
+      select: { userId: true, role: true, createdAt: true, user: { select: { name: true } } }
     }),
     prisma.membership.findMany({
       where: { teamId, status: "ACTIVE", role: { in: ["ADMIN", "BOEDEKASSEFORMAND"] } },
@@ -67,12 +29,14 @@ export async function processMissedSignupFines(teamId: string) {
       select: {
         id: true,
         title: true,
+        date: true,
+        kind: true,
         signupDeadline: true,
         signups: {
           select: { userId: true, status: true }
         },
         signupLogs: {
-          select: { userId: true, createdAt: true },
+          select: { userId: true, status: true, createdAt: true },
           orderBy: { createdAt: "desc" }
         }
       },
@@ -85,6 +49,8 @@ export async function processMissedSignupFines(teamId: string) {
     return { created: 0, events: 0 };
   }
 
+    const playerById = new Map(players.map((member) => [member.userId, member]));
+
   let totalCreated = 0;
 
   for (const event of dueEvents) {
@@ -92,64 +58,158 @@ export async function processMissedSignupFines(teamId: string) {
     if (Number.isNaN(deadlineMs) || deadlineMs > nowMs) continue;
 
     const statusByUser = new Map(event.signups.map((signup) => [signup.userId, signup.status]));
-    const latestLogByUser = new Map<string, Date>();
+    const latestLogByUser = new Map<string, { createdAt: Date; status: "IN" | "OUT" | "UNKNOWN" }>();
     for (const log of event.signupLogs) {
       if (!latestLogByUser.has(log.userId)) {
-        latestLogByUser.set(log.userId, new Date(log.createdAt));
+        latestLogByUser.set(log.userId, {
+          createdAt: new Date(log.createdAt),
+          status: log.status
+        });
       }
     }
 
     const deadlineDate = new Date(event.signupDeadline);
-    const candidateUserIds = players
-      .filter((member) => member.role !== "SOME")
-      .filter((member) => member.createdAt <= deadlineDate)
-      .map((member) => member.userId)
-      .filter((targetUserId) => {
-        const status = statusByUser.get(targetUserId);
-        const latestLogAt = latestLogByUser.get(targetUserId)?.getTime() ?? null;
 
-        const lateResponse =
-          (status === "IN" || status === "OUT") && latestLogAt !== null && latestLogAt > deadlineMs;
-        const missingAfterDeadline = (!status || status === "UNKNOWN") && nowMs > deadlineMs;
-        return lateResponse || missingAfterDeadline;
-      });
+    const missingUserIds: string[] = [];
+    const lateUserIds: string[] = [];
+    const sameDayWithdrawalUserIds: string[] = [];
 
-    if (candidateUserIds.length === 0) continue;
+    for (const member of players) {
+      if (member.createdAt > deadlineDate) continue;
+      const targetUserId = member.userId;
+      const status = statusByUser.get(targetUserId);
+      const latestLog = latestLogByUser.get(targetUserId);
+      const latestLogAt = latestLog?.createdAt.getTime() ?? null;
+      const changedBeforeEventDay =
+        latestLogAt !== null &&
+        latestLog !== undefined &&
+        latestLog.createdAt < new Date(event.date) &&
+        !isSameCalendarDayAsEvent(new Date(event.date), latestLog.createdAt);
+      const sameDayWithdrawal =
+        status === "OUT" &&
+        latestLog?.status === "OUT" &&
+        latestLogAt !== null &&
+        latestLogAt > deadlineMs &&
+        isSameCalendarDayAsEvent(new Date(event.date), latestLog.createdAt);
+
+      const lateResponse =
+        (status === "IN" || status === "OUT") &&
+        latestLogAt !== null &&
+        latestLogAt > deadlineMs &&
+        changedBeforeEventDay;
+      const missingAfterDeadline = (!status || status === "UNKNOWN") && nowMs > deadlineMs;
+
+      if (missingAfterDeadline) missingUserIds.push(targetUserId);
+      else if (sameDayWithdrawal) sameDayWithdrawalUserIds.push(targetUserId);
+      else if (lateResponse) lateUserIds.push(targetUserId);
+    }
+
+    const allCandidates = [...new Set([...missingUserIds, ...lateUserIds, ...sameDayWithdrawalUserIds])];
+    if (allCandidates.length === 0) continue;
 
     const existingFines = await prisma.fine.findMany({
       where: {
         teamId,
         eventId: event.id,
-        userId: { in: candidateUserIds }
+        userId: { in: allCandidates }
       },
       select: { userId: true }
     });
     const existingUserIds = new Set(existingFines.map((fine) => fine.userId));
-    const userIdsToCreate = candidateUserIds.filter((userId) => !existingUserIds.has(userId));
-    if (userIdsToCreate.length === 0) continue;
+
+    const [missedResolved, statusResolved, sameDayResolved] = await Promise.all([
+      resolveAutomationTemplate(teamId, "MISSED_SIGNUP_AT_DEADLINE", event.kind),
+      resolveAutomationTemplate(teamId, "STATUS_CHANGE_AFTER_DEADLINE", event.kind),
+      resolveAutomationTemplate(teamId, "SAME_DAY_WITHDRAWAL", event.kind)
+    ]);
+
+    type Row = {
+      userId: string;
+      templateId: string;
+      amount: number;
+      reason: string;
+      description: string | null;
+      automationAction: FineAutomationAction;
+    };
+
+    const rows: Row[] = [];
+
+    for (const userId of missingUserIds) {
+      if (existingUserIds.has(userId)) continue;
+      if (!missedResolved) continue;
+      const member = playerById.get(userId);
+      if (!member || roleExcludedFromFineAutomation(member.role, missedResolved.excludedRoles)) continue;
+      rows.push({
+        userId,
+        templateId: missedResolved.template.id,
+        amount: missedResolved.template.amount,
+        reason: missedResolved.template.title,
+        description: missedResolved.template.description ?? null,
+        automationAction: missedResolved.automationAction
+      });
+    }
+
+    for (const userId of lateUserIds) {
+      if (existingUserIds.has(userId)) continue;
+      if (!statusResolved) continue;
+      const member = playerById.get(userId);
+      if (!member || roleExcludedFromFineAutomation(member.role, statusResolved.excludedRoles)) continue;
+      rows.push({
+        userId,
+        templateId: statusResolved.template.id,
+        amount: statusResolved.template.amount,
+        reason: statusResolved.template.title,
+        description: statusResolved.template.description ?? null,
+        automationAction: statusResolved.automationAction
+      });
+    }
+
+    for (const userId of sameDayWithdrawalUserIds) {
+      if (existingUserIds.has(userId)) continue;
+      if (!sameDayResolved) continue;
+      const member = playerById.get(userId);
+      if (!member || roleExcludedFromFineAutomation(member.role, sameDayResolved.excludedRoles)) continue;
+      rows.push({
+        userId,
+        templateId: sameDayResolved.template.id,
+        amount: sameDayResolved.template.amount,
+        reason: sameDayResolved.template.title,
+        description: sameDayResolved.template.description ?? null,
+        automationAction: sameDayResolved.automationAction
+      });
+    }
+
+    if (rows.length === 0) continue;
 
     await prisma.fine.createMany({
-      data: userIdsToCreate.map((userId) => ({
+      data: rows.map((row) => ({
         teamId,
-        userId,
+        userId: row.userId,
         eventId: event.id,
-        templateId: template.id,
-        amount: template.amount,
-        reason: template.title,
-        description: template.description ?? null,
+        templateId: row.templateId,
+        amount: row.amount,
+        reason: row.reason,
+        description: row.description,
         status: "FORESLAET" as const,
         createdById: null,
-        createdByLabel: "System"
+        createdByLabel: "System",
+        automationAction: row.automationAction
       }))
     });
-    totalCreated += userIdsToCreate.length;
+    totalCreated += rows.length;
+
+    const singlePlayerName = rows.length === 1 ? playerById.get(rows[0].userId)?.user.name ?? "ukendt spiller" : null;
+    const body =
+      rows.length === 1
+        ? `${singlePlayerName} i "${event.title}" har fået foreslået bøde.`
+        : `${rows.length} spiller(e) i "${event.title}" har fået foreslået bøde.`;
 
     const notifications = managers.map((manager) => ({
       userId: manager.userId,
       teamId,
       type: "FINE_PROPOSED" as const,
       title: "System foreslår bøder",
-      body: `${userIdsToCreate.length} spiller(e) i "${event.title}" har fået foreslået bøde (${template.amount} kr).`,
+      body,
       link: "/dashboard/boder"
     }));
     if (notifications.length > 0) {

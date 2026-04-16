@@ -3,6 +3,7 @@ import { z } from "zod";
 import { createNotifications } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 import { FINE_AUTOMATION_ROLES, requireActiveTeamMemberWithRoles, requireSession } from "@/lib/apiAuth";
+import { resolveAutomationTemplate, roleExcludedFromFineAutomation } from "@/lib/fineAutomation";
 
 const bodySchema = z.object({
   teamId: z.string().min(1),
@@ -21,7 +22,14 @@ export async function POST(request: Request) {
 
   const event = await prisma.event.findFirst({
     where: { id: body.eventId, teamId: body.teamId },
-    include: { signups: true }
+    select: {
+      id: true,
+      teamId: true,
+      title: true,
+      kind: true,
+      signupDeadline: true,
+      signups: { select: { userId: true, status: true } }
+    }
   });
 
   if (!event) {
@@ -32,18 +40,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Deadline er ikke passeret" }, { status: 400 });
   }
 
-  const rule = await prisma.fineRule.findFirst({
-    where: { teamId: body.teamId, isActive: true },
-    orderBy: { createdAt: "asc" }
-  });
-
-  if (!rule) {
-    return NextResponse.json({ error: "Ingen aktiv boederegel" }, { status: 400 });
+  const resolved = await resolveAutomationTemplate(body.teamId, "MISSED_SIGNUP_AT_DEADLINE", event.kind);
+  if (!resolved) {
+    return NextResponse.json({ error: "Ingen aktiv automatisering for manglende tilmelding" }, { status: 400 });
   }
 
   const members = await prisma.membership.findMany({
-    where: { teamId: body.teamId, status: "ACTIVE", role: { not: "SOME" } },
-    include: { user: true }
+    where: { teamId: body.teamId, status: "ACTIVE" },
+    select: { userId: true, role: true, createdAt: true, user: { select: { name: true } } }
   });
 
   const deadlineAt = event.signupDeadline;
@@ -51,8 +55,10 @@ export async function POST(request: Request) {
   const signupMap = new Map(event.signups.map((signup) => [signup.userId, signup.status]));
 
   let created = 0;
+  let singlePlayerName: string | null = null;
   for (const member of members) {
     if (member.createdAt > deadlineAt) continue;
+    if (roleExcludedFromFineAutomation(member.role, resolved.excludedRoles)) continue;
     const status = signupMap.get(member.userId);
     if (status === "IN" || status === "OUT") continue;
 
@@ -61,40 +67,52 @@ export async function POST(request: Request) {
     });
     if (existingFine) continue;
 
-    const fine = await prisma.fine.create({
+    const template = resolved.template;
+    await prisma.fine.create({
       data: {
         teamId: body.teamId,
         userId: member.userId,
         eventId: event.id,
-        amount: rule.amount,
-        reason: rule.name,
-        description: null,
+        templateId: template.id,
+        amount: template.amount,
+        reason: template.title,
+        description: template.description ?? null,
         status: "FORESLAET",
         createdById: null,
-        createdByLabel: "System"
+        createdByLabel: "System",
+        automationAction: resolved.automationAction
       }
     });
+    created += 1;
+    if (created === 1) {
+      singlePlayerName = member.user.name;
+    } else {
+      singlePlayerName = null;
+    }
+  }
 
+  if (created > 0) {
     const managers = await prisma.membership.findMany({
       where: { teamId: body.teamId, role: { in: ["ADMIN", "BOEDEKASSEFORMAND"] } },
       select: { userId: true }
     });
 
-    const notifications = managers
-      .filter((manager) => manager.userId !== member.userId)
-      .map((manager) => ({
-        userId: manager.userId,
-        teamId: body.teamId,
-        type: "FINE_PROPOSED" as const,
-        title: "System foreslår bøde",
-        body: `${fine.reason} · ${fine.amount} kr`,
-        link: "/dashboard/boder"
-      }));
+    const template = resolved.template;
+    const notifications = managers.map((manager) => ({
+      userId: manager.userId,
+      teamId: body.teamId,
+      type: "FINE_PROPOSED" as const,
+      title: "System foreslår bøde",
+      body:
+        created === 1
+          ? `${singlePlayerName ?? "En spiller"} · ${template.title} · ${template.amount} kr`
+          : `${created} foreslåede bøder · ${template.title} · ${template.amount} kr`,
+      link: "/dashboard/boder"
+    }));
 
     if (notifications.length > 0) {
       await createNotifications(notifications);
     }
-    created += 1;
   }
 
   return NextResponse.json({ created });

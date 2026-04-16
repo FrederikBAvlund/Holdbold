@@ -206,21 +206,6 @@ async function main() {
     }
   }
 
-  const fineRule = await prisma.fineRule.findFirst({
-    where: { teamId: team.id }
-  });
-
-  if (!fineRule) {
-    await prisma.fineRule.create({
-      data: {
-        teamId: team.id,
-        name: "Mistet deadline",
-        amount: 50,
-        createdById: adminUserId
-      }
-    });
-  }
-
   const existingTemplates = await prisma.fineTemplate.findMany({
     where: { teamId: team.id },
     select: {
@@ -269,6 +254,76 @@ async function main() {
 
   if (templatesToUpdate.length > 0) {
     await Promise.all(templatesToUpdate);
+  }
+
+  const allTemplates = await prisma.fineTemplate.findMany({
+    where: { teamId: team.id, status: "APPROVED" },
+    select: { id: true, title: true }
+  });
+
+  function findTemplateByTitleCI(title) {
+    const needle = title.trim().toLowerCase();
+    return allTemplates.find((template) => template.title.trim().toLowerCase() === needle);
+  }
+
+  const defaultSignup = findTemplateByTitleCI("Ikke skrive sig til/fra på opslag") ?? allTemplates[0];
+  if (defaultSignup) {
+    const trainingDay = findTemplateByTitleCI("Melde fra til træning på dagen");
+    const matchDay = findTemplateByTitleCI("Afbud 24 timer eller mindre før kamp");
+
+    const sameDayTrainingId = trainingDay?.id ?? defaultSignup.id;
+    const sameDayMatchId = matchDay?.id ?? defaultSignup.id;
+
+    const automationRules = [
+      {
+        action: "MISSED_SIGNUP_AT_DEADLINE",
+        appliesTraining: true,
+        appliesMatch: true,
+        templateTrainingId: defaultSignup.id,
+        templateMatchId: defaultSignup.id
+      },
+      {
+        action: "STATUS_CHANGE_AFTER_DEADLINE",
+        appliesTraining: true,
+        appliesMatch: true,
+        templateTrainingId: defaultSignup.id,
+        templateMatchId: defaultSignup.id
+      },
+      {
+        action: "SAME_DAY_WITHDRAWAL",
+        appliesTraining: true,
+        appliesMatch: true,
+        templateTrainingId: sameDayTrainingId,
+        templateMatchId: sameDayMatchId
+      }
+    ];
+
+    for (const row of automationRules) {
+      await prisma.fineAutomationSetting.upsert({
+        where: {
+          teamId_action: {
+            teamId: team.id,
+            action: row.action
+          }
+        },
+        create: {
+          teamId: team.id,
+          action: row.action,
+          appliesTraining: row.appliesTraining,
+          appliesMatch: row.appliesMatch,
+          templateTrainingId: row.templateTrainingId,
+          templateMatchId: row.templateMatchId,
+          excludedRoles: ["SOME"],
+          isActive: true
+        },
+        update: {
+          appliesTraining: row.appliesTraining,
+          appliesMatch: row.appliesMatch,
+          templateTrainingId: row.templateTrainingId,
+          templateMatchId: row.templateMatchId
+        }
+      });
+    }
   }
 
   console.log("Seed complete", {
