@@ -9,6 +9,7 @@ vi.mock("@/lib/prisma", () => ({
 
 import { prisma } from "@/lib/prisma";
 import {
+  isPostDeadlineWithdrawal,
   isSameCalendarDayAsEvent,
   resolveAutomationTemplate,
   roleExcludedFromFineAutomation
@@ -32,6 +33,54 @@ describe("isSameCalendarDayAsEvent", () => {
     const eventDate = new Date("2026-04-16T12:00:00.000Z");
     const now = new Date("2026-04-17T12:00:00.000Z");
     expect(isSameCalendarDayAsEvent(eventDate, now, "Europe/Copenhagen")).toBe(false);
+  });
+});
+
+describe("isPostDeadlineWithdrawal", () => {
+  it("matches IN to OUT after deadline before event day", () => {
+    expect(
+      isPostDeadlineWithdrawal(
+        "IN",
+        "OUT",
+        new Date("2026-04-16T10:00:00.000Z"),
+        new Date("2026-04-15T10:00:00.000Z"),
+        new Date("2026-04-17T18:00:00.000Z")
+      )
+    ).toBe(true);
+  });
+
+  it("ignores late signups and unknown to out changes", () => {
+    expect(
+      isPostDeadlineWithdrawal(
+        null,
+        "IN",
+        new Date("2026-04-16T10:00:00.000Z"),
+        new Date("2026-04-15T10:00:00.000Z"),
+        new Date("2026-04-17T18:00:00.000Z")
+      )
+    ).toBe(false);
+
+    expect(
+      isPostDeadlineWithdrawal(
+        "UNKNOWN",
+        "OUT",
+        new Date("2026-04-16T10:00:00.000Z"),
+        new Date("2026-04-15T10:00:00.000Z"),
+        new Date("2026-04-17T18:00:00.000Z")
+      )
+    ).toBe(false);
+  });
+
+  it("excludes withdrawals on the event day", () => {
+    expect(
+      isPostDeadlineWithdrawal(
+        "IN",
+        "OUT",
+        new Date("2026-04-17T08:00:00.000Z"),
+        new Date("2026-04-15T10:00:00.000Z"),
+        new Date("2026-04-17T18:00:00.000Z")
+      )
+    ).toBe(false);
   });
 });
 

@@ -102,7 +102,7 @@ export async function POST(request: Request) {
       userId: manager.userId,
       teamId: body.teamId,
       type: "FINE_PROPOSED" as const,
-      title: "System foreslår bøde",
+      title: "Foreslået bøde",
       body:
         created === 1
           ? `${singlePlayerName ?? "En spiller"} · ${template.title} · ${template.amount} kr`

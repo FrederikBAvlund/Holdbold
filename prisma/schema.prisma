@@ -44,6 +44,11 @@ enum EventKind {
   MATCH
 }
 
+enum EventMotmPollStatus {
+  OPEN
+  CLOSED
+}
+
 enum FineStatus {
   UNPAID
   PAID_PENDING
@@ -117,6 +122,10 @@ model User {
   createdFineCollections FineCollection[] @relation("FineCollectionCreator")
   pushSubscriptions PushSubscription[]
   eventMatchPlayerStats EventMatchPlayerStat[]
+  createdEventMotmPolls EventMotmPoll[] @relation("EventMotmPollCreator")
+  eventMotmBallots EventMotmBallot[] @relation("EventMotmBallotVoter")
+  receivedEventMotmVotes EventMotmVote[] @relation("EventMotmVoteTarget")
+  wonMatchMotmEvents Event[] @relation("EventMatchMotmWinner")
 }
 
 model Team {
@@ -194,6 +203,7 @@ model Event {
   kind           EventKind    @default(TRAINING)
   matchHomeGoals Int?
   matchAwayGoals Int?
+  matchMotmUserId String?
   createdAt      DateTime     @default(now())
 
   team Team @relation(fields: [teamId], references: [id])
@@ -203,11 +213,13 @@ model Event {
   canceledBy User? @relation("EventCanceledBy", fields: [canceledById], references: [id])
   thingCarrier User? @relation("EventThingCarrier", fields: [thingCarrierId], references: [id])
   beerCarrier User? @relation("EventBeerCarrier", fields: [beerCarrierId], references: [id])
+  matchMotmUser User? @relation("EventMatchMotmWinner", fields: [matchMotmUserId], references: [id])
   signups Signup[]
   fines Fine[]
   signupLogs SignupLog[]
   eventLogs EventLog[]
   matchPlayerStats EventMatchPlayerStat[]
+  motmPolls EventMotmPoll[]
 
   @@index([teamId, date])
   @@index([teamId, kind, date])
@@ -215,6 +227,54 @@ model Event {
   @@index([canceledAt])
   @@index([thingCarrierId])
   @@index([beerCarrierId])
+  @@index([matchMotmUserId])
+}
+
+model EventMotmPoll {
+  id            String              @id @default(cuid())
+  eventId       String              @unique
+  createdById   String
+  status        EventMotmPollStatus @default(OPEN)
+  votesPerVoter Int
+  revealCount   Int
+  closedAt      DateTime?
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  event      Event              @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  createdBy  User               @relation("EventMotmPollCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  ballots    EventMotmBallot[]
+
+  @@index([status])
+}
+
+model EventMotmBallot {
+  id        String   @id @default(cuid())
+  pollId     String
+  voterId    String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  poll   EventMotmPoll   @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  voter  User            @relation("EventMotmBallotVoter", fields: [voterId], references: [id], onDelete: Cascade)
+  votes  EventMotmVote[]
+
+  @@unique([pollId, voterId])
+  @@index([pollId])
+  @@index([voterId])
+}
+
+model EventMotmVote {
+  id           String @id @default(cuid())
+  ballotId      String
+  targetUserId  String
+  weight        Int    @default(1)
+
+  ballot    EventMotmBallot @relation(fields: [ballotId], references: [id], onDelete: Cascade)
+  targetUser User           @relation("EventMotmVoteTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
+
+  @@index([ballotId])
+  @@index([targetUserId])
 }
 
 model EventMatchPlayerStat {

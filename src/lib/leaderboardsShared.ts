@@ -7,7 +7,8 @@ export const LEADERBOARD_CATEGORIES = [
   "assists",
   "fines",
   "thing_duty",
-  "beer_duty"
+  "beer_duty",
+  "motm_wins"
 ] as const;
 
 export type LeaderboardCategory = (typeof LEADERBOARD_CATEGORIES)[number];
@@ -21,7 +22,8 @@ export const LEADERBOARD_CATEGORY_LABELS_DA: Record<LeaderboardCategory, string>
   assists: "Flest assists",
   fines: "Flest bøder",
   thing_duty: "Flest ting med hjem",
-  beer_duty: "Flest øl"
+  beer_duty: "Flest øl",
+  motm_wins: "Flest kampens spiller"
 };
 
 export function isLeaderboardCategory(value: string): value is LeaderboardCategory {
