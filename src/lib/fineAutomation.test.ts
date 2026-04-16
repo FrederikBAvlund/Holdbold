@@ -123,4 +123,31 @@ describe("resolveAutomationTemplate", () => {
     const resolved = await resolveAutomationTemplate("team1", "SAME_DAY_WITHDRAWAL", "MATCH");
     expect(resolved).toBeNull();
   });
+
+  it("supports MOTM winner automation for matches", async () => {
+    vi.mocked(prisma.fineAutomationSetting.findUnique).mockResolvedValue({
+      id: "cfg",
+      teamId: "team1",
+      action: "MATCH_MOTM_WINNER",
+      appliesTraining: false,
+      appliesMatch: true,
+      templateTrainingId: null,
+      templateMatchId: "tpl-motm",
+      excludedRoles: [],
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    } as Awaited<ReturnType<typeof prisma.fineAutomationSetting.findUnique>>);
+
+    vi.mocked(prisma.fineTemplate.findFirst).mockResolvedValue({
+      id: "tpl-motm",
+      title: "Kampens spiller",
+      amount: 50,
+      description: "Fast bøde til MOTM"
+    } as Awaited<ReturnType<typeof prisma.fineTemplate.findFirst>>);
+
+    const resolved = await resolveAutomationTemplate("team1", "MATCH_MOTM_WINNER", "MATCH");
+    expect(resolved?.template.id).toBe("tpl-motm");
+    expect(resolved?.automationAction).toBe("MATCH_MOTM_WINNER");
+  });
 });

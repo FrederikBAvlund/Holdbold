@@ -61,6 +61,7 @@ enum FineAutomationAction {
   MISSED_SIGNUP_AT_DEADLINE
   STATUS_CHANGE_AFTER_DEADLINE
   SAME_DAY_WITHDRAWAL
+  MATCH_MOTM_WINNER
 }
 
 enum FineTemplateStatus {
@@ -278,11 +279,13 @@ model EventMotmVote {
 }
 
 model EventMatchPlayerStat {
-  id      String @id @default(cuid())
-  eventId String
-  userId  String
-  goals   Int    @default(0)
-  assists Int    @default(0)
+  id          String @id @default(cuid())
+  eventId     String
+  userId      String
+  goals       Int    @default(0)
+  assists     Int    @default(0)
+  yellowCards Int    @default(0)
+  redCards    Int    @default(0)
 
   event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
   user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)

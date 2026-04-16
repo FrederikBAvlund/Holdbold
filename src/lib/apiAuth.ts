@@ -10,6 +10,9 @@ const forbidden = () => NextResponse.json({ error: "Ikke adgang" }, { status: 40
 /** Trænere/admin kan oprette begivenheder og gentagelser */
 export const EVENT_MANAGER_ROLES: readonly Role[] = ["ADMIN", "TRAENER", "BOEDEKASSEFORMAND"];
 
+/** Kun admin og bødekasseformand må åbne eller nulstille MOTM-afstemninger */
+export const MOTM_MANAGER_ROLES: readonly Role[] = ["ADMIN", "BOEDEKASSEFORMAND"];
+
 /** Kun admin og bødekasse kan køre visse automations-endpoints manuelt */
 export const FINE_AUTOMATION_ROLES: readonly Role[] = ["ADMIN", "BOEDEKASSEFORMAND"];
 

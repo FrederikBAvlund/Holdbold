@@ -67,6 +67,13 @@ type EventSignup = {
   user: { id: string; name: string | null };
 };
 
+type MatchStatRowFields = {
+  goals: string;
+  assists: string;
+  yellowCards: string;
+  redCards: string;
+};
+
 type CachedEventDetails = {
   signupStatus: "IN" | "OUT" | "UNKNOWN";
   reason: string;
@@ -78,7 +85,7 @@ type CachedEventDetails = {
   eventKind?: string | null;
   editableMatchHome?: string;
   editableMatchAway?: string;
-  matchStatRows?: Record<string, { goals: string; assists: string }>;
+  matchStatRows?: Record<string, MatchStatRowFields>;
   eventSignups: EventSignup[];
   logs: SignupLog[];
   eventLogs: EventLog[];
@@ -238,6 +245,7 @@ export default function KalenderPage() {
   const canAssignLateFine = actingMember
     ? actingMember.role === "ADMIN" || actingMember.role === "BOEDEKASSEFORMAND"
     : false;
+  const canManageMotmPoll = canAssignLateFine;
   const canEditOtherSignups = canAssignLateFine;
 
   useEffect(() => {
@@ -376,7 +384,7 @@ export default function KalenderPage() {
   const [savingMatchMeta, setSavingMatchMeta] = useState(false);
   const [editableMatchHome, setEditableMatchHome] = useState("");
   const [editableMatchAway, setEditableMatchAway] = useState("");
-  const [matchStatRows, setMatchStatRows] = useState<Record<string, { goals: string; assists: string }>>({});
+  const [matchStatRows, setMatchStatRows] = useState<Record<string, MatchStatRowFields>>({});
   const [savingMatchStats, setSavingMatchStats] = useState(false);
   const [matchStatSearch, setMatchStatSearch] = useState("");
   const [showMatchStatsEditor, setShowMatchStatsEditor] = useState(false);
@@ -429,12 +437,25 @@ export default function KalenderPage() {
   };
 
   function buildMatchStatRows(
-    stats: Array<{ userId: string; goals: number; assists: number }> | undefined
+    stats:
+      | Array<{
+          userId: string;
+          goals: number;
+          assists: number;
+          yellowCards?: number;
+          redCards?: number;
+        }>
+      | undefined
   ) {
-    const rows: Record<string, { goals: string; assists: string }> = {};
+    const rows: Record<string, MatchStatRowFields> = {};
     for (const m of members) {
       const stat = stats?.find((s) => s.userId === m.user.id);
-      rows[m.user.id] = { goals: String(stat?.goals ?? 0), assists: String(stat?.assists ?? 0) };
+      rows[m.user.id] = {
+        goals: String(stat?.goals ?? 0),
+        assists: String(stat?.assists ?? 0),
+        yellowCards: String(stat?.yellowCards ?? 0),
+        redCards: String(stat?.redCards ?? 0)
+      };
     }
     return rows;
   }
@@ -443,7 +464,13 @@ export default function KalenderPage() {
     kind?: string | null;
     matchHomeGoals?: number | null;
     matchAwayGoals?: number | null;
-    matchPlayerStats?: Array<{ userId: string; goals: number; assists: number }>;
+    matchPlayerStats?: Array<{
+      userId: string;
+      goals: number;
+      assists: number;
+      yellowCards?: number;
+      redCards?: number;
+    }>;
   }) {
     setDraftEventKind(apiEvent.kind === "MATCH" ? "MATCH" : "TRAINING");
     setEditableMatchHome(apiEvent.matchHomeGoals != null ? String(apiEvent.matchHomeGoals) : "");
@@ -529,7 +556,7 @@ export default function KalenderPage() {
           return next;
         });
       }
-      if (lastMotmPollStatusRef.current === "OPEN" && nextPoll.status === "CLOSED") {
+      if (lastMotmPollStatusRef.current === "OPEN" && nextPoll.status === "CLOSED" && nextPoll.isCreator) {
         openMotmReveal({
           eventTitle,
           revealRows: nextPoll.revealRows.map((row) => ({
@@ -579,7 +606,7 @@ export default function KalenderPage() {
   }
 
   async function openMotmPoll() {
-    if (!eventIdForSignup || !canManageEvents) return;
+    if (!eventIdForSignup || !canManageMotmPoll) return;
     const votesParsed = Math.max(1, Math.min(10, parseInt(motmVotesPerVoterDraft, 10) || 1));
     const revealParsed = Math.max(1, Math.min(10, parseInt(motmRevealCountDraft, 10) || 1));
     setMotmSubmitting(true);
@@ -634,7 +661,7 @@ export default function KalenderPage() {
   }
 
   async function closeMotmPoll() {
-    if (!eventIdForSignup || !canManageEvents || !motmPoll) return;
+    if (!eventIdForSignup || !motmPoll || !motmPoll.isCreator) return;
     if (motmVoteTotal > 0 && motmVoteTotal !== motmPoll.votesPerVoter) {
       pushToast(
         "Fordel alle dine stemmer, eller sæt alle tilbage til 0, før du lukker afstemningen.",
@@ -668,6 +695,33 @@ export default function KalenderPage() {
       applyMotmResponse(data, revealTitle, { syncDraft: true });
       closeEventModal();
       pushToast("Afstemning lukket", "success");
+    } finally {
+      setMotmSubmitting(false);
+    }
+  }
+
+  async function resetMotmPoll() {
+    if (!eventIdForSignup || !canManageMotmPoll || !motmPoll) return;
+    if (
+      !window.confirm(
+        motmPoll.status === "CLOSED"
+          ? "Nulstil MOTM-afstemningen? Det sletter den gemte vinder og alle tilhørende stemmer."
+          : "Nulstil MOTM-afstemningen? Det sletter alle afgivne stemmer."
+      )
+    ) {
+      return;
+    }
+    setMotmSubmitting(true);
+    try {
+      const response = await fetch(`/api/events/${eventIdForSignup}/motm-poll`, { method: "DELETE" });
+      const data = await response.json();
+      if (!response.ok) {
+        pushToast(data.error ?? "Kunne ikke nulstille afstemning", "error");
+        return;
+      }
+      applyMotmResponse(data, selectedEvent?.title ?? "Kampens spiller", { syncDraft: true });
+      setMotmVoteDraft({});
+      pushToast("MOTM-afstemning nulstillet", "success");
     } finally {
       setMotmSubmitting(false);
     }
@@ -846,7 +900,25 @@ export default function KalenderPage() {
         setDraftEventKind(cachedDetails.eventKind === "MATCH" ? "MATCH" : "TRAINING");
         setEditableMatchHome(cachedDetails.editableMatchHome ?? "");
         setEditableMatchAway(cachedDetails.editableMatchAway ?? "");
-        setMatchStatRows(cachedDetails.matchStatRows ?? {});
+        {
+          const rawRows = cachedDetails.matchStatRows ?? {};
+          setMatchStatRows(
+            Object.fromEntries(
+              members.map((m) => {
+                const r = rawRows[m.user.id];
+                return [
+                  m.user.id,
+                  {
+                    goals: r?.goals ?? "0",
+                    assists: r?.assists ?? "0",
+                    yellowCards: r?.yellowCards ?? "0",
+                    redCards: r?.redCards ?? "0"
+                  }
+                ];
+              })
+            )
+          );
+        }
         setEventSignups(cachedDetails.eventSignups);
         setLogs(cachedDetails.logs);
         setEventLogs(canManageEvents ? cachedDetails.eventLogs : []);
@@ -931,7 +1003,15 @@ export default function KalenderPage() {
         editableMatchAway:
           statusData.event?.matchAwayGoals != null ? String(statusData.event.matchAwayGoals) : "",
         matchStatRows: buildMatchStatRows(
-          statusData.event?.matchPlayerStats as Array<{ userId: string; goals: number; assists: number }> | undefined
+          statusData.event?.matchPlayerStats as
+            | Array<{
+                userId: string;
+                goals: number;
+                assists: number;
+                yellowCards?: number;
+                redCards?: number;
+              }>
+            | undefined
         ),
         eventSignups: signupsData.signups ?? [],
         logs: logData.logs ?? [],
@@ -1183,7 +1263,9 @@ export default function KalenderPage() {
     const matchPlayerStats = members.map((m) => ({
       userId: m.user.id,
       goals: Math.max(0, parseInt(matchStatRows[m.user.id]?.goals ?? "0", 10) || 0),
-      assists: Math.max(0, parseInt(matchStatRows[m.user.id]?.assists ?? "0", 10) || 0)
+      assists: Math.max(0, parseInt(matchStatRows[m.user.id]?.assists ?? "0", 10) || 0),
+      yellowCards: Math.max(0, parseInt(matchStatRows[m.user.id]?.yellowCards ?? "0", 10) || 0),
+      redCards: Math.max(0, parseInt(matchStatRows[m.user.id]?.redCards ?? "0", 10) || 0)
     }));
     setSavingMatchStats(true);
     try {
@@ -1437,10 +1519,14 @@ export default function KalenderPage() {
       .map((member) => {
         const goals = Math.max(0, parseInt(matchStatRows[member.user.id]?.goals ?? "0", 10) || 0);
         const assists = Math.max(0, parseInt(matchStatRows[member.user.id]?.assists ?? "0", 10) || 0);
-        if (goals === 0 && assists === 0) return null;
+        const yellowCards = Math.max(0, parseInt(matchStatRows[member.user.id]?.yellowCards ?? "0", 10) || 0);
+        const redCards = Math.max(0, parseInt(matchStatRows[member.user.id]?.redCards ?? "0", 10) || 0);
+        if (goals === 0 && assists === 0 && yellowCards === 0 && redCards === 0) return null;
         const parts: string[] = [];
         if (goals > 0) parts.push(`${goals}x mål`);
         if (assists > 0) parts.push(`${assists}x assist${assists === 1 ? "" : "s"}`);
+        if (yellowCards > 0) parts.push(`${yellowCards}x gult kort`);
+        if (redCards > 0) parts.push(`${redCards}x rødt kort`);
         return { userId: member.user.id, name: member.user.name ?? "Ukendt", summary: parts.join(" · ") };
       })
       .filter((entry): entry is { userId: string; name: string; summary: string } => Boolean(entry));
@@ -2155,7 +2241,7 @@ export default function KalenderPage() {
               ) : null}
               {isMatchEvent && eventIdForSignup && !selectedEvent.canceledAt ? (
                 <CollapsibleCard
-                  title="Kampresultat"
+                  title="Kampresultat og statistik"
                   storageKey="event-modal-match-result"
                   defaultOpen={!isMobile}
                   className="order-8"
@@ -2202,11 +2288,11 @@ export default function KalenderPage() {
                   </div>
                   <div className="mt-4 space-y-2">
                     <p className="text-xs font-medium text-ink/70">
-                      Mål og assists
+                      Mål, assists og kort
                     </p>
                     <div className="rounded-xl border border-ink/10 bg-white/70 px-3 py-2.5">
                       {matchStatSummaryEntries.length === 0 ? (
-                        <p className="text-sm text-ink/60">Ingen registrerede mål eller assists endnu.</p>
+                        <p className="text-sm text-ink/60">Ingen registrerede mål, assists eller kort endnu.</p>
                       ) : (
                         <ul className="space-y-1.5">
                           {matchStatSummaryEntries.map((entry) => (
@@ -2225,7 +2311,7 @@ export default function KalenderPage() {
                         className="btn-primary w-full sm:w-auto sm:min-w-[12rem]"
                         onClick={() => setShowMatchStatsEditor(true)}
                       >
-                        Rediger mål og assists
+                        Rediger mål, assists og kort
                       </button>
                     </div>
                   ) : null}
@@ -2246,10 +2332,10 @@ export default function KalenderPage() {
                       <span className="font-semibold text-ink">Kampens spiller:</span> {motmWinner.name}
                     </p>
                   ) : null}
-                  {!motmPoll && canManageEvents ? (
+                  {!motmPoll && canManageMotmPoll ? (
                     <div className="mt-3 space-y-3">
                       <p className="text-xs text-ink/60">
-                        Fordel stemmer på holdkammerater. Alle aktive spillere kan stemme, når afstemningen er åben.
+                        Kun admin og bødekasseformand kan åbne en afstemning. Alle aktive spillere kan stemme, når den er åben.
                       </p>
                       <div className="grid gap-3 sm:grid-cols-2">
                         <div className="space-y-2">
@@ -2319,7 +2405,7 @@ export default function KalenderPage() {
                           Brug + og − til at fordele i alt {motmPoll.votesPerVoter} stemmer. Tryk{" "}
                           <span className="font-semibold">Gem stemme</span> for at gemme til serveren med det samme.
                         </p>
-                        {canManageEvents ? (
+                      {motmPoll.isCreator ? (
                           <p className="text-xs text-ink/55">
                             Lukker du afstemningen selv, gemmes dine egne stemmer automatisk, hvis du allerede har fordelt alle
                             stemmer.
@@ -2374,26 +2460,62 @@ export default function KalenderPage() {
                           </button>
                         </div>
                       </div>
-                      {canManageEvents ? (
-                        <button type="button" className="btn-ghost w-full sm:w-auto" onClick={closeMotmPoll} disabled={motmSubmitting}>
-                          {motmSubmitting ? "Lukker..." : "Luk afstemning og vis resultat"}
-                        </button>
-                      ) : null}
+                      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                        {motmPoll.isCreator ? (
+                          <button
+                            type="button"
+                            className="btn-ghost w-full sm:w-auto"
+                            onClick={closeMotmPoll}
+                            disabled={motmSubmitting}
+                          >
+                            {motmSubmitting ? "Lukker..." : "Luk afstemning og vis resultat"}
+                          </button>
+                        ) : null}
+                        {canManageMotmPoll ? (
+                          <button
+                            type="button"
+                            className="btn-ghost w-full sm:w-auto"
+                            onClick={resetMotmPoll}
+                            disabled={motmSubmitting}
+                          >
+                            {motmSubmitting ? "Nulstiller..." : "Nulstil afstemning"}
+                          </button>
+                        ) : null}
+                      </div>
                     </div>
                   ) : null}
-                  {motmPoll?.status === "CLOSED" && motmPoll.scoreboard.length > 0 ? (
-                    <div className="mt-3">
-                      <p className="text-xs font-semibold text-ink/70">Resultat</p>
-                      <ul className="mt-2 space-y-1 text-sm text-ink/80">
-                        {motmPoll.scoreboard.map((row) => (
-                          <li key={row.userId} className="flex items-center justify-between gap-3">
-                            <span>
-                              <span className="font-semibold text-ink/60">{row.rank}.</span> {row.name}
-                            </span>
-                            <span className="font-semibold text-ink">{row.votes}</span>
-                          </li>
-                        ))}
-                      </ul>
+                  {motmPoll?.status === "CLOSED" ? (
+                    <div className="mt-3 space-y-3">
+                      {motmPoll.isCreator && motmPoll.scoreboard.length > 0 ? (
+                        <div>
+                          <p className="text-xs font-semibold text-ink/70">Resultat</p>
+                          <ul className="mt-2 space-y-1 text-sm text-ink/80">
+                            {motmPoll.scoreboard.map((row) => (
+                              <li key={row.userId} className="flex items-center justify-between gap-3">
+                                <span>
+                                  <span className="font-semibold text-ink/60">{row.rank}.</span> {row.name}
+                                </span>
+                                <span className="font-semibold text-ink">{row.votes}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : null}
+                      {motmPoll.isCreator ? null : (
+                        <p className="text-xs text-ink/60">
+                          Kun personen der åbnede afstemningen kan se den fulde resultatliste.
+                        </p>
+                      )}
+                      {canManageMotmPoll ? (
+                        <button
+                          type="button"
+                          className="btn-ghost w-full sm:w-auto"
+                          onClick={resetMotmPoll}
+                          disabled={motmSubmitting}
+                        >
+                          {motmSubmitting ? "Nulstiller..." : "Nulstil afstemning"}
+                        </button>
+                      ) : null}
                     </div>
                   ) : null}
                 </CollapsibleCard>
@@ -2928,7 +3050,7 @@ export default function KalenderPage() {
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="label">Kampresultat</p>
-                  <h4 className="mt-1 text-base font-semibold text-ink">Mål og assists</h4>
+                  <h4 className="mt-1 text-base font-semibold text-ink">Mål, assists og kort</h4>
                 </div>
                 <button
                   type="button"
@@ -2961,7 +3083,7 @@ export default function KalenderPage() {
                       className="rounded-xl border border-ink/10 bg-white/70 p-2.5 text-sm"
                     >
                       <span className="mb-2 block font-medium text-ink">{member.user.name ?? "Ukendt"}</span>
-                      <div className="grid grid-cols-2 gap-2">
+                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                         <div className="flex items-center gap-1">
                           <label className="sr-only" htmlFor={`modal-g-${member.user.id}`}>
                             Mål
@@ -2978,7 +3100,9 @@ export default function KalenderPage() {
                                 ...prev,
                                 [member.user.id]: {
                                   goals: event.target.value,
-                                  assists: prev[member.user.id]?.assists ?? "0"
+                                  assists: prev[member.user.id]?.assists ?? "0",
+                                  yellowCards: prev[member.user.id]?.yellowCards ?? "0",
+                                  redCards: prev[member.user.id]?.redCards ?? "0"
                                 }
                               }))
                             }
@@ -3000,7 +3124,57 @@ export default function KalenderPage() {
                                 ...prev,
                                 [member.user.id]: {
                                   goals: prev[member.user.id]?.goals ?? "0",
-                                  assists: event.target.value
+                                  assists: event.target.value,
+                                  yellowCards: prev[member.user.id]?.yellowCards ?? "0",
+                                  redCards: prev[member.user.id]?.redCards ?? "0"
+                                }
+                              }))
+                            }
+                          />
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <label className="sr-only" htmlFor={`modal-yc-${member.user.id}`}>
+                            Gule kort
+                          </label>
+                          <span className="text-xs text-ink/55">Gul</span>
+                          <input
+                            id={`modal-yc-${member.user.id}`}
+                            type="number"
+                            min={0}
+                            className="input min-h-0 h-10 w-full px-2 py-1 text-center"
+                            value={matchStatRows[member.user.id]?.yellowCards ?? "0"}
+                            onChange={(event) =>
+                              setMatchStatRows((prev) => ({
+                                ...prev,
+                                [member.user.id]: {
+                                  goals: prev[member.user.id]?.goals ?? "0",
+                                  assists: prev[member.user.id]?.assists ?? "0",
+                                  yellowCards: event.target.value,
+                                  redCards: prev[member.user.id]?.redCards ?? "0"
+                                }
+                              }))
+                            }
+                          />
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <label className="sr-only" htmlFor={`modal-rc-${member.user.id}`}>
+                            Røde kort
+                          </label>
+                          <span className="text-xs text-ink/55">Rød</span>
+                          <input
+                            id={`modal-rc-${member.user.id}`}
+                            type="number"
+                            min={0}
+                            className="input min-h-0 h-10 w-full px-2 py-1 text-center"
+                            value={matchStatRows[member.user.id]?.redCards ?? "0"}
+                            onChange={(event) =>
+                              setMatchStatRows((prev) => ({
+                                ...prev,
+                                [member.user.id]: {
+                                  goals: prev[member.user.id]?.goals ?? "0",
+                                  assists: prev[member.user.id]?.assists ?? "0",
+                                  yellowCards: prev[member.user.id]?.yellowCards ?? "0",
+                                  redCards: event.target.value
                                 }
                               }))
                             }

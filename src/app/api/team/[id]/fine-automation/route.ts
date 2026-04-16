@@ -8,7 +8,8 @@ const roleEnum = z.enum(["ADMIN", "TRAENER", "SPILLER", "SOME", "BOEDEKASSEFORMA
 const actionEnum = z.enum([
   "MISSED_SIGNUP_AT_DEADLINE",
   "STATUS_CHANGE_AFTER_DEADLINE",
-  "SAME_DAY_WITHDRAWAL"
+  "SAME_DAY_WITHDRAWAL",
+  "MATCH_MOTM_WINNER"
 ]);
 
 const ruleInputSchema = z
@@ -38,7 +39,7 @@ const ruleInputSchema = z
   });
 
 const patchSchema = z.object({
-  rules: z.array(ruleInputSchema).min(1).max(3)
+  rules: z.array(ruleInputSchema).min(1).max(4)
 });
 
 export async function GET(_request: Request, { params }: { params: { id: string } }) {
