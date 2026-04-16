@@ -4,7 +4,11 @@ import { z } from "zod";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { createNotifications } from "@/lib/notifications";
-import { getOrCreateMissedSignupTemplate } from "@/lib/autoFines";
+import {
+  isSameCalendarDayAsEvent,
+  resolveAutomationTemplate,
+  roleExcludedFromFineAutomation
+} from "@/lib/fineAutomation";
 
 const bodySchema = z.object({
   userId: z.string().min(1),
@@ -74,6 +78,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
       teamId: true,
       title: true,
       date: true,
+      kind: true,
       signupDeadline: true
     }
   });
@@ -120,6 +125,11 @@ export async function POST(request: Request, { params }: { params: { id: string 
     return NextResponse.json({ error: "Spiller ikke fundet på holdet" }, { status: 404 });
   }
 
+  const targetUser = await prisma.user.findUnique({
+    where: { id: body.userId },
+    select: { name: true }
+  });
+
   const existingSignup = await prisma.signup.findUnique({
     where: {
       eventId_userId: {
@@ -164,10 +174,6 @@ export async function POST(request: Request, { params }: { params: { id: string 
   });
 
   if (!isOwnSignup) {
-    const targetUser = await prisma.user.findUnique({
-      where: { id: body.userId },
-      select: { name: true }
-    });
     await prisma.eventLog.create({
       data: {
         eventId: event.id,
@@ -180,19 +186,40 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
   const deadlinePassed = new Date(event.signupDeadline).getTime() <= Date.now();
   const wasMemberAtDeadline = targetMembership.createdAt <= event.signupDeadline;
-  if (deadlinePassed && wasMemberAtDeadline && (body.status === "IN" || body.status === "OUT")) {
-    if (targetMembership.role !== "SOME") {
-      const existingFine = await prisma.fine.findFirst({
-        where: {
-          teamId: event.teamId,
-          eventId: event.id,
-          userId: body.userId
-        },
-        select: { id: true }
-      });
+  const isEventDay = isSameCalendarDayAsEvent(new Date(event.date));
+  const isSameDayWithdrawal =
+    body.status === "OUT" &&
+    wasMemberAtDeadline &&
+    isEventDay;
 
-      if (!existingFine) {
-        const template = await getOrCreateMissedSignupTemplate(event.teamId);
+  const shouldProposeAfterDeadlineFine =
+    deadlinePassed &&
+    wasMemberAtDeadline &&
+    (body.status === "IN" || body.status === "OUT") &&
+    !isEventDay &&
+    !isSameDayWithdrawal;
+
+  if (shouldProposeAfterDeadlineFine || isSameDayWithdrawal) {
+    const automationAction = isSameDayWithdrawal
+      ? ("SAME_DAY_WITHDRAWAL" as const)
+      : ("STATUS_CHANGE_AFTER_DEADLINE" as const);
+
+    const existingFine = await prisma.fine.findFirst({
+      where: {
+        teamId: event.teamId,
+        eventId: event.id,
+        userId: body.userId
+      },
+      select: { id: true }
+    });
+
+    if (!existingFine) {
+      const resolved = await resolveAutomationTemplate(event.teamId, automationAction, event.kind);
+      if (
+        resolved &&
+        !roleExcludedFromFineAutomation(targetMembership.role, resolved.excludedRoles)
+      ) {
+        const template = resolved.template;
         await prisma.fine.create({
           data: {
             teamId: event.teamId,
@@ -204,7 +231,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
             description: template.description ?? null,
             status: "FORESLAET",
             createdById: null,
-            createdByLabel: "System"
+            createdByLabel: "System",
+            automationAction: resolved.automationAction
           }
         });
 
@@ -224,7 +252,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
             teamId: event.teamId,
             type: "FINE_PROPOSED" as const,
             title: "System foreslår bøde",
-            body: `${template.title} · ${template.amount} kr (${event.title})`,
+            body: `${targetUser?.name ?? "En spiller"} · ${template.title} · ${template.amount} kr (${event.title})`,
             link: "/dashboard/boder"
           }));
 

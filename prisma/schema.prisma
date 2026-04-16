@@ -52,8 +52,10 @@ enum FineStatus {
   AFVIST
 }
 
-enum FineTrigger {
-  MISSED_DEADLINE
+enum FineAutomationAction {
+  MISSED_SIGNUP_AT_DEADLINE
+  STATUS_CHANGE_AFTER_DEADLINE
+  SAME_DAY_WITHDRAWAL
 }
 
 enum FineTemplateStatus {
@@ -102,7 +104,6 @@ model User {
   canceledEvents Event[]     @relation("EventCanceledBy")
   eventsWithThingDuty Event[] @relation("EventThingCarrier")
   eventsWithBeerDuty Event[]  @relation("EventBeerCarrier")
-  createdFineRules FineRule[]
   createdFineTemplates FineTemplate[]
   approvedFineTemplates FineTemplate[] @relation("FineTemplateApprover")
   rejectedFineTemplates FineTemplate[] @relation("FineTemplateRejecter")
@@ -129,8 +130,8 @@ model Team {
   memberships Membership[]
   eventSeries EventSeries[]
   events      Event[]
-  fineRules   FineRule[]
   fineTemplates FineTemplate[]
+  fineAutomationSettings FineAutomationSetting[]
   fineCollections FineCollection[]
   fines       Fine[]
   icalFeeds   IcalFeed[]
@@ -313,20 +314,6 @@ model PushSubscription {
   @@index([userId])
 }
 
-model FineRule {
-  id        String      @id @default(cuid())
-  teamId    String
-  name      String
-  amount    Int
-  trigger   FineTrigger @default(MISSED_DEADLINE)
-  isActive  Boolean     @default(true)
-  createdById String?
-  createdAt DateTime    @default(now())
-
-  team Team @relation(fields: [teamId], references: [id])
-  createdBy User? @relation(fields: [createdById], references: [id])
-}
-
 model Fine {
   id            String     @id @default(cuid())
   teamId        String
@@ -346,6 +333,7 @@ model Fine {
   approvedById  String?
   rejectedAt    DateTime?
   rejectedById  String?
+  automationAction FineAutomationAction?
 
   team Team @relation(fields: [teamId], references: [id])
   user User @relation("FineRecipient", fields: [userId], references: [id])
@@ -380,10 +368,33 @@ model FineTemplate {
   rejectedBy User? @relation("FineTemplateRejecter", fields: [rejectedById], references: [id])
   fines Fine[]
   fineCollections FineCollection[]
+  fineAutomationTrainingTemplates FineAutomationSetting[] @relation("FineAutomationTemplateTraining")
+  fineAutomationMatchTemplates FineAutomationSetting[] @relation("FineAutomationTemplateMatch")
 
   @@index([teamId])
   @@index([teamId, status])
   @@index([teamId, category])
+}
+
+model FineAutomationSetting {
+  id                   String               @id @default(cuid())
+  teamId               String
+  action               FineAutomationAction
+  appliesTraining      Boolean              @default(false)
+  appliesMatch         Boolean              @default(false)
+  templateTrainingId   String?
+  templateMatchId      String?
+  excludedRoles        Role[]               @default([SOME])
+  isActive             Boolean              @default(true)
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+
+  team               Team          @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  templateTraining   FineTemplate? @relation("FineAutomationTemplateTraining", fields: [templateTrainingId], references: [id], onDelete: Restrict)
+  templateMatch      FineTemplate? @relation("FineAutomationTemplateMatch", fields: [templateMatchId], references: [id], onDelete: Restrict)
+
+  @@unique([teamId, action])
+  @@index([teamId, action])
 }
 
 model FineCollection {

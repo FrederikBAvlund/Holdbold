@@ -54,5 +54,5 @@ export function fineStatusMeta(status: string) {
 }
 
 export function canDeleteFine(status: string) {
-  return ["UNPAID", "PAID_PENDING", "FORESLAET", "AFVIST"].includes(status);
+  return ["UNPAID", "PAID_PENDING", "AFVIST"].includes(status);
 }

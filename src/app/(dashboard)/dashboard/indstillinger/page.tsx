@@ -10,6 +10,10 @@ import { CollapsibleCard } from "@/components/CollapsibleCard";
 import LoadingButton from "@/components/LoadingButton";
 import { invalidateDashboardTeam } from "@/components/DashboardTeamProvider";
 import { clearMeClientCache } from "@/lib/meClientCache";
+import {
+  fetchFineAutomationCached,
+  primeFineAutomationCache
+} from "@/lib/fineAutomationClientCache";
 
 type Membership = {
   role: string;
@@ -47,6 +51,44 @@ const statusLabels: Record<string, string> = {
   ACTIVE: "Aktiv",
   PENDING: "Afventer"
 };
+
+const FINE_AUTOMATION_ACTIONS = [
+  {
+    action: "MISSED_SIGNUP_AT_DEADLINE" as const,
+    label: "Manglende svar ved/efter deadline",
+    hint: "Gælder spillere uden svar efter tilmeldingsfrist."
+  },
+  {
+    action: "STATUS_CHANGE_AFTER_DEADLINE" as const,
+    label: "Ændring af status efter deadline",
+    hint: "Når nogen sætter svar efter fristen er passeret."
+  },
+  {
+    action: "SAME_DAY_WITHDRAWAL" as const,
+    label: "Afbud på begivenhedsdag",
+    hint: "Når nogen melder fra på begivenhedens dag."
+  }
+] as const;
+
+const FINE_AUTOMATION_ROLE_KEYS = ["ADMIN", "TRAENER", "SPILLER", "SOME", "BOEDEKASSEFORMAND"] as const;
+
+type FineAutomationRuleDraft = {
+  appliesTraining: boolean;
+  appliesMatch: boolean;
+  templateTrainingId: string;
+  templateMatchId: string;
+  excludedRoles: string[];
+};
+
+function emptyFineAutomationRuleDraft(): FineAutomationRuleDraft {
+  return {
+    appliesTraining: false,
+    appliesMatch: false,
+    templateTrainingId: "",
+    templateMatchId: "",
+    excludedRoles: ["SOME"]
+  };
+}
 
 const presets = [
   { id: "atlantic", label: "Atlantic" },
@@ -110,6 +152,14 @@ export default function IndstillingerPage() {
   const [themeApplyingId, setThemeApplyingId] = useState<string | null>(null);
   const [memberActionSubmitting, setMemberActionSubmitting] = useState<"approve" | "updateRole" | "delete" | null>(null);
   const [pendingApprovalNotice, setPendingApprovalNotice] = useState(false);
+  const [fineAutomationTemplates, setFineAutomationTemplates] = useState<
+    Array<{ id: string; title: string; amount: number; category: string }>
+  >([]);
+  const [fineAutomationRules, setFineAutomationRules] = useState<
+    Record<string, FineAutomationRuleDraft>
+  >({});
+  const [fineAutomationLoading, setFineAutomationLoading] = useState(false);
+  const [fineAutomationSaving, setFineAutomationSaving] = useState(false);
 
   useEffect(() => {
     setTeamId(getStoredTeamId());
@@ -234,6 +284,55 @@ export default function IndstillingerPage() {
 
     loadIcalFeeds();
   }, [teamId]);
+
+  useEffect(() => {
+    const membership = memberships.find((item) => item.team.id === teamId);
+    const canFine =
+      membership?.role === "ADMIN" || membership?.role === "BOEDEKASSEFORMAND";
+    if (!teamId || !canFine) return;
+
+    let cancelled = false;
+    (async () => {
+      setFineAutomationLoading(true);
+      try {
+        const result = await fetchFineAutomationCached(teamId);
+        const data = result.data ?? {};
+        if (!result.ok) {
+          if (!cancelled) {
+            pushToast(data.error ?? "Kunne ikke hente automatiske bøder", "error");
+          }
+          return;
+        }
+        const rules: Record<string, FineAutomationRuleDraft> = {};
+        for (const def of FINE_AUTOMATION_ACTIONS) {
+          const saved = (data.rules ?? []).find(
+            (item: { action: string }) => item.action === def.action
+          );
+          rules[def.action] = saved
+            ? {
+                appliesTraining: Boolean(saved.appliesTraining),
+                appliesMatch: Boolean(saved.appliesMatch),
+                templateTrainingId: saved.templateTrainingId ?? "",
+                templateMatchId: saved.templateMatchId ?? "",
+                excludedRoles: Array.isArray(saved.excludedRoles) ? saved.excludedRoles : ["SOME"]
+              }
+            : emptyFineAutomationRuleDraft();
+        }
+        if (!cancelled) {
+          setFineAutomationTemplates(data.templates ?? []);
+          setFineAutomationRules(rules);
+        }
+      } finally {
+        if (!cancelled) {
+          setFineAutomationLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [teamId, memberships, pushToast]);
 
   async function handleTheme(theme: string) {
     if (themeApplyingId) return;
@@ -383,8 +482,74 @@ export default function IndstillingerPage() {
     }
   }
 
+  async function handleSaveFineAutomation() {
+    if (!teamId) return;
+    const membership = memberships.find((item) => item.team.id === teamId);
+    if (membership?.role !== "ADMIN" && membership?.role !== "BOEDEKASSEFORMAND") return;
+
+    for (const def of FINE_AUTOMATION_ACTIONS) {
+      const draft = fineAutomationRules[def.action] ?? emptyFineAutomationRuleDraft();
+      if (draft.appliesTraining && !draft.templateTrainingId) {
+        pushToast(`Vælg skabelon for træning: ${def.label}`, "error");
+        return;
+      }
+      if (draft.appliesMatch && !draft.templateMatchId) {
+        pushToast(`Vælg skabelon for kamp: ${def.label}`, "error");
+        return;
+      }
+    }
+
+    const rules = FINE_AUTOMATION_ACTIONS.map((def) => {
+      const draft = fineAutomationRules[def.action] ?? emptyFineAutomationRuleDraft();
+      return {
+        action: def.action,
+        appliesTraining: draft.appliesTraining,
+        appliesMatch: draft.appliesMatch,
+        templateTrainingId: draft.appliesTraining ? draft.templateTrainingId : null,
+        templateMatchId: draft.appliesMatch ? draft.templateMatchId : null,
+        excludedRoles: draft.excludedRoles
+      };
+    });
+
+    setFineAutomationSaving(true);
+    try {
+      const response = await fetch(`/api/team/${teamId}/fine-automation`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rules })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        pushToast(data.error ?? "Kunne ikke gemme automatisering", "error");
+        return;
+      }
+      primeFineAutomationCache(teamId, data);
+      pushToast("Automatiske bødeforslag gemt", "success");
+      const next: Record<string, FineAutomationRuleDraft> = {};
+      for (const def of FINE_AUTOMATION_ACTIONS) {
+        const saved = (data.rules ?? []).find(
+          (item: { action: string }) => item.action === def.action
+        );
+        next[def.action] = saved
+          ? {
+              appliesTraining: Boolean(saved.appliesTraining),
+              appliesMatch: Boolean(saved.appliesMatch),
+              templateTrainingId: saved.templateTrainingId ?? "",
+              templateMatchId: saved.templateMatchId ?? "",
+              excludedRoles: Array.isArray(saved.excludedRoles) ? saved.excludedRoles : ["SOME"]
+            }
+          : emptyFineAutomationRuleDraft();
+      }
+      setFineAutomationRules(next);
+    } finally {
+      setFineAutomationSaving(false);
+    }
+  }
+
   const currentMembership = memberships.find((item) => item.team.id === teamId);
   const isAdmin = currentMembership?.role === "ADMIN";
+  const canManageFineAutomation =
+    currentMembership?.role === "ADMIN" || currentMembership?.role === "BOEDEKASSEFORMAND";
   const inviteSlug = currentMembership?.team.slug ?? "";
   const passwordValidationMessage =
     newPassword && newPassword.length < 6
@@ -825,6 +990,183 @@ export default function IndstillingerPage() {
       <CollapsibleCard title="Push-notifikationer" storageKey={`holdbold:settings:${session.user.id}:push`}>
         <PushSettings />
       </CollapsibleCard>
+
+      {canManageFineAutomation && teamId ? (
+        <CollapsibleCard
+          title="Automatiske bødeforslag"
+          description="Slå træning og/eller kamp til for hver — når en type er aktiv, skal du vælge en godkendt skabelon for den."
+          storageKey={`holdbold:settings:${session.user.id}:fine-auto:${teamId}`}
+        >
+          {fineAutomationLoading ? (
+            <p className="text-sm text-ink/60">Henter indstillinger…</p>
+          ) : fineAutomationTemplates.length === 0 ? (
+            <p className="text-sm text-ink/60">
+              Opret mindst én godkendt bødeskabelon under Bøder, før automatisering kan konfigureres.
+            </p>
+          ) : (
+            <div className="space-y-6">
+              {FINE_AUTOMATION_ACTIONS.map((def) => {
+                const draft = fineAutomationRules[def.action] ?? emptyFineAutomationRuleDraft();
+                return (
+                  <CollapsibleCard
+                    key={def.action}
+                    title={def.label}
+                    description={def.hint}
+                    storageKey={`holdbold:settings:${session.user.id}:fine-auto:${teamId}:${def.action}`}
+                    className="border border-ink/10 bg-white/80"
+                    surface="card-soft"
+                    titleClassName="text-sm font-semibold text-ink"
+                    descriptionClassName="mt-1 text-xs text-ink/60"
+                  >
+                    <p className="label">Begivenhedstype</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setFineAutomationRules((prev) => {
+                            const cur = prev[def.action] ?? emptyFineAutomationRuleDraft();
+                            const nextOn = !cur.appliesTraining;
+                            return {
+                              ...prev,
+                              [def.action]: {
+                                ...cur,
+                                appliesTraining: nextOn,
+                                templateTrainingId: nextOn ? cur.templateTrainingId : ""
+                              }
+                            };
+                          })
+                        }
+                        className={`rounded-full border px-4 py-2 text-sm font-semibold ${
+                          draft.appliesTraining
+                            ? "border-moss bg-moss/15 text-ink"
+                            : "border-ink/15 bg-white/60 text-ink/70"
+                        }`}
+                      >
+                        Træning {draft.appliesTraining ? "· til" : "· fra"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setFineAutomationRules((prev) => {
+                            const cur = prev[def.action] ?? emptyFineAutomationRuleDraft();
+                            const nextOn = !cur.appliesMatch;
+                            return {
+                              ...prev,
+                              [def.action]: {
+                                ...cur,
+                                appliesMatch: nextOn,
+                                templateMatchId: nextOn ? cur.templateMatchId : ""
+                              }
+                            };
+                          })
+                        }
+                        className={`rounded-full border px-4 py-2 text-sm font-semibold ${
+                          draft.appliesMatch
+                            ? "border-moss bg-moss/15 text-ink"
+                            : "border-ink/15 bg-white/60 text-ink/70"
+                        }`}
+                      >
+                        Kamp {draft.appliesMatch ? "· til" : "· fra"}
+                      </button>
+                    </div>
+                    {draft.appliesTraining ? (
+                      <div className="mt-4">
+                        <label className="label" htmlFor={`fine-auto-train-${def.action}`}>
+                          Bødeskabelon · træning
+                        </label>
+                        <select
+                          id={`fine-auto-train-${def.action}`}
+                          className="input mt-1"
+                          value={draft.templateTrainingId}
+                          onChange={(event) =>
+                            setFineAutomationRules((prev) => {
+                              const cur = prev[def.action] ?? emptyFineAutomationRuleDraft();
+                              return {
+                                ...prev,
+                                [def.action]: { ...cur, templateTrainingId: event.target.value }
+                              };
+                            })
+                          }
+                        >
+                          <option value="">Vælg skabelon</option>
+                          {fineAutomationTemplates.map((template) => (
+                            <option key={template.id} value={template.id}>
+                              {template.title} · {template.amount} kr
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    ) : null}
+                    {draft.appliesMatch ? (
+                      <div className="mt-4">
+                        <label className="label" htmlFor={`fine-auto-match-${def.action}`}>
+                          Bødeskabelon · kamp
+                        </label>
+                        <select
+                          id={`fine-auto-match-${def.action}`}
+                          className="input mt-1"
+                          value={draft.templateMatchId}
+                          onChange={(event) =>
+                            setFineAutomationRules((prev) => {
+                              const cur = prev[def.action] ?? emptyFineAutomationRuleDraft();
+                              return {
+                                ...prev,
+                                [def.action]: { ...cur, templateMatchId: event.target.value }
+                              };
+                            })
+                          }
+                        >
+                          <option value="">Vælg skabelon</option>
+                          {fineAutomationTemplates.map((template) => (
+                            <option key={template.id} value={template.id}>
+                              {template.title} · {template.amount} kr
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    ) : null}
+                    <p className="mt-4 text-xs font-semibold text-ink/80">Undtag roller</p>
+                    <div className="mt-2 flex flex-wrap gap-3">
+                      {FINE_AUTOMATION_ROLE_KEYS.map((role) => (
+                        <label key={`${def.action}-${role}`} className="flex items-center gap-2 text-sm text-ink">
+                          <input
+                            type="checkbox"
+                            checked={draft.excludedRoles.includes(role)}
+                            onChange={() => {
+                              setFineAutomationRules((prev) => {
+                                const current = prev[def.action] ?? emptyFineAutomationRuleDraft();
+                                const next = new Set(current.excludedRoles);
+                                if (next.has(role)) next.delete(role);
+                                else next.add(role);
+                                return {
+                                  ...prev,
+                                  [def.action]: {
+                                    ...current,
+                                    excludedRoles: Array.from(next)
+                                  }
+                                };
+                              });
+                            }}
+                          />
+                          {roleLabels[role] ?? role}
+                        </label>
+                      ))}
+                    </div>
+                  </CollapsibleCard>
+                );
+              })}
+              <LoadingButton
+                type="button"
+                className="btn-primary w-full sm:w-auto"
+                onClick={handleSaveFineAutomation}
+                isLoading={fineAutomationSaving}
+                idleContent="Gem automatisering"
+                loadingContent="Gemmer…"
+              />
+            </div>
+          )}
+        </CollapsibleCard>
+      ) : null}
 
       <div className="grid w-full min-w-0 gap-6 lg:grid-cols-2">
         <CollapsibleCard
