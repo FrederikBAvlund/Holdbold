@@ -18,7 +18,9 @@ const updateSchema = z.object({
       z.object({
         userId: z.string().min(1),
         goals: z.number().int().min(0),
-        assists: z.number().int().min(0)
+        assists: z.number().int().min(0),
+        yellowCards: z.number().int().min(0),
+        redCards: z.number().int().min(0)
       })
     )
     .optional()
@@ -215,14 +217,22 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
     if (wantsPlayerStatsUpdate && effectiveKind === "MATCH" && body.matchPlayerStats) {
       await tx.eventMatchPlayerStat.deleteMany({ where: { eventId: event.id } });
-      const rows = body.matchPlayerStats.filter((s) => s.goals > 0 || s.assists > 0);
+      const rows = body.matchPlayerStats.filter(
+        (s) =>
+          s.goals > 0 ||
+          s.assists > 0 ||
+          s.yellowCards > 0 ||
+          s.redCards > 0
+      );
       if (rows.length > 0) {
         await tx.eventMatchPlayerStat.createMany({
           data: rows.map((s) => ({
             eventId: event.id,
             userId: s.userId,
             goals: s.goals,
-            assists: s.assists
+            assists: s.assists,
+            yellowCards: s.yellowCards,
+            redCards: s.redCards
           }))
         });
       }

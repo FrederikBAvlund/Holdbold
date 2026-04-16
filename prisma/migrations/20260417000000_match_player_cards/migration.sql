@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "EventMatchPlayerStat" ADD COLUMN "yellowCards" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "EventMatchPlayerStat" ADD COLUMN "redCards" INTEGER NOT NULL DEFAULT 0;

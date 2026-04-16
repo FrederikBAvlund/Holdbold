@@ -82,9 +82,6 @@ export function buildMotmPollApiView(
   canManage: boolean
 ): MotmPollApiView {
   const tallies = buildScoreRowsFromPollBallots(poll.ballots);
-  const scoreboard = poll.status === "CLOSED" ? tallies : [];
-  const revealRows = poll.status === "CLOSED" ? buildRevealRows(tallies, poll.revealCount) : [];
-  const winner = poll.status === "CLOSED" ? winnerFromRows(tallies) : null;
   const myBallot = poll.ballots.find((ballot) => ballot.voterId === viewerUserId);
   const myVotes = (myBallot?.votes ?? [])
     .map((vote) => ({ userId: vote.targetUser.id, weight: vote.weight }))
@@ -93,6 +90,9 @@ export function buildMotmPollApiView(
       return a.userId.localeCompare(b.userId);
     });
   const isCreator = poll.createdById === viewerUserId;
+  const scoreboard = poll.status === "CLOSED" && isCreator ? tallies : [];
+  const revealRows = poll.status === "CLOSED" && isCreator ? buildRevealRows(tallies, poll.revealCount) : [];
+  const winner = poll.status === "CLOSED" && isCreator ? winnerFromRows(tallies) : null;
 
   return {
     id: poll.id,

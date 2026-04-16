@@ -72,7 +72,32 @@ describe("buildMotmPollApiView", () => {
     expect(view.winner).toBeNull();
   });
 
-  it("shows scoreboard after close", () => {
+  it("shows scoreboard after close for the creator", () => {
+    const view = buildMotmPollApiView(
+      {
+        id: "poll1",
+        createdById: "admin",
+        status: "CLOSED",
+        votesPerVoter: 1,
+        revealCount: 2,
+        closedAt: baseDate,
+        ballots: [
+          {
+            voterId: "v1",
+            createdAt: baseDate,
+            voter: { id: "v1", name: "V1" },
+            votes: [{ weight: 1, targetUser: { id: "p1", name: "Spiller 1", image: null } }]
+          }
+        ]
+      },
+      "admin",
+      false
+    );
+    expect(view.scoreboard.length).toBe(1);
+    expect(view.winner?.userId).toBe("p1");
+  });
+
+  it("hides detailed results from non-creators after close", () => {
     const view = buildMotmPollApiView(
       {
         id: "poll1",
@@ -93,7 +118,8 @@ describe("buildMotmPollApiView", () => {
       "v1",
       false
     );
-    expect(view.scoreboard.length).toBe(1);
-    expect(view.winner?.userId).toBe("p1");
+    expect(view.scoreboard).toEqual([]);
+    expect(view.revealRows).toEqual([]);
+    expect(view.winner).toBeNull();
   });
 });

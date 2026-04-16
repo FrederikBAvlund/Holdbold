@@ -103,7 +103,7 @@ async function attendanceStreaks(teamId: string, kind: EventKind, memberIds: Set
 
 async function sumPlayerStats(
   teamId: string,
-  field: "goals" | "assists",
+  field: "goals" | "assists" | "yellowCards" | "redCards",
   memberIds: Set<string>
 ) {
   const now = new Date();
@@ -250,6 +250,10 @@ async function valuesForCategory(
       return sumPlayerStats(teamId, "goals", memberIds);
     case "assists":
       return sumPlayerStats(teamId, "assists", memberIds);
+    case "yellow_cards":
+      return sumPlayerStats(teamId, "yellowCards", memberIds);
+    case "red_cards":
+      return sumPlayerStats(teamId, "redCards", memberIds);
     case "fines":
       return fineSeasonDebtTotals(teamId, memberIds);
     case "thing_duty":

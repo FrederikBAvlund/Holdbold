@@ -56,17 +56,34 @@ const FINE_AUTOMATION_ACTIONS = [
   {
     action: "MISSED_SIGNUP_AT_DEADLINE" as const,
     label: "Manglende svar ved/efter deadline",
-    hint: "Gælder spillere uden svar efter tilmeldingsfrist."
+    hint: "Gælder spillere uden svar efter tilmeldingsfrist.",
+    supportsTraining: true,
+    supportsMatch: true,
+    supportsExcludedRoles: true
   },
   {
     action: "STATUS_CHANGE_AFTER_DEADLINE" as const,
     label: "Afbud efter deadline",
-    hint: "Når nogen går fra tilmeldt til frameldt efter fristen, men før begivenhedsdagen."
+    hint: "Når nogen går fra tilmeldt til frameldt efter fristen, men før begivenhedsdagen.",
+    supportsTraining: true,
+    supportsMatch: true,
+    supportsExcludedRoles: true
   },
   {
     action: "SAME_DAY_WITHDRAWAL" as const,
     label: "Afbud på begivenhedsdag",
-    hint: "Når nogen melder fra på begivenhedens dag."
+    hint: "Når nogen melder fra på begivenhedens dag.",
+    supportsTraining: true,
+    supportsMatch: true,
+    supportsExcludedRoles: true
+  },
+  {
+    action: "MATCH_MOTM_WINNER" as const,
+    label: "Kampens spiller",
+    hint: "Foreslå automatisk en bøde til vinderen, når MOTM-afstemningen lukkes.",
+    supportsTraining: false,
+    supportsMatch: true,
+    supportsExcludedRoles: false
   }
 ] as const;
 
@@ -489,11 +506,11 @@ export default function IndstillingerPage() {
 
     for (const def of FINE_AUTOMATION_ACTIONS) {
       const draft = fineAutomationRules[def.action] ?? emptyFineAutomationRuleDraft();
-      if (draft.appliesTraining && !draft.templateTrainingId) {
+      if (def.supportsTraining && draft.appliesTraining && !draft.templateTrainingId) {
         pushToast(`Vælg skabelon for træning: ${def.label}`, "error");
         return;
       }
-      if (draft.appliesMatch && !draft.templateMatchId) {
+      if (def.supportsMatch && draft.appliesMatch && !draft.templateMatchId) {
         pushToast(`Vælg skabelon for kamp: ${def.label}`, "error");
         return;
       }
@@ -503,11 +520,11 @@ export default function IndstillingerPage() {
       const draft = fineAutomationRules[def.action] ?? emptyFineAutomationRuleDraft();
       return {
         action: def.action,
-        appliesTraining: draft.appliesTraining,
-        appliesMatch: draft.appliesMatch,
-        templateTrainingId: draft.appliesTraining ? draft.templateTrainingId : null,
-        templateMatchId: draft.appliesMatch ? draft.templateMatchId : null,
-        excludedRoles: draft.excludedRoles
+        appliesTraining: def.supportsTraining ? draft.appliesTraining : false,
+        appliesMatch: def.supportsMatch ? draft.appliesMatch : false,
+        templateTrainingId: def.supportsTraining && draft.appliesTraining ? draft.templateTrainingId : null,
+        templateMatchId: def.supportsMatch && draft.appliesMatch ? draft.templateMatchId : null,
+        excludedRoles: def.supportsExcludedRoles ? draft.excludedRoles : []
       };
     });
 
@@ -1018,58 +1035,63 @@ export default function IndstillingerPage() {
                     titleClassName="text-sm font-semibold text-ink"
                     descriptionClassName="mt-1 text-xs text-ink/60"
                   >
-                    <p className="label">Begivenhedstype</p>
+                    <p className="label">{def.supportsTraining ? "Begivenhedstype" : "Aktivering"}</p>
                     <div className="mt-2 flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setFineAutomationRules((prev) => {
-                            const cur = prev[def.action] ?? emptyFineAutomationRuleDraft();
-                            const nextOn = !cur.appliesTraining;
-                            return {
-                              ...prev,
-                              [def.action]: {
-                                ...cur,
-                                appliesTraining: nextOn,
-                                templateTrainingId: nextOn ? cur.templateTrainingId : ""
-                              }
-                            };
-                          })
-                        }
-                        className={`rounded-full border px-4 py-2 text-sm font-semibold ${
-                          draft.appliesTraining
-                            ? "border-moss bg-moss/15 text-ink"
-                            : "border-ink/15 bg-white/60 text-ink/70"
-                        }`}
-                      >
-                        Træning {draft.appliesTraining ? "· til" : "· fra"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setFineAutomationRules((prev) => {
-                            const cur = prev[def.action] ?? emptyFineAutomationRuleDraft();
-                            const nextOn = !cur.appliesMatch;
-                            return {
-                              ...prev,
-                              [def.action]: {
-                                ...cur,
-                                appliesMatch: nextOn,
-                                templateMatchId: nextOn ? cur.templateMatchId : ""
-                              }
-                            };
-                          })
-                        }
-                        className={`rounded-full border px-4 py-2 text-sm font-semibold ${
-                          draft.appliesMatch
-                            ? "border-moss bg-moss/15 text-ink"
-                            : "border-ink/15 bg-white/60 text-ink/70"
-                        }`}
-                      >
-                        Kamp {draft.appliesMatch ? "· til" : "· fra"}
-                      </button>
+                      {def.supportsTraining ? (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setFineAutomationRules((prev) => {
+                              const cur = prev[def.action] ?? emptyFineAutomationRuleDraft();
+                              const nextOn = !cur.appliesTraining;
+                              return {
+                                ...prev,
+                                [def.action]: {
+                                  ...cur,
+                                  appliesTraining: nextOn,
+                                  templateTrainingId: nextOn ? cur.templateTrainingId : ""
+                                }
+                              };
+                            })
+                          }
+                          className={`rounded-full border px-4 py-2 text-sm font-semibold ${
+                            draft.appliesTraining
+                              ? "border-moss bg-moss/15 text-ink"
+                              : "border-ink/15 bg-white/60 text-ink/70"
+                          }`}
+                        >
+                          Træning {draft.appliesTraining ? "· til" : "· fra"}
+                        </button>
+                      ) : null}
+                      {def.supportsMatch ? (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setFineAutomationRules((prev) => {
+                              const cur = prev[def.action] ?? emptyFineAutomationRuleDraft();
+                              const nextOn = !cur.appliesMatch;
+                              return {
+                                ...prev,
+                                [def.action]: {
+                                  ...cur,
+                                  appliesMatch: nextOn,
+                                  templateMatchId: nextOn ? cur.templateMatchId : ""
+                                }
+                              };
+                            })
+                          }
+                          className={`rounded-full border px-4 py-2 text-sm font-semibold ${
+                            draft.appliesMatch
+                              ? "border-moss bg-moss/15 text-ink"
+                              : "border-ink/15 bg-white/60 text-ink/70"
+                          }`}
+                        >
+                          {def.supportsTraining ? "Kamp" : "Aktiveret ved kamp"}
+                          {draft.appliesMatch ? " · til" : " · fra"}
+                        </button>
+                      ) : null}
                     </div>
-                    {draft.appliesTraining ? (
+                    {def.supportsTraining && draft.appliesTraining ? (
                       <div className="mt-4">
                         <label className="label" htmlFor={`fine-auto-train-${def.action}`}>
                           Bødeskabelon · træning
@@ -1097,10 +1119,10 @@ export default function IndstillingerPage() {
                         </select>
                       </div>
                     ) : null}
-                    {draft.appliesMatch ? (
+                    {def.supportsMatch && draft.appliesMatch ? (
                       <div className="mt-4">
                         <label className="label" htmlFor={`fine-auto-match-${def.action}`}>
-                          Bødeskabelon · kamp
+                          {def.supportsTraining ? "Bødeskabelon · kamp" : "Bødeskabelon"}
                         </label>
                         <select
                           id={`fine-auto-match-${def.action}`}
@@ -1125,33 +1147,37 @@ export default function IndstillingerPage() {
                         </select>
                       </div>
                     ) : null}
-                    <p className="mt-4 text-xs font-semibold text-ink/80">Undtag roller</p>
-                    <div className="mt-2 flex flex-wrap gap-3">
-                      {FINE_AUTOMATION_ROLE_KEYS.map((role) => (
-                        <label key={`${def.action}-${role}`} className="flex items-center gap-2 text-sm text-ink">
-                          <input
-                            type="checkbox"
-                            checked={draft.excludedRoles.includes(role)}
-                            onChange={() => {
-                              setFineAutomationRules((prev) => {
-                                const current = prev[def.action] ?? emptyFineAutomationRuleDraft();
-                                const next = new Set(current.excludedRoles);
-                                if (next.has(role)) next.delete(role);
-                                else next.add(role);
-                                return {
-                                  ...prev,
-                                  [def.action]: {
-                                    ...current,
-                                    excludedRoles: Array.from(next)
-                                  }
-                                };
-                              });
-                            }}
-                          />
-                          {roleLabels[role] ?? role}
-                        </label>
-                      ))}
-                    </div>
+                    {def.supportsExcludedRoles ? (
+                      <>
+                        <p className="mt-4 text-xs font-semibold text-ink/80">Undtag roller</p>
+                        <div className="mt-2 flex flex-wrap gap-3">
+                          {FINE_AUTOMATION_ROLE_KEYS.map((role) => (
+                            <label key={`${def.action}-${role}`} className="flex items-center gap-2 text-sm text-ink">
+                              <input
+                                type="checkbox"
+                                checked={draft.excludedRoles.includes(role)}
+                                onChange={() => {
+                                  setFineAutomationRules((prev) => {
+                                    const current = prev[def.action] ?? emptyFineAutomationRuleDraft();
+                                    const next = new Set(current.excludedRoles);
+                                    if (next.has(role)) next.delete(role);
+                                    else next.add(role);
+                                    return {
+                                      ...prev,
+                                      [def.action]: {
+                                        ...current,
+                                        excludedRoles: Array.from(next)
+                                      }
+                                    };
+                                  });
+                                }}
+                              />
+                              {roleLabels[role] ?? role}
+                            </label>
+                          ))}
+                        </div>
+                      </>
+                    ) : null}
                   </CollapsibleCard>
                 );
               })}

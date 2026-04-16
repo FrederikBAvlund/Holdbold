@@ -1,5 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { longestAttendanceStreak } from "./leaderboardsShared";
+import {
+  LEADERBOARD_CATEGORIES,
+  LEADERBOARD_CATEGORY_LABELS_DA,
+  longestAttendanceStreak
+} from "./leaderboardsShared";
+
+describe("leaderboard categories", () => {
+  it("has a Danish label for every category", () => {
+    for (const category of LEADERBOARD_CATEGORIES) {
+      expect(LEADERBOARD_CATEGORY_LABELS_DA[category]).toBeTruthy();
+    }
+  });
+});
 
 describe("longestAttendanceStreak", () => {
   it("returns 0 when no events", () => {
