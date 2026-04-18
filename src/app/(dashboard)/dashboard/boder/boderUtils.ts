@@ -47,6 +47,18 @@ export function fineStatusMeta(status: string) {
       className: "bg-green-100 text-green-700"
     };
   }
+  if (status === "FORESLAET") {
+    return {
+      label: "Foreslået",
+      className: "bg-amber-100 text-amber-800"
+    };
+  }
+  if (status === "AFVIST") {
+    return {
+      label: "Afvist",
+      className: "bg-red-100 text-red-700"
+    };
+  }
   return {
     label: status,
     className: "bg-ink/10 text-ink/70"

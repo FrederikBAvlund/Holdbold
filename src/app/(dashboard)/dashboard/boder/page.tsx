@@ -190,7 +190,6 @@ export default function BoderPage() {
     const totals = new Map<string, { name: string; total: number }>();
 
     for (const member of members) {
-      if (member.role !== "SPILLER") continue;
       totals.set(member.user.id, { name: member.user.name ?? "Ukendt", total: 0 });
     }
 
@@ -221,9 +220,16 @@ export default function BoderPage() {
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }, [selectedDebtorUserId, teamFines]);
   const selectedDebtorName = useMemo(() => {
-    if (!selectedDebtorUserId) return "Spiller";
-    return rankedDebtors.find((debtor) => debtor.id === selectedDebtorUserId)?.name ?? "Spiller";
+    if (!selectedDebtorUserId) return "Medlem";
+    return rankedDebtors.find((debtor) => debtor.id === selectedDebtorUserId)?.name ?? "Medlem";
   }, [rankedDebtors, selectedDebtorUserId]);
+
+  const fineHistoryLast14Days = useMemo(() => {
+    const cutoff = Date.now() - 14 * 24 * 60 * 60 * 1000;
+    return teamFines
+      .filter((fine) => new Date(fine.createdAt).getTime() >= cutoff)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }, [teamFines]);
 
   async function handleCreateTemplate(event: React.FormEvent) {
     event.preventDefault();
@@ -1025,12 +1031,12 @@ export default function BoderPage() {
 
       <CollapsibleCard
         title="Top skyldnere"
-        description="Samlet bødebeløb pr. spiller."
+        description="Samlet bødebeløb pr. medlem."
         storageKey={`holdbold:boder:${teamId}:${userId}:top-skyldnere`}
         right={
           <div className="flex flex-wrap items-center gap-2">
             <span className="rounded-full bg-ink/10 px-3 py-1 text-xs font-semibold text-ink/60">
-              {rankedDebtors.length} spillere
+              {rankedDebtors.length} medlemmer
             </span>
             <span className="rounded-full bg-ember/10 px-3 py-1 text-xs font-semibold text-ember">
               Samlet: {totalAcrossDebtors} kr
@@ -1042,7 +1048,7 @@ export default function BoderPage() {
           <table className="w-full text-sm">
             <thead className="bg-ink/5 text-left">
               <tr>
-                <th className="px-4 py-3">Spiller</th>
+                <th className="px-4 py-3">Medlem</th>
                 <th className="px-4 py-3 text-right">Total</th>
               </tr>
             </thead>
@@ -1217,6 +1223,79 @@ export default function BoderPage() {
         </div>
       </CollapsibleCard>
 
+      <CollapsibleCard
+        title="Historik"
+        description="Seneste 14 dages bøder."
+        storageKey={`holdbold:boder:${teamId}:${userId}:historik`}
+        right={
+          fineHistoryLast14Days.length > 0 ? (
+            <span className="rounded-full bg-ink/10 px-3 py-1 text-xs font-semibold text-ink/60">
+              {fineHistoryLast14Days.length} registreringer
+            </span>
+          ) : null
+        }
+      >
+        {fineHistoryLast14Days.length === 0 ? (
+          <p className="text-sm text-ink/60">Ingen bøder de seneste 14 dage.</p>
+        ) : (
+          <div className="space-y-3">
+            {fineHistoryLast14Days.map((fine) => {
+              const status = fineStatusMeta(fine.status);
+              const proposedBy = creatorLabel(fine);
+              const approverName =
+                fine.approvedBy?.name ?? (fine.approvedById ? memberNameById.get(fine.approvedById) : null);
+              const rejectedByName = fine.rejectedById ? memberNameById.get(fine.rejectedById) : null;
+              return (
+                <div key={fine.id} className="rounded-2xl border border-ink/10 bg-white/90 p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-ink">{fine.reason}</p>
+                      {fine.description ? <p className="mt-0.5 text-xs text-ink/60">{fine.description}</p> : null}
+                      <ul className="mt-2 space-y-1 text-xs text-ink/70">
+                        <li>
+                          <span className="font-medium text-ink/80">Modtager:</span> {fine.user?.name ?? "—"}
+                        </li>
+                        <li>
+                          <span className="font-medium text-ink/80">Foreslået af:</span> {proposedBy}
+                        </li>
+                        {fine.status === "FORESLAET" ? (
+                          <li>
+                            <span className="font-medium text-ink/80">Godkendt af:</span> Afventer
+                          </li>
+                        ) : fine.status === "AFVIST" ? (
+                          <li>
+                            <span className="font-medium text-ink/80">Afvist af:</span> {rejectedByName ?? "Ukendt"}
+                          </li>
+                        ) : (
+                          <li>
+                            <span className="font-medium text-ink/80">Godkendt af:</span> {approverName ?? "—"}
+                          </li>
+                        )}
+                      </ul>
+                      {fine.event ? <FineEventLink event={fine.event} /> : null}
+                      <p className="mt-2 text-xs text-ink/55">
+                        {new Date(fine.createdAt).toLocaleString("da-DK", {
+                          dateStyle: "short",
+                          timeStyle: "short"
+                        })}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 flex-col items-end gap-2">
+                      <span className={`text-sm font-semibold ${fineAmountClass(fine.amount)}`}>
+                        {formatFineKr(fine.amount)}
+                      </span>
+                      <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${status.className}`}>
+                        {status.label}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </CollapsibleCard>
+
       {showPayModal ? (
         <div className="modal-backdrop" onClick={() => setShowPayModal(false)}>
           <div className="modal-panel max-w-lg" onClick={(event) => event.stopPropagation()}>
@@ -1344,7 +1423,7 @@ export default function BoderPage() {
             <div className="flex items-start justify-between">
               <div>
                 <h3 className="text-lg font-semibold text-ink">{selectedDebtorName} · bøder</h3>
-                <p className="mt-2 text-sm text-ink/70">Alle registrerede bøder for spilleren.</p>
+                <p className="mt-2 text-sm text-ink/70">Alle registrerede bøder for medlemmet.</p>
               </div>
               <button className="btn-ghost" onClick={() => setSelectedDebtorUserId(null)}>
                 Luk
