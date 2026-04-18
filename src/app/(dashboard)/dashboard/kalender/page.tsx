@@ -13,6 +13,12 @@ import "@fullcalendar/common/main.css";
 import "@fullcalendar/daygrid/main.css";
 import { useDashboardTeam, type DashboardTeamMember } from "@/components/DashboardTeamProvider";
 import { CollapsibleCard } from "@/components/CollapsibleCard";
+import {
+  DutyWheelModal,
+  type DutyWheelAppliedPayload,
+  type DutyWheelNextEvent
+} from "@/components/DutyWheelModal";
+import { DutyWheelOpenIcon } from "@/components/DutyWheelOpenIcon";
 
 type CalendarEvent = {
   id: string;
@@ -381,6 +387,12 @@ export default function KalenderPage() {
   const [editableDeadlineAt, setEditableDeadlineAt] = useState("");
   const [editableThingCarrierId, setEditableThingCarrierId] = useState("");
   const [editableBeerCarrierId, setEditableBeerCarrierId] = useState("");
+  const [dutyWheelKind, setDutyWheelKind] = useState<"thing" | "beer" | null>(null);
+  const [dutyWheelMeta, setDutyWheelMeta] = useState<{
+    beerPreviouslyUserIds: string[];
+    nextEvent: DutyWheelNextEvent | null;
+  } | null>(null);
+  const [dutyWheelOpening, setDutyWheelOpening] = useState(false);
   const [savingMatchMeta, setSavingMatchMeta] = useState(false);
   const [editableMatchHome, setEditableMatchHome] = useState("");
   const [editableMatchAway, setEditableMatchAway] = useState("");
@@ -490,6 +502,9 @@ export default function KalenderPage() {
   function closeEventModal() {
     setShowCancelConfirm(false);
     setShowMatchStatsEditor(false);
+    setDutyWheelKind(null);
+    setDutyWheelMeta(null);
+    setDutyWheelOpening(false);
     setSelectedEvent(null);
     setEventIdForSignup(null);
     setMotmPoll(null);
@@ -497,6 +512,73 @@ export default function KalenderPage() {
     setMotmVoteDraft({});
     setMotmLoading(false);
     lastMotmPollStatusRef.current = null;
+  }
+
+  async function openDutyWheelForEvent(kind: "thing" | "beer") {
+    if (!eventIdForSignup) return;
+    setDutyWheelOpening(true);
+    try {
+      const response = await fetch(`/api/events/${eventIdForSignup}/duty-wheel`, { cache: "no-store" });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        pushToast(typeof data.error === "string" ? data.error : "Kunne ikke åbne hjulet", "error");
+        return;
+      }
+      const nextRaw = data.nextEvent;
+      const nextEvent: DutyWheelNextEvent | null =
+        nextRaw &&
+        typeof nextRaw.id === "string" &&
+        typeof nextRaw.title === "string" &&
+        typeof nextRaw.date === "string" &&
+        typeof nextRaw.kind === "string"
+          ? {
+              id: nextRaw.id,
+              title: nextRaw.title,
+              date: nextRaw.date,
+              kind: nextRaw.kind
+            }
+          : null;
+      setDutyWheelMeta({
+        beerPreviouslyUserIds: Array.isArray(data.beerPreviouslyUserIds) ? data.beerPreviouslyUserIds : [],
+        nextEvent
+      });
+      setDutyWheelKind(kind);
+    } finally {
+      setDutyWheelOpening(false);
+    }
+  }
+
+  function handleDutyWheelApplied(payload: DutyWheelAppliedPayload) {
+    eventDetailsCacheRef.current.delete(payload.targetEventId);
+    setEvents((prev) =>
+      prev.map((item) =>
+        item.id === payload.targetEventId
+          ? {
+              ...item,
+              ...(payload.field === "thingCarrierId"
+                ? { thingCarrierId: payload.userId }
+                : { beerCarrierId: payload.userId })
+            }
+          : item
+      )
+    );
+    setSelectedEvent((prev) =>
+      prev && prev.id === payload.targetEventId
+        ? {
+            ...prev,
+            ...(payload.field === "thingCarrierId"
+              ? { thingCarrierId: payload.userId }
+              : { beerCarrierId: payload.userId })
+          }
+        : prev
+    );
+    if (payload.targetEventId === eventIdForSignup) {
+      if (payload.field === "thingCarrierId") {
+        setEditableThingCarrierId(payload.userId);
+      } else {
+        setEditableBeerCarrierId(payload.userId);
+      }
+    }
   }
 
   function motmOpenPollFingerprint(poll: MotmPoll) {
@@ -2531,9 +2613,21 @@ export default function KalenderPage() {
                 >
                   <div className="mt-5 grid gap-5 sm:grid-cols-2">
                     <div className="flex min-w-0 flex-col gap-2.5">
-                      <label className="text-xs font-medium text-ink/70" htmlFor="thing-carrier">
-                        Tingene
-                      </label>
+                      <div className="flex items-center justify-between gap-2">
+                        <label className="text-xs font-medium text-ink/70" htmlFor="thing-carrier">
+                          Tingene
+                        </label>
+                        <button
+                          type="button"
+                          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-control border border-ink/15 bg-white/80 text-ink/80 hover:border-ink/25 hover:bg-white"
+                          aria-label="Træk lod om tingene"
+                          title="Træk lod"
+                          disabled={dutyWheelOpening || eventDetailsLoading || Boolean(selectedEvent?.canceledAt)}
+                          onClick={() => void openDutyWheelForEvent("thing")}
+                        >
+                          <DutyWheelOpenIcon className="h-[22px] w-[22px]" />
+                        </button>
+                      </div>
                       <select
                         id="thing-carrier"
                         className="input"
@@ -2549,9 +2643,21 @@ export default function KalenderPage() {
                       </select>
                     </div>
                     <div className="flex min-w-0 flex-col gap-2.5">
-                      <label className="text-xs font-medium text-ink/70" htmlFor="beer-carrier">
-                        Øl
-                      </label>
+                      <div className="flex items-center justify-between gap-2">
+                        <label className="text-xs font-medium text-ink/70" htmlFor="beer-carrier">
+                          Øl
+                        </label>
+                        <button
+                          type="button"
+                          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-control border border-ink/15 bg-white/80 text-ink/80 hover:border-ink/25 hover:bg-white"
+                          aria-label="Træk lod om øl"
+                          title="Træk lod"
+                          disabled={dutyWheelOpening || eventDetailsLoading || Boolean(selectedEvent?.canceledAt)}
+                          onClick={() => void openDutyWheelForEvent("beer")}
+                        >
+                          <DutyWheelOpenIcon className="h-[22px] w-[22px]" />
+                        </button>
+                      </div>
                       <select
                         id="beer-carrier"
                         className="input"
@@ -3209,6 +3315,22 @@ export default function KalenderPage() {
               </div>
             </div>
           </div>
+        ) : null}
+        {dutyWheelKind && dutyWheelMeta && eventIdForSignup ? (
+          <DutyWheelModal
+            kind={dutyWheelKind}
+            eventId={eventIdForSignup}
+            members={members}
+            signups={eventSignups}
+            beerPreviouslyUserIds={dutyWheelMeta.beerPreviouslyUserIds}
+            nextEvent={dutyWheelMeta.nextEvent}
+            onClose={() => {
+              setDutyWheelKind(null);
+              setDutyWheelMeta(null);
+            }}
+            onApplied={handleDutyWheelApplied}
+            showToast={(message, variant) => pushToast(message, variant)}
+          />
         ) : null}
         </>
       ) : null}
