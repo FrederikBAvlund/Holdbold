@@ -49,6 +49,16 @@ export type LeaderboardTop = {
   value: number;
 };
 
+/** Kategorier hvor dashboard-sammenfatning viser alle, der deler 1. pladsen ved samme tal. */
+export const LEADERBOARD_TIE_SUMMARY_CATEGORIES: readonly LeaderboardCategory[] = [
+  "goals",
+  "assists",
+  "yellow_cards",
+  "red_cards",
+  "fines",
+  "motm_wins"
+] as const;
+
 /** Longest consecutive stretch of events where user had signup IN (missing/OUT/UNKNOWN breaks). */
 export function longestAttendanceStreak(
   eventIdsOrdered: string[],

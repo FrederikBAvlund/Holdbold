@@ -39,11 +39,12 @@ type Occurrence = {
 type FineItem = { amount: number };
 
 type DashboardSnapshot = {
+  todayEvents: CalendarEvent[];
   nextEvents: CalendarEvent[];
   eventCounts: Record<string, { in: number; out: number; missing: number }>;
   memberCount: number;
   totalFines: number;
-  leaderboardSummary: Record<LeaderboardCategory, LeaderboardTop | null> | null;
+  leaderboardSummary: Record<LeaderboardCategory, LeaderboardTop[]> | null;
   updatedAt: number;
 };
 
@@ -57,17 +58,26 @@ function formatLeaderboardMetric(category: LeaderboardCategory, value: number): 
   return String(value);
 }
 
+function isSameLocalCalendarDay(a: Date, b: Date) {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
 export default function DashboardHome() {
   const router = useRouter();
   const { data: session, status: sessionStatus } = useSession();
   const { teamId, userId, members } = useDashboardTeam();
   const memberCount = members.length;
+  const [todayEvents, setTodayEvents] = useState<CalendarEvent[]>([]);
   const [nextEvents, setNextEvents] = useState<CalendarEvent[]>([]);
   const [eventCounts, setEventCounts] = useState<Record<string, { in: number; out: number; missing: number }>>({});
   const [totalFines, setTotalFines] = useState(0);
   const [leaderboardSummary, setLeaderboardSummary] = useState<Record<
     LeaderboardCategory,
-    LeaderboardTop | null
+    LeaderboardTop[]
   > | null>(null);
   const [loadingNextEvents, setLoadingNextEvents] = useState(true);
   const [loadingFines, setLoadingFines] = useState(true);
@@ -81,13 +91,13 @@ export default function DashboardHome() {
   const storagePrefix = `${DASHBOARD_CARDS_STORAGE_KEY}:${teamId}:${userId ?? "anon"}`;
   const collapseAllCards = () => {
     if (typeof window === "undefined") return;
-    const keys = ["welcome", "nextEvents", "fines", "leaderboards"];
+    const keys = ["welcome", "todayEvents", "nextEvents", "fines", "leaderboards"];
     keys.forEach((key) => window.localStorage.setItem(`${storagePrefix}:${key}`, "0"));
     setCollapseVersion((prev) => prev + 1);
   };
   const expandAllCards = () => {
     if (typeof window === "undefined") return;
-    const keys = ["welcome", "nextEvents", "fines", "leaderboards"];
+    const keys = ["welcome", "todayEvents", "nextEvents", "fines", "leaderboards"];
     keys.forEach((key) => window.localStorage.setItem(`${storagePrefix}:${key}`, "1"));
     setCollapseVersion((prev) => prev + 1);
   };
@@ -100,12 +110,18 @@ export default function DashboardHome() {
 
     const cached = dashboardCache.get(key);
     if (!cached) return;
-    if (!("leaderboardSummary" in cached)) {
+    if (!("leaderboardSummary" in cached) || !("todayEvents" in cached)) {
+      dashboardCache.delete(key);
+      return;
+    }
+    const lb = cached.leaderboardSummary;
+    if (lb && lb.goals != null && !Array.isArray(lb.goals)) {
       dashboardCache.delete(key);
       return;
     }
 
     skipNextCacheWriteRef.current = true;
+    setTodayEvents(cached.todayEvents);
     setNextEvents(cached.nextEvents);
     setEventCounts(cached.eventCounts);
     setTotalFines(cached.totalFines);
@@ -126,11 +142,12 @@ export default function DashboardHome() {
 
       try {
         const now = new Date();
+        const rangeStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
         const end = new Date(now);
         end.setDate(end.getDate() + 90);
 
         const response = await fetch(
-          `/api/calendar?teamId=${teamId}&start=${now.toISOString()}&end=${end.toISOString()}&userId=${userId}`
+          `/api/calendar?teamId=${teamId}&start=${rangeStart.toISOString()}&end=${end.toISOString()}&userId=${userId}`
         );
         if (!response.ok) return;
         const data = await response.json();
@@ -142,7 +159,7 @@ export default function DashboardHome() {
           ...occ,
           date: typeof occ.date === "string" ? occ.date : new Date(occ.date).toISOString()
         }));
-        const upcoming = [
+        const merged = [
           ...events.map((item) => ({ ...item })),
           ...occurrences.map((item) => ({
             id: item.id,
@@ -156,14 +173,21 @@ export default function DashboardHome() {
             signupDeadline: null,
             signupStatus: null
           }))
-        ]
-          .filter((item) => new Date(item.date) >= now)
-          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        ].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-        const firstTwo = upcoming.slice(0, 2);
+        const todayList = merged.filter((item) => isSameLocalCalendarDay(new Date(item.date), now));
+        const upcomingList = merged.filter(
+          (item) =>
+            new Date(item.date).getTime() >= now.getTime() &&
+            !isSameLocalCalendarDay(new Date(item.date), now)
+        );
+
+        setTodayEvents(todayList);
+        const firstTwo = upcomingList.slice(0, 2);
         setNextEvents(firstTwo);
 
-        if (firstTwo.length === 0) {
+        const forCounts = [...todayList, ...firstTwo];
+        if (forCounts.length === 0) {
           setEventCounts({});
           return;
         }
@@ -174,7 +198,7 @@ export default function DashboardHome() {
 
         const nextCounts: Record<string, { in: number; out: number; missing: number }> = {};
         await Promise.all(
-          firstTwo.map(async (eventItem) => {
+          forCounts.map(async (eventItem) => {
             if (eventItem.id.startsWith("series:")) {
               nextCounts[eventItem.id] = { in: 0, out: 0, missing: membersLen };
               return;
@@ -269,6 +293,7 @@ export default function DashboardHome() {
     }
     const key = `${teamId}:${userId}`;
     dashboardCache.set(key, {
+      todayEvents,
       nextEvents,
       eventCounts,
       memberCount,
@@ -279,6 +304,7 @@ export default function DashboardHome() {
   }, [
     teamId,
     userId,
+    todayEvents,
     nextEvents,
     eventCounts,
     memberCount,
@@ -343,6 +369,61 @@ export default function DashboardHome() {
     setDetailRows([]);
   }
 
+  const renderEventCards = (items: CalendarEvent[]) => (
+    <div className="space-y-3">
+      {items.map((eventItem) => {
+        const times = formatEventTimes(eventItem);
+        const counts = eventCounts[eventItem.id] ?? { in: 0, out: 0, missing: memberCount };
+        return (
+          <button
+            key={eventItem.id}
+            type="button"
+            onClick={() => openNextEvent(eventItem)}
+            className="w-full space-y-2 rounded-control border border-ink/10 bg-white p-4 text-left text-sm text-ink/70 shadow-sm transition hover:border-ink/14 hover:bg-white/88"
+          >
+            <div className="text-base font-semibold text-ink">{eventItem.title}</div>
+            <div className="grid gap-2 rounded-control border border-ink/10 bg-white/80 p-3">
+              <div className="flex items-center justify-between gap-4">
+                <span className="text-xs font-semibold uppercase tracking-[0.08em] text-ink/55">Start</span>
+                <span className="font-semibold text-ink">{times.start}</span>
+              </div>
+              {times.meeting ? (
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-xs font-semibold uppercase tracking-[0.08em] text-ink/55">Mødetid</span>
+                  <span className="font-semibold text-ink">{times.meeting}</span>
+                </div>
+              ) : null}
+              <div className="flex items-center justify-between gap-4">
+                <span className="text-xs font-semibold uppercase tracking-[0.08em] text-ink/55">Svarfrist</span>
+                <span className="font-semibold text-ink">{times.deadline}</span>
+              </div>
+            </div>
+            <div>{eventItem.location}</div>
+            <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-ink/60">
+              <span className="rounded-full bg-green-100 px-3 py-1 text-green-700">Kommer: {counts.in}</span>
+              <span className="rounded-full bg-red-100 px-3 py-1 text-red-700">Kan ikke: {counts.out}</span>
+              <span className="rounded-full bg-amber-100 px-3 py-1 text-amber-700">
+                Mangler svar: {counts.missing}
+              </span>
+            </div>
+            {eventItem.signupStatus ? (
+              <div
+                className="pt-2 text-xs font-semibold uppercase tracking-[0.2em] text-ink/60"
+                style={{ color: eventItem.signupStatus === "IN" ? "green" : "red" }}
+              >
+                {eventItem.signupStatus === "IN" ? "Du kommer" : "Du kan ikke"}
+              </div>
+            ) : (
+              <div className="pt-2 text-xs font-bold uppercase tracking-[0.2em] text-amber-500">
+                Du mangler at svare
+              </div>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+
   if (sessionStatus === "loading") {
     return (
       <section className="space-y-6">
@@ -388,6 +469,20 @@ export default function DashboardHome() {
         </p>
       </CollapsibleCard>
 
+      <CollapsibleCard
+        key={`todayEvents-${collapseVersion}`}
+        title="Dagens begivenhed"
+        storageKey={`${storagePrefix}:todayEvents`}
+      >
+        {loadingNextEvents ? (
+          <p className="text-sm text-ink/70">Indlæser begivenheder...</p>
+        ) : todayEvents.length > 0 ? (
+          renderEventCards(todayEvents)
+        ) : (
+          <p className="text-sm text-ink/70">Ingen begivenheder i dag.</p>
+        )}
+      </CollapsibleCard>
+
       <div className="grid gap-6 lg:grid-cols-2">
         <CollapsibleCard
           key={`nextEvents-${collapseVersion}`}
@@ -397,60 +492,9 @@ export default function DashboardHome() {
           {loadingNextEvents ? (
             <p className="text-sm text-ink/70">Indlæser begivenheder...</p>
           ) : nextEvents.length > 0 ? (
-            <div className="space-y-3">
-              {nextEvents.map((eventItem) => {
-                const times = formatEventTimes(eventItem);
-                const counts = eventCounts[eventItem.id] ?? { in: 0, out: 0, missing: memberCount };
-                return (
-                  <button
-                    key={eventItem.id}
-                    type="button"
-                    onClick={() => openNextEvent(eventItem)}
-                    className="w-full space-y-2 rounded-control border border-ink/10 bg-white p-4 text-left text-sm text-ink/70 shadow-sm transition hover:border-ink/14 hover:bg-white/88"
-                  >
-                    <div className="text-base font-semibold text-ink">{eventItem.title}</div>
-                    <div className="grid gap-2 rounded-control border border-ink/10 bg-white/80 p-3">
-                      <div className="flex items-center justify-between gap-4">
-                        <span className="text-xs font-semibold uppercase tracking-[0.08em] text-ink/55">Start</span>
-                        <span className="font-semibold text-ink">{times.start}</span>
-                      </div>
-                      {times.meeting ? (
-                        <div className="flex items-center justify-between gap-4">
-                          <span className="text-xs font-semibold uppercase tracking-[0.08em] text-ink/55">Mødetid</span>
-                          <span className="font-semibold text-ink">{times.meeting}</span>
-                        </div>
-                      ) : null}
-                      <div className="flex items-center justify-between gap-4">
-                        <span className="text-xs font-semibold uppercase tracking-[0.08em] text-ink/55">Svarfrist</span>
-                        <span className="font-semibold text-ink">{times.deadline}</span>
-                      </div>
-                    </div>
-                    <div>{eventItem.location}</div>
-                    <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-ink/60">
-                      <span className="rounded-full bg-green-100 px-3 py-1 text-green-700">Kommer: {counts.in}</span>
-                      <span className="rounded-full bg-red-100 px-3 py-1 text-red-700">Kan ikke: {counts.out}</span>
-                      <span className="rounded-full bg-amber-100 px-3 py-1 text-amber-700">
-                        Mangler svar: {counts.missing}
-                      </span>
-                    </div>
-                    {eventItem.signupStatus ? (
-                      <div
-                        className="pt-2 text-xs font-semibold uppercase tracking-[0.2em] text-ink/60"
-                        style={{ color: eventItem.signupStatus === "IN" ? "green" : "red" }}
-                      >
-                        {eventItem.signupStatus === "IN" ? "Du kommer" : "Du kan ikke"}
-                      </div>
-                    ) : (
-                      <div className="pt-2 text-xs font-bold uppercase tracking-[0.2em] text-amber-500">
-                        Du mangler at svare
-                      </div>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
+            renderEventCards(nextEvents)
           ) : (
-            <p className="text-sm text-ink/70">Ingen begivenheder endnu.</p>
+            <p className="text-sm text-ink/70">Ingen kommende begivenheder efter i dag.</p>
           )}
         </CollapsibleCard>
 
@@ -458,7 +502,7 @@ export default function DashboardHome() {
           key={`fines-${collapseVersion}`}
           title="Mine bøder"
           description="Skylder i alt"
-          titleClassName="text-base font-semibold leading-tight text-ink sm:text-lg"
+          titleClassName="text-base font-bold leading-tight text-ink text-lg"
           descriptionClassName="mt-0.5 text-xs text-ink/55"
           surface="card-soft"
           storageKey={`${storagePrefix}:fines`}
@@ -486,7 +530,8 @@ export default function DashboardHome() {
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {LEADERBOARD_CATEGORIES.map((category) => {
-              const top = leaderboardSummary?.[category] ?? null;
+              const leaders = leaderboardSummary?.[category] ?? [];
+              const primary = leaders[0];
               return (
                 <button
                   key={category}
@@ -497,11 +542,13 @@ export default function DashboardHome() {
                   <p className="text-xs font-semibold uppercase tracking-[0.12em] text-ink/55">
                     {LEADERBOARD_CATEGORY_LABELS_DA[category]}
                   </p>
-                  {top ? (
+                  {primary ? (
                     <div className="mt-2">
-                      <p className="font-semibold text-ink">{top.name}</p>
+                      <p className="font-semibold text-ink">
+                        {leaders.map((entry) => entry.name).join(" · ")}
+                      </p>
                       <p className="text-sm text-ink/70">
-                        {formatLeaderboardMetric(category, top.value)}
+                        {formatLeaderboardMetric(category, primary.value)}
                       </p>
                     </div>
                   ) : (

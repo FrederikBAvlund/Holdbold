@@ -97,7 +97,7 @@ describe("buildMotmPollApiView", () => {
     expect(view.winner?.userId).toBe("p1");
   });
 
-  it("hides detailed results from non-creators after close", () => {
+  it("shows detailed results to all viewers after close", () => {
     const view = buildMotmPollApiView(
       {
         id: "poll1",
@@ -118,8 +118,9 @@ describe("buildMotmPollApiView", () => {
       "v1",
       false
     );
-    expect(view.scoreboard).toEqual([]);
-    expect(view.revealRows).toEqual([]);
-    expect(view.winner).toBeNull();
+    expect(view.scoreboard.length).toBe(1);
+    expect(view.revealRows.length).toBeGreaterThan(0);
+    expect(view.winner?.userId).toBe("p1");
+    expect(view.voters).toBeNull();
   });
 });

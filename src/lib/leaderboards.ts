@@ -2,6 +2,7 @@ import type { EventKind } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import {
   LEADERBOARD_CATEGORIES,
+  LEADERBOARD_TIE_SUMMARY_CATEGORIES,
   longestAttendanceStreak,
   type LeaderboardCategory,
   type LeaderboardRow,
@@ -20,13 +21,25 @@ function sortRows(
     if (vb !== va) return vb - va;
     return a.name.localeCompare(b.name, "da");
   });
-  return sorted.map((u, i) => ({
-    rank: i + 1,
-    userId: u.id,
-    name: u.name,
-    image: u.image,
-    value: valueByUser.get(u.id) ?? 0
-  }));
+
+  let rank = 1;
+  let previousValue: number | null = null;
+  return sorted.map((u, i) => {
+    const value = valueByUser.get(u.id) ?? 0;
+    if (previousValue === null) {
+      rank = 1;
+    } else if (value < previousValue) {
+      rank = i + 1;
+    }
+    previousValue = value;
+    return {
+      rank,
+      userId: u.id,
+      name: u.name,
+      image: u.image,
+      value
+    };
+  });
 }
 
 function countsToMap(
@@ -276,27 +289,49 @@ export async function getLeaderboardRows(
 }
 
 export async function getLeaderboardSummary(teamId: string): Promise<{
-  summary: Record<LeaderboardCategory, LeaderboardTop | null>;
+  summary: Record<LeaderboardCategory, LeaderboardTop[]>;
 }> {
   const memberUsers = await loadActiveMembers(teamId);
   if (memberUsers.length === 0) {
-    const empty = {} as Record<LeaderboardCategory, LeaderboardTop | null>;
-    for (const c of LEADERBOARD_CATEGORIES) empty[c] = null;
+    const empty = {} as Record<LeaderboardCategory, LeaderboardTop[]>;
+    for (const c of LEADERBOARD_CATEGORIES) empty[c] = [];
     return { summary: empty };
   }
+  const tieSummary = new Set<LeaderboardCategory>(LEADERBOARD_TIE_SUMMARY_CATEGORIES);
   const categories = LEADERBOARD_CATEGORIES;
   const valueMaps = await Promise.all(
     categories.map((cat) => valuesForCategory(teamId, cat, memberUsers))
   );
-  const summary = {} as Record<LeaderboardCategory, LeaderboardTop | null>;
+  const summary = {} as Record<LeaderboardCategory, LeaderboardTop[]>;
   for (let i = 0; i < categories.length; i++) {
     const cat = categories[i]!;
     const values = valueMaps[i]!;
     const rows = sortRows(memberUsers, values);
-    const top = rows.find((r) => r.value > 0) ?? null;
-    summary[cat] = top
-      ? { userId: top.userId, name: top.name, image: top.image, value: top.value }
-      : null;
+    const firstPositive = rows.find((r) => r.value > 0) ?? null;
+    if (!firstPositive) {
+      summary[cat] = [];
+      continue;
+    }
+    if (tieSummary.has(cat)) {
+      const maxVal = firstPositive.value;
+      summary[cat] = rows
+        .filter((r) => r.value === maxVal)
+        .map((r) => ({
+          userId: r.userId,
+          name: r.name,
+          image: r.image,
+          value: r.value
+        }));
+    } else {
+      summary[cat] = [
+        {
+          userId: firstPositive.userId,
+          name: firstPositive.name,
+          image: firstPositive.image,
+          value: firstPositive.value
+        }
+      ];
+    }
   }
   return { summary };
 }
