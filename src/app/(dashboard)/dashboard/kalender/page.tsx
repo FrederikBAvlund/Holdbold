@@ -638,7 +638,7 @@ export default function KalenderPage() {
           return next;
         });
       }
-      if (lastMotmPollStatusRef.current === "OPEN" && nextPoll.status === "CLOSED" && nextPoll.isCreator) {
+      if (lastMotmPollStatusRef.current === "OPEN" && nextPoll.status === "CLOSED") {
         openMotmReveal({
           eventTitle,
           revealRows: nextPoll.revealRows.map((row) => ({
@@ -2568,7 +2568,7 @@ export default function KalenderPage() {
                   ) : null}
                   {motmPoll?.status === "CLOSED" ? (
                     <div className="mt-3 space-y-3">
-                      {motmPoll.isCreator && motmPoll.scoreboard.length > 0 ? (
+                      {motmPoll.scoreboard.length > 0 ? (
                         <div>
                           <p className="text-xs font-semibold text-ink/70">Resultat</p>
                           <ul className="mt-2 space-y-1 text-sm text-ink/80">
@@ -2582,12 +2582,14 @@ export default function KalenderPage() {
                             ))}
                           </ul>
                         </div>
-                      ) : null}
-                      {motmPoll.isCreator ? null : (
-                        <p className="text-xs text-ink/60">
-                          Kun personen der åbnede afstemningen kan se den fulde resultatliste.
-                        </p>
+                      ) : (
+                        <p className="text-xs text-ink/60">Der blev ikke gemt nogen stemmer i denne afstemning.</p>
                       )}
+                      {!canManageMotmPoll ? (
+                        <p className="text-xs text-ink/55">
+                          Kun admin eller bødekasseformand kan nulstille en lukket afstemning og åbne en ny.
+                        </p>
+                      ) : null}
                       {canManageMotmPoll ? (
                         <button
                           type="button"

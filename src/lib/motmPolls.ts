@@ -90,9 +90,10 @@ export function buildMotmPollApiView(
       return a.userId.localeCompare(b.userId);
     });
   const isCreator = poll.createdById === viewerUserId;
-  const scoreboard = poll.status === "CLOSED" && isCreator ? tallies : [];
-  const revealRows = poll.status === "CLOSED" && isCreator ? buildRevealRows(tallies, poll.revealCount) : [];
-  const winner = poll.status === "CLOSED" && isCreator ? winnerFromRows(tallies) : null;
+  const resultsVisible = poll.status === "CLOSED";
+  const scoreboard = resultsVisible ? tallies : [];
+  const revealRows = resultsVisible ? buildRevealRows(tallies, poll.revealCount) : [];
+  const winner = resultsVisible ? winnerFromRows(tallies) : null;
 
   return {
     id: poll.id,

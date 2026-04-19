@@ -1,9 +1,28 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { MOTM_MANAGER_ROLES, requireActiveTeamMember, requireSession } from "@/lib/apiAuth";
+import { createNotifications } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 import { buildMotmPollApiView, eventMotmAvailabilityError } from "@/lib/motmPolls";
 import { resolveProfileImageUrl } from "@/lib/profileImages";
+
+function calendarFocusHrefForEvent(event: {
+  id: string;
+  title: string;
+  date: Date;
+  location: string;
+  source: "MANUAL" | "SERIES" | "ICAL";
+  seriesId: string | null;
+}) {
+  const params = new URLSearchParams();
+  params.set("focusEvent", event.id);
+  params.set("focusTitle", event.title);
+  params.set("focusDate", event.date.toISOString());
+  params.set("focusLocation", event.location);
+  params.set("focusSource", event.source);
+  if (event.seriesId) params.set("focusSeriesId", event.seriesId);
+  return `/dashboard/kalender?${params.toString()}`;
+}
 
 const createPollSchema = z.object({
   votesPerVoter: z.number().int().min(1).max(10),
@@ -93,7 +112,12 @@ export async function POST(request: Request, { params }: { params: { id: string 
       id: true,
       teamId: true,
       kind: true,
-      canceledAt: true
+      canceledAt: true,
+      title: true,
+      date: true,
+      location: true,
+      source: true,
+      seriesId: true
     }
   });
   if (!event) {
@@ -138,6 +162,45 @@ export async function POST(request: Request, { params }: { params: { id: string 
       message: "MOTM-afstemning åbnet"
     }
   });
+
+  const signedUpRecipients = await prisma.signup.findMany({
+    where: {
+      eventId: params.id,
+      status: "IN",
+      userId: { not: session.userId },
+      user: {
+        memberships: {
+          some: {
+            teamId: event.teamId,
+            status: "ACTIVE"
+          }
+        }
+      }
+    },
+    select: { userId: true }
+  });
+
+  const calendarLink = calendarFocusHrefForEvent({
+    id: event.id,
+    title: event.title,
+    date: event.date,
+    location: event.location,
+    source: event.source,
+    seriesId: event.seriesId
+  });
+
+  const motmNotifications = signedUpRecipients.map((row) => ({
+    userId: row.userId,
+    teamId: event.teamId,
+    type: "EVENT" as const,
+    title: "MOTM-afstemning åbnet",
+    body: `${event.title} · Tryk for at åbne begivenheden og stemme`,
+    link: calendarLink
+  }));
+
+  if (motmNotifications.length > 0) {
+    await createNotifications(motmNotifications);
+  }
 
   return NextResponse.json({
     poll: buildMotmPollApiView(poll, session.userId, true)
