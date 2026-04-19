@@ -240,6 +240,15 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
   }
 
   await prisma.$transaction(async (tx) => {
+    await tx.fine.deleteMany({
+      where: {
+        teamId: event.teamId,
+        eventId: event.id,
+        automationAction: "MATCH_MOTM_SELF_VOTE",
+        status: "FORESLAET"
+      }
+    });
+
     await tx.event.update({
       where: { id: params.id },
       data: {

@@ -84,6 +84,14 @@ const FINE_AUTOMATION_ACTIONS = [
     supportsTraining: false,
     supportsMatch: true,
     supportsExcludedRoles: false
+  },
+  {
+    action: "MATCH_MOTM_SELF_VOTE" as const,
+    label: "Stem på sig selv (MOTM)",
+    hint: "Foreslå en bøde til den, der stemmer, for hver stemme de lægger på sig selv, når de gemmer deres MOTM-stemme.",
+    supportsTraining: false,
+    supportsMatch: true,
+    supportsExcludedRoles: true
   }
 ] as const;
 

@@ -62,6 +62,7 @@ enum FineAutomationAction {
   STATUS_CHANGE_AFTER_DEADLINE
   SAME_DAY_WITHDRAWAL
   MATCH_MOTM_WINNER
+  MATCH_MOTM_SELF_VOTE
 }
 
 enum FineTemplateStatus {
