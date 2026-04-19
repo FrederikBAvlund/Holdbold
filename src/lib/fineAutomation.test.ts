@@ -150,4 +150,31 @@ describe("resolveAutomationTemplate", () => {
     expect(resolved?.template.id).toBe("tpl-motm");
     expect(resolved?.automationAction).toBe("MATCH_MOTM_WINNER");
   });
+
+  it("supports MOTM self-vote automation for matches", async () => {
+    vi.mocked(prisma.fineAutomationSetting.findUnique).mockResolvedValue({
+      id: "cfg",
+      teamId: "team1",
+      action: "MATCH_MOTM_SELF_VOTE",
+      appliesTraining: false,
+      appliesMatch: true,
+      templateTrainingId: null,
+      templateMatchId: "tpl-self",
+      excludedRoles: ["SOME"],
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    } as Awaited<ReturnType<typeof prisma.fineAutomationSetting.findUnique>>);
+
+    vi.mocked(prisma.fineTemplate.findFirst).mockResolvedValue({
+      id: "tpl-self",
+      title: "Selvstemme",
+      amount: 25,
+      description: null
+    } as Awaited<ReturnType<typeof prisma.fineTemplate.findFirst>>);
+
+    const resolved = await resolveAutomationTemplate("team1", "MATCH_MOTM_SELF_VOTE", "MATCH");
+    expect(resolved?.template.id).toBe("tpl-self");
+    expect(resolved?.automationAction).toBe("MATCH_MOTM_SELF_VOTE");
+  });
 });

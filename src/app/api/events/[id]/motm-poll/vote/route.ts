@@ -3,6 +3,7 @@ import { z } from "zod";
 import { EVENT_MANAGER_ROLES, requireActiveTeamMember, requireSession } from "@/lib/apiAuth";
 import { normalizeMotmSelections } from "@/lib/motm";
 import { buildMotmPollApiView, eventMotmAvailabilityError } from "@/lib/motmPolls";
+import { syncMotmSelfVoteProposedFines } from "@/lib/motmSelfVoteFines";
 import { prisma } from "@/lib/prisma";
 
 const voteSchema = z.object({
@@ -132,6 +133,14 @@ export async function POST(request: Request, { params }: { params: { id: string 
         weight: selection.weight
       }))
     });
+  });
+
+  await syncMotmSelfVoteProposedFines({
+    teamId: event.teamId,
+    eventId: event.id,
+    voterId: session.userId,
+    voterRole: member.role,
+    selections
   });
 
   const updatedPoll = await prisma.eventMotmPoll.findUnique({
