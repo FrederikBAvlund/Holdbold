@@ -5,10 +5,47 @@ import { authOptions } from "@/lib/auth";
 import { createNotifications } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 
+const FINE_STATUSES = [
+  "UNPAID",
+  "PAID_PENDING",
+  "PAID_APPROVED",
+  "FORESLAET",
+  "AFVIST"
+] as const;
+
 const listSchema = z.object({
   teamId: z.string().min(1),
-  userId: z.string().optional()
+  userId: z.string().optional(),
+  createdById: z.string().optional(),
+  since: z.string().optional(),
+  status: z.string().optional()
 });
+
+function parseStatusFilter(raw: string | undefined) {
+  if (!raw?.trim()) return undefined;
+  const statuses = raw
+    .split(",")
+    .map((value) => value.trim())
+    .filter((value): value is typeof FINE_STATUSES[number] =>
+      (FINE_STATUSES as readonly string[]).includes(value)
+    );
+  return statuses.length > 0 ? statuses : undefined;
+}
+
+function parseSinceFilter(raw: string | undefined) {
+  if (!raw?.trim()) return undefined;
+  const since = new Date(raw);
+  if (Number.isNaN(since.getTime())) {
+    throw new z.ZodError([
+      {
+        code: "custom",
+        message: "Ugyldig since-dato",
+        path: ["since"]
+      }
+    ]);
+  }
+  return since;
+}
 
 const createSchema = z.object({
   teamId: z.string().min(1),
@@ -28,9 +65,15 @@ export async function GET(request: Request) {
   }
 
   const { searchParams } = new URL(request.url);
-  const teamId = searchParams.get("teamId") ?? "";
-  const userId = searchParams.get("userId") ?? undefined;
-  const parsed = listSchema.parse({ teamId, userId });
+  const parsed = listSchema.parse({
+    teamId: searchParams.get("teamId") ?? "",
+    userId: searchParams.get("userId") ?? undefined,
+    createdById: searchParams.get("createdById") ?? undefined,
+    since: searchParams.get("since") ?? undefined,
+    status: searchParams.get("status") ?? undefined
+  });
+  const statuses = parseStatusFilter(parsed.status);
+  const since = parseSinceFilter(parsed.since);
 
   const actingMembership = await prisma.membership.findFirst({
     where: { teamId: parsed.teamId, userId: session.user.id, status: "ACTIVE" },
@@ -48,15 +91,31 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Ikke adgang til andre spilleres bøder" }, { status: 403 });
   }
 
+  if (
+    parsed.createdById &&
+    parsed.createdById !== session.user.id &&
+    !["ADMIN", "BOEDEKASSEFORMAND"].includes(actingMembership.role)
+  ) {
+    return NextResponse.json({ error: "Ikke adgang til andre spilleres bøder" }, { status: 403 });
+  }
+
+  const hasNarrowFilter =
+    Boolean(parsed.userId) ||
+    Boolean(parsed.createdById) ||
+    Boolean(statuses) ||
+    Boolean(since);
+
   const fines = await prisma.fine.findMany({
     where: {
       teamId: parsed.teamId,
-      ...(parsed.userId
-        ? {
-            userId: parsed.userId,
-            status: { in: ["UNPAID", "PAID_PENDING", "PAID_APPROVED"] }
-          }
-        : {})
+      ...(parsed.userId ? { userId: parsed.userId } : {}),
+      ...(parsed.createdById ? { createdById: parsed.createdById } : {}),
+      ...(since ? { createdAt: { gte: since } } : {}),
+      ...(statuses
+        ? { status: { in: statuses } }
+        : parsed.userId
+          ? { status: { in: ["UNPAID", "PAID_PENDING", "PAID_APPROVED"] } }
+          : {})
     },
     include: {
       user: true,
@@ -66,7 +125,7 @@ export async function GET(request: Request) {
       event: { select: { id: true, title: true, date: true } }
     },
     orderBy: { createdAt: "desc" },
-    take: 200
+    ...(hasNarrowFilter ? {} : { take: 500 })
   });
 
   return NextResponse.json({ fines });

@@ -26,14 +26,18 @@ export default function BoderPage() {
   const members = teamMembers as Member[];
   const loadedTemplatesKeyRef = useRef<string | null>(null);
   const loadedMyFinesKeyRef = useRef<string | null>(null);
-  const loadedTeamFinesKeyRef = useRef<string | null>(null);
+  const loadedTeamFineViewsKeyRef = useRef<string | null>(null);
   const loadedTeamInfoKeyRef = useRef<string | null>(null);
   const loadedPendingPaymentsKeyRef = useRef<string | null>(null);
   const loadedCollectionsKeyRef = useRef<string | null>(null);
 
   const [templates, setTemplates] = useState<FineTemplate[]>([]);
   const [fines, setFines] = useState<FineItem[]>([]);
-  const [teamFines, setTeamFines] = useState<FineItem[]>([]);
+  const [debtorTotals, setDebtorTotals] = useState<Array<{ userId: string; name: string; total: number }>>([]);
+  const [managementFines, setManagementFines] = useState<FineItem[]>([]);
+  const [historyFines, setHistoryFines] = useState<FineItem[]>([]);
+  const [mySubmittedFines, setMySubmittedFines] = useState<FineItem[]>([]);
+  const [selectedDebtorFines, setSelectedDebtorFines] = useState<FineItem[]>([]);
   const [teamMobilePayBox, setTeamMobilePayBox] = useState("");
   const [pendingPayments, setPendingPayments] = useState<PendingPayment[]>([]);
   const [collections, setCollections] = useState<FineCollection[]>([]);
@@ -107,17 +111,76 @@ export default function BoderPage() {
   }, [teamId, userId]);
 
   useEffect(() => {
-    async function loadTeamFines() {
-      if (!teamId) return;
-      if (loadedTeamFinesKeyRef.current === teamId) return;
-      loadedTeamFinesKeyRef.current = teamId;
-      const response = await fetch(`/api/fines?teamId=${teamId}`);
-      const data = await response.json();
-      setTeamFines(data.fines ?? []);
+    async function loadTeamFineViews() {
+      if (!teamId || !userId) return;
+      const key = `${teamId}:${userId}:${canManageFines ? "1" : "0"}`;
+      if (loadedTeamFineViewsKeyRef.current === key) return;
+      loadedTeamFineViewsKeyRef.current = key;
+
+      const since = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
+      const tasks: Promise<Response>[] = [
+        fetch(`/api/fines/debtors?teamId=${teamId}`, { cache: "no-store" }),
+        fetch(`/api/fines?teamId=${teamId}&since=${encodeURIComponent(since)}`, { cache: "no-store" }),
+        fetch(`/api/fines?teamId=${teamId}&createdById=${userId}`, { cache: "no-store" })
+      ];
+      if (canManageFines) {
+        tasks.push(fetch(`/api/fines?teamId=${teamId}&status=FORESLAET`, { cache: "no-store" }));
+      }
+
+      const [debtorsResponse, historyResponse, mySubmittedResponse, managementResponse] = await Promise.all(tasks);
+
+      if (debtorsResponse.ok) {
+        const data = await debtorsResponse.json();
+        setDebtorTotals(data.debtors ?? []);
+      } else {
+        setDebtorTotals([]);
+      }
+
+      if (historyResponse.ok) {
+        const data = await historyResponse.json();
+        setHistoryFines(data.fines ?? []);
+      } else {
+        setHistoryFines([]);
+      }
+
+      if (mySubmittedResponse.ok) {
+        const data = await mySubmittedResponse.json();
+        setMySubmittedFines(data.fines ?? []);
+      } else {
+        setMySubmittedFines([]);
+      }
+
+      if (canManageFines && managementResponse?.ok) {
+        const data = await managementResponse.json();
+        setManagementFines(data.fines ?? []);
+      } else if (!canManageFines) {
+        setManagementFines([]);
+      }
     }
 
-    loadTeamFines();
-  }, [teamId]);
+    loadTeamFineViews();
+  }, [teamId, userId, canManageFines]);
+
+  useEffect(() => {
+    async function loadSelectedDebtorFines() {
+      if (!teamId || !selectedDebtorUserId) {
+        setSelectedDebtorFines([]);
+        return;
+      }
+      const response = await fetch(
+        `/api/fines?teamId=${teamId}&userId=${selectedDebtorUserId}`,
+        { cache: "no-store" }
+      );
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setSelectedDebtorFines([]);
+        return;
+      }
+      setSelectedDebtorFines(data.fines ?? []);
+    }
+
+    loadSelectedDebtorFines();
+  }, [teamId, selectedDebtorUserId]);
 
   useEffect(() => {
     async function loadTeamInfo() {
@@ -193,43 +256,31 @@ export default function BoderPage() {
       totals.set(member.user.id, { name: member.user.name ?? "Ukendt", total: 0 });
     }
 
-    for (const fine of teamFines) {
-      if (!debtStatuses.has(fine.status)) continue;
-      const user = fine.user;
-      if (!user) continue;
-      const current = totals.get(user.id) ?? { name: user.name ?? "Ukendt", total: 0 };
-      current.total += fine.amount;
-      totals.set(user.id, current);
+    for (const debtor of debtorTotals) {
+      const current = totals.get(debtor.userId) ?? { name: debtor.name, total: 0 };
+      current.total = debtor.total;
+      totals.set(debtor.userId, current);
     }
     return Array.from(totals.entries())
       .map(([id, entry]) => ({ id, ...entry }))
       .sort((a, b) => b.total - a.total);
-  }, [members, teamFines, debtStatuses]);
+  }, [members, debtorTotals]);
   const totalAcrossDebtors = useMemo(
     () => rankedDebtors.reduce((sum, debtor) => sum + debtor.total, 0),
     [rankedDebtors]
   );
-  const selectedDebtorFines = useMemo(() => {
-    if (!selectedDebtorUserId) return [];
-    return teamFines
-      .filter(
-        (fine) =>
-          fine.user?.id === selectedDebtorUserId &&
-          ["UNPAID", "PAID_PENDING", "PAID_APPROVED"].includes(fine.status)
-      )
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  }, [selectedDebtorUserId, teamFines]);
   const selectedDebtorName = useMemo(() => {
     if (!selectedDebtorUserId) return "Medlem";
     return rankedDebtors.find((debtor) => debtor.id === selectedDebtorUserId)?.name ?? "Medlem";
   }, [rankedDebtors, selectedDebtorUserId]);
 
-  const fineHistoryLast14Days = useMemo(() => {
-    const cutoff = Date.now() - 14 * 24 * 60 * 60 * 1000;
-    return teamFines
-      .filter((fine) => new Date(fine.createdAt).getTime() >= cutoff)
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  }, [teamFines]);
+  const fineHistoryLast14Days = useMemo(
+    () =>
+      [...historyFines].sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      ),
+    [historyFines]
+  );
 
   async function handleCreateTemplate(event: React.FormEvent) {
     event.preventDefault();
@@ -332,25 +383,62 @@ export default function BoderPage() {
 
   async function refreshFinesAndApprovals() {
     if (!teamId || !userId) return;
+    const since = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
     const tasks: Promise<Response>[] = [
       fetch(`/api/fines?teamId=${teamId}&userId=${userId}`, { cache: "no-store" }),
-      fetch(`/api/fines?teamId=${teamId}`, { cache: "no-store" })
+      fetch(`/api/fines/debtors?teamId=${teamId}`, { cache: "no-store" }),
+      fetch(`/api/fines?teamId=${teamId}&since=${encodeURIComponent(since)}`, { cache: "no-store" }),
+      fetch(`/api/fines?teamId=${teamId}&createdById=${userId}`, { cache: "no-store" })
     ];
+    if (canManageFines) {
+      tasks.push(fetch(`/api/fines?teamId=${teamId}&status=FORESLAET`, { cache: "no-store" }));
+    }
     if (isAdmin) {
       tasks.push(fetch(`/api/fines/payments/pending?teamId=${teamId}`, { cache: "no-store" }));
     }
-    const [mineResponse, teamResponse, pendingResponse] = await Promise.all(tasks);
+    if (selectedDebtorUserId) {
+      tasks.push(
+        fetch(`/api/fines?teamId=${teamId}&userId=${selectedDebtorUserId}`, { cache: "no-store" })
+      );
+    }
+
+    const responses = await Promise.all(tasks);
+    let offset = 0;
+    const mineResponse = responses[offset++];
+    const debtorsResponse = responses[offset++];
+    const historyResponse = responses[offset++];
+    const mySubmittedResponse = responses[offset++];
+    const managementResponse = canManageFines ? responses[offset++] : null;
+    const pendingResponse = isAdmin ? responses[offset++] : null;
+    const selectedDebtorResponse = selectedDebtorUserId ? responses[offset++] : null;
+
     if (mineResponse.ok) {
       const mineData = await mineResponse.json();
       setFines(mineData.fines ?? []);
     }
-    if (teamResponse.ok) {
-      const teamData = await teamResponse.json();
-      setTeamFines(teamData.fines ?? []);
+    if (debtorsResponse.ok) {
+      const debtorsData = await debtorsResponse.json();
+      setDebtorTotals(debtorsData.debtors ?? []);
+    }
+    if (historyResponse.ok) {
+      const historyData = await historyResponse.json();
+      setHistoryFines(historyData.fines ?? []);
+    }
+    if (mySubmittedResponse.ok) {
+      const mySubmittedData = await mySubmittedResponse.json();
+      setMySubmittedFines(mySubmittedData.fines ?? []);
+    }
+    if (managementResponse?.ok) {
+      const managementData = await managementResponse.json();
+      setManagementFines(managementData.fines ?? []);
     }
     if (isAdmin && pendingResponse?.ok) {
       const pendingData = await pendingResponse.json();
       setPendingPayments(pendingData.payments ?? []);
+    }
+    if (selectedDebtorResponse?.ok) {
+      const selectedDebtorData = await selectedDebtorResponse.json();
+      setSelectedDebtorFines(selectedDebtorData.fines ?? []);
     }
   }
 
@@ -560,7 +648,7 @@ export default function BoderPage() {
     return new Map(members.map((member) => [member.user.id, member.user.name]));
   }, [members]);
 
-  const pendingFines = teamFines.filter((fine) => fine.status === "FORESLAET");
+  const pendingFines = managementFines;
   const templateSearchNeedle = templateSearch.trim().toLowerCase();
   const matchesTemplateSearch = (template: FineTemplate) => {
     if (!templateSearchNeedle) return true;
@@ -588,7 +676,7 @@ export default function BoderPage() {
     label: `${template.title} (${formatFineKr(template.amount)})`
   }));
 
-  const myFineRequests = teamFines
+  const myFineRequests = mySubmittedFines
     .filter((fine) => fine.createdById === userId)
     .filter(
       (fine) =>
