@@ -16,6 +16,7 @@ export default function PrivatlivPage() {
             <li>Navn</li>
             <li>Email</li>
             <li>Krypteret adgangskode (password hash)</li>
+            <li>Ved login med Facebook: dit Facebook-id, navn, e-mail og profilbillede</li>
             <li>Holdmedlemskab, roller, tilmeldinger, bøder og notifikationer</li>
           </ul>
         </section>
@@ -48,7 +49,11 @@ export default function PrivatlivPage() {
           <h2 className="text-xl font-semibold text-ink">Dine rettigheder</h2>
           <p>
             Du kan anmode om indsigt, rettelse eller sletning af dine data. Kontakt din holdadministrator eller os
-            direkte.
+            direkte. Se{" "}
+            <a className="underline underline-offset-4" href="/slet-data">
+              instruktioner til sletning af data
+            </a>
+            .
           </p>
         </section>
 
