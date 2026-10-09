@@ -30,15 +30,6 @@ export type ParseUsage = {
 export const emptyTranscribeUsage = (): TranscribeUsage => ({ audioIn: 0, textIn: 0, textOut: 0 });
 export const emptyParseUsage = (): ParseUsage => ({ input: 0, output: 0, cacheRead: 0, cacheWrite: 0 });
 
-// gpt-realtime-2.1-mini, USD per 1M tokens.
-export const DIALOGUE_RATES = { audioIn: 10, audioOut: 20, textIn: 0.6, textOut: 2.4, cachedAudio: 0.3, cachedText: 0.06 };
-export type DialogueUsage = Record<keyof typeof DIALOGUE_RATES, number>;
-export const emptyDialogueUsage = (): DialogueUsage => ({ audioIn: 0, audioOut: 0, textIn: 0, textOut: 0, cachedAudio: 0, cachedText: 0 });
-export function dialogueCostUsd(u: DialogueUsage): number {
-  return (Object.keys(DIALOGUE_RATES) as Array<keyof DialogueUsage>)
-    .reduce((sum, key) => sum + u[key] * DIALOGUE_RATES[key], 0) / 1_000_000;
-}
-
 export function transcribeCostUsd(u: TranscribeUsage): number {
   return (
     (u.audioIn * TRANSCRIBE_RATES.audioIn + u.textIn * TRANSCRIBE_RATES.textIn + u.textOut * TRANSCRIBE_RATES.textOut) /
