@@ -123,6 +123,11 @@ export default function LoginPage() {
         <Button type="submit" size="lg" block loading={loading}>
           Log ind
         </Button>
+        <p className="text-center text-sm">
+          <a href="/glemt-password" className="font-semibold text-moss underline decoration-moss/30 underline-offset-4 hover:decoration-moss">
+            Glemt adgangskode?
+          </a>
+        </p>
       </form>
 
       {facebookEnabled ? (
