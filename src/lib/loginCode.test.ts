@@ -8,12 +8,14 @@ import {
   generateLoginCode,
   hashLoginCode,
   requestLoginCode,
+  requestSignupCode,
   verifyLoginCode
 } from "./loginCode";
 
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     user: { findFirst: vi.fn() },
+    team: { findUnique: vi.fn() },
     membership: { findFirst: vi.fn() },
     loginCode: { findMany: vi.fn(), findFirst: vi.fn(), create: vi.fn(), update: vi.fn(), updateMany: vi.fn() }
   }
@@ -24,6 +26,7 @@ vi.mock("@/lib/rateLimit", () => ({ checkRateLimit: vi.fn() }));
 const db = prisma as unknown as {
   user: { findFirst: ReturnType<typeof vi.fn> };
   membership: { findFirst: ReturnType<typeof vi.fn> };
+  team: { findUnique: ReturnType<typeof vi.fn> };
   loginCode: Record<"findMany" | "findFirst" | "create" | "update" | "updateMany", ReturnType<typeof vi.fn>>;
 };
 
@@ -115,27 +118,60 @@ describe("verifyLoginCode", () => {
   it("accepts a correct code once", async () => {
     db.loginCode.findFirst.mockResolvedValue(record());
     db.loginCode.updateMany.mockResolvedValue({ count: 1 });
-    expect(await verifyLoginCode("a@b.dk", "123456")).toBe(true);
+    expect(await verifyLoginCode("a@b.dk", "123456")).toEqual({ ok: true, signup: null });
 
     db.loginCode.updateMany.mockResolvedValue({ count: 0 });
-    expect(await verifyLoginCode("a@b.dk", "123456")).toBe(false);
+    expect(await verifyLoginCode("a@b.dk", "123456")).toEqual({ ok: false });
   });
 
   it("counts wrong attempts and rejects", async () => {
     db.loginCode.findFirst.mockResolvedValue(record());
-    expect(await verifyLoginCode("a@b.dk", "000000")).toBe(false);
+    expect(await verifyLoginCode("a@b.dk", "000000")).toEqual({ ok: false });
     expect(db.loginCode.update).toHaveBeenCalledWith({ where: { id: "c1" }, data: { attempts: { increment: 1 } } });
   });
 
   it("locks the code after too many attempts, even with the right code", async () => {
     db.loginCode.findFirst.mockResolvedValue(record({ attempts: LOGIN_CODE_MAX_ATTEMPTS }));
-    expect(await verifyLoginCode("a@b.dk", "123456")).toBe(false);
+    expect(await verifyLoginCode("a@b.dk", "123456")).toEqual({ ok: false });
     expect(db.loginCode.updateMany).not.toHaveBeenCalled();
   });
 
   it("rejects when no valid code exists or the format is wrong", async () => {
     db.loginCode.findFirst.mockResolvedValue(null);
-    expect(await verifyLoginCode("a@b.dk", "123456")).toBe(false);
-    expect(await verifyLoginCode("a@b.dk", "12ab56")).toBe(false);
+    expect(await verifyLoginCode("a@b.dk", "123456")).toEqual({ ok: false });
+    expect(await verifyLoginCode("a@b.dk", "12ab56")).toEqual({ ok: false });
+  });
+});
+
+describe("signup codes", () => {
+  it("rejects unknown teams and already registered emails without sending", async () => {
+    db.team.findUnique.mockResolvedValue(null);
+    expect(await requestSignupCode({ email: "ny@b.dk", name: "Ny", teamSlug: "findes-ikke" })).toEqual({ status: "team_not_found" });
+
+    db.team.findUnique.mockResolvedValue({ id: "t1" });
+    db.user.findFirst.mockResolvedValue({ id: "u1" });
+    expect(await requestSignupCode({ email: "ny@b.dk", name: "Ny", teamSlug: "hold" })).toEqual({ status: "email_taken" });
+    expect(sendMail).not.toHaveBeenCalled();
+  });
+
+  it("stores name and team with the code and mails it", async () => {
+    db.team.findUnique.mockResolvedValue({ id: "t1" });
+    db.user.findFirst.mockResolvedValue(null);
+    db.loginCode.findMany.mockResolvedValue([]);
+    expect(await requestSignupCode({ email: "Ny@B.dk", name: " Ny Bruger ", teamSlug: "Hold" })).toEqual({ status: "sent" });
+    expect(db.loginCode.create.mock.calls[0][0].data).toMatchObject({ email: "ny@b.dk", signupName: "Ny Bruger", signupTeamId: "t1" });
+    expect(sendMail).toHaveBeenCalledOnce();
+  });
+
+  it("returns signup data when a signup code is verified", async () => {
+    db.loginCode.findFirst.mockResolvedValue({
+      id: "c1",
+      codeHash: hashLoginCode("ny@b.dk", "123456"),
+      attempts: 0,
+      signupName: "Ny Bruger",
+      signupTeamId: "t1"
+    });
+    db.loginCode.updateMany.mockResolvedValue({ count: 1 });
+    expect(await verifyLoginCode("ny@b.dk", "123456")).toEqual({ ok: true, signup: { name: "Ny Bruger", teamId: "t1" } });
   });
 });

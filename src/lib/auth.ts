@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { verifyLoginCode } from "@/lib/loginCode";
 import { checkRateLimit, getClientIp } from "@/lib/rateLimit";
+import { createUserFromSignup } from "@/lib/signupUser";
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
@@ -28,13 +29,18 @@ export const authOptions: NextAuthOptions = {
         const ipLimit = await checkRateLimit(`otp-verify:ip:${ip}`, 20, 10 * 60);
         if (!ipLimit.allowed) return null;
 
-        const valid = await verifyLoginCode(email, code);
-        if (!valid) return null;
+        const verified = await verifyLoginCode(email, code);
+        if (!verified.ok) return null;
 
-        const user = await prisma.user.findFirst({
+        let user = await prisma.user.findFirst({
           where: { email: { equals: email, mode: "insensitive" } }
         });
-        if (!user) return null;
+        if (!user) {
+          // Ny bruger: koden beviser, at e-mailen tilhører personen, så oprettelsen kan gennemføres.
+          if (!verified.signup) return null;
+          user = await createUserFromSignup({ email, ...verified.signup });
+          if (!user) return null;
+        }
 
         const hasMembership = await prisma.membership.findFirst({
           where: { userId: user.id, status: { in: ["ACTIVE", "PENDING"] } },

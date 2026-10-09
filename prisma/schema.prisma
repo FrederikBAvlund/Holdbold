@@ -609,6 +609,9 @@ model LoginCode {
   attempts   Int       @default(0)
   consumedAt DateTime?
   createdAt  DateTime  @default(now())
+  /// Sat, når koden bruges til at oprette en ny bruger (navn + hold fra signup).
+  signupName   String?
+  signupTeamId String?
 
   @@index([email, createdAt])
 }
