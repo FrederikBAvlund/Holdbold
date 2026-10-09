@@ -147,6 +147,22 @@ model Team {
   fines       Fine[]
   icalFeeds   IcalFeed[]
   notifications Notification[]
+  seasons     Season[]
+}
+
+model Season {
+  id        String    @id @default(cuid())
+  teamId    String
+  name      String
+  startedAt DateTime  @default(now())
+  closedAt  DateTime?
+
+  team        Team          @relation(fields: [teamId], references: [id])
+  events      Event[]
+  eventSeries EventSeries[]
+  fines       Fine[]
+
+  @@index([teamId, closedAt])
 }
 
 model Membership {
@@ -177,10 +193,12 @@ model EventSeries {
   endDate                  DateTime?
   signupDeadlineHoursBefore Int      @default(24)
   kind                     EventKind @default(TRAINING)
+  seasonId                 String
   createdById              String
   createdAt                DateTime @default(now())
 
   team Team @relation(fields: [teamId], references: [id])
+  season Season @relation(fields: [seasonId], references: [id])
   createdBy User @relation(fields: [createdById], references: [id])
   events Event[]
 }
@@ -206,9 +224,11 @@ model Event {
   matchHomeGoals Int?
   matchAwayGoals Int?
   matchMotmUserId String?
+  seasonId       String
   createdAt      DateTime     @default(now())
 
   team Team @relation(fields: [teamId], references: [id])
+  season Season @relation(fields: [seasonId], references: [id])
   series EventSeries? @relation(fields: [seriesId], references: [id])
   feed IcalFeed? @relation(fields: [feedId], references: [id])
   createdBy User? @relation("EventCreatedBy", fields: [createdById], references: [id])
@@ -225,6 +245,7 @@ model Event {
 
   @@index([teamId, date])
   @@index([teamId, kind, date])
+  @@index([seasonId])
   @@index([externalUid])
   @@index([canceledAt])
   @@index([thingCarrierId])
@@ -398,8 +419,10 @@ model Fine {
   rejectedAt    DateTime?
   rejectedById  String?
   automationAction FineAutomationAction?
+  seasonId      String
 
   team Team @relation(fields: [teamId], references: [id])
+  season Season @relation(fields: [seasonId], references: [id])
   user User @relation("FineRecipient", fields: [userId], references: [id])
   event Event? @relation(fields: [eventId], references: [id])
   template FineTemplate? @relation(fields: [templateId], references: [id])
@@ -409,6 +432,7 @@ model Fine {
 
   @@index([teamId, status])
   @@index([userId, status])
+  @@index([teamId, seasonId])
 }
 
 model FineTemplate {

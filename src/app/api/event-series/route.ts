@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { EVENT_MANAGER_ROLES, requireActiveTeamMember, requireSession } from "@/lib/apiAuth";
 import { prisma } from "@/lib/prisma";
+import { getActiveSeason } from "@/lib/seasons";
 
 const listSchema = z.object({
   teamId: z.string().min(1)
@@ -51,9 +52,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Kun trænere/admin kan oprette gentagelser" }, { status: 403 });
   }
 
+  const season = await getActiveSeason(body.teamId);
   const series = await prisma.eventSeries.create({
     data: {
       teamId: body.teamId,
+      seasonId: season.id,
       title: body.title,
       location: body.location,
       startDate: new Date(body.startDate),

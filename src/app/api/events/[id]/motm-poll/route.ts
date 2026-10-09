@@ -5,6 +5,7 @@ import { createNotifications } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 import { buildMotmPollApiView, eventMotmAvailabilityError } from "@/lib/motmPolls";
 import { resolveProfileImageUrl } from "@/lib/profileImages";
+import { ensureEventSeasonOpen } from "@/lib/seasons";
 
 function calendarFocusHrefForEvent(event: {
   id: string;
@@ -103,6 +104,9 @@ export async function GET(_request: Request, { params }: { params: { id: string 
 }
 
 export async function POST(request: Request, { params }: { params: { id: string } }) {
+  const seasonGuard = await ensureEventSeasonOpen(params.id);
+  if (seasonGuard) return seasonGuard;
+
   const session = await requireSession();
   if (!session.ok) return session.response;
 
@@ -208,6 +212,9 @@ export async function POST(request: Request, { params }: { params: { id: string 
 }
 
 export async function DELETE(_request: Request, { params }: { params: { id: string } }) {
+  const seasonGuard = await ensureEventSeasonOpen(params.id);
+  if (seasonGuard) return seasonGuard;
+
   const session = await requireSession();
   if (!session.ok) return session.response;
 

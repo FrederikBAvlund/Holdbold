@@ -69,7 +69,7 @@ function isSameLocalCalendarDay(a: Date, b: Date) {
 export default function DashboardHome() {
   const router = useRouter();
   const { data: session, status: sessionStatus } = useSession();
-  const { teamId, userId, members } = useDashboardTeam();
+  const { teamId, userId, members, seasonQuery } = useDashboardTeam();
   const memberCount = members.length;
   const [todayEvents, setTodayEvents] = useState<CalendarEvent[]>([]);
   const [nextEvents, setNextEvents] = useState<CalendarEvent[]>([]);
@@ -104,7 +104,7 @@ export default function DashboardHome() {
 
   useEffect(() => {
     if (!teamId || !userId) return;
-    const key = `${teamId}:${userId}`;
+    const key = `${teamId}:${userId}${seasonQuery}`;
     if (hasHydratedCacheRef.current === key) return;
     hasHydratedCacheRef.current = key;
 
@@ -129,12 +129,12 @@ export default function DashboardHome() {
     setLoadingNextEvents(false);
     setLoadingFines(false);
     setLoadingLeaderboards(false);
-  }, [teamId, userId]);
+  }, [teamId, userId, seasonQuery]);
 
   useEffect(() => {
     async function loadNextEvents() {
       if (!teamId || !userId) return;
-      const key = `${teamId}:${userId}`;
+      const key = `${teamId}:${userId}${seasonQuery}`;
       const cached = dashboardCache.get(key);
       const isFresh = cached && Date.now() - cached.updatedAt < DASHBOARD_CACHE_TTL_MS;
       if (isFresh) return;
@@ -223,7 +223,7 @@ export default function DashboardHome() {
     }
 
     loadNextEvents();
-  }, [teamId, userId]);
+  }, [teamId, userId, seasonQuery]);
 
   useEffect(() => {
     if (memberCount <= 0) return;
@@ -242,13 +242,13 @@ export default function DashboardHome() {
   useEffect(() => {
     async function loadFines() {
       if (!teamId || !userId) return;
-      const key = `${teamId}:${userId}`;
+      const key = `${teamId}:${userId}${seasonQuery}`;
       const cached = dashboardCache.get(key);
       const isFresh = cached && Date.now() - cached.updatedAt < DASHBOARD_CACHE_TTL_MS;
       if (isFresh) return;
       setLoadingFines(!cached);
       try {
-        const response = await fetch(`/api/fines?teamId=${teamId}&userId=${userId}`);
+        const response = await fetch(`/api/fines?teamId=${teamId}&userId=${userId}${seasonQuery}`);
         const data = await response.json();
         const list: FineItem[] = data.fines ?? [];
         setTotalFines(list.reduce((sum, fine) => sum + fine.amount, 0));
@@ -258,18 +258,18 @@ export default function DashboardHome() {
     }
 
     loadFines();
-  }, [teamId, userId]);
+  }, [teamId, userId, seasonQuery]);
 
   useEffect(() => {
     async function loadLeaderboards() {
       if (!teamId) return;
-      const key = `${teamId}:${userId ?? ""}`;
+      const key = `${teamId}:${userId ?? ""}${seasonQuery}`;
       const cached = dashboardCache.get(key);
       const isFresh = cached && Date.now() - cached.updatedAt < DASHBOARD_CACHE_TTL_MS;
       if (isFresh) return;
       setLoadingLeaderboards(!cached);
       try {
-        const response = await fetch(`/api/teams/${teamId}/leaderboards`);
+        const response = await fetch(`/api/teams/${teamId}/leaderboards${seasonQuery ? `?${seasonQuery.slice(1)}` : ""}`);
         if (!response.ok) {
           setLeaderboardSummary(null);
           return;
@@ -282,7 +282,7 @@ export default function DashboardHome() {
     }
 
     loadLeaderboards();
-  }, [teamId, userId]);
+  }, [teamId, userId, seasonQuery]);
 
   useEffect(() => {
     if (!teamId || !userId) return;
@@ -291,7 +291,7 @@ export default function DashboardHome() {
       skipNextCacheWriteRef.current = false;
       return;
     }
-    const key = `${teamId}:${userId}`;
+    const key = `${teamId}:${userId}${seasonQuery}`;
     dashboardCache.set(key, {
       todayEvents,
       nextEvents,
@@ -356,7 +356,7 @@ export default function DashboardHome() {
     setDetailRows([]);
     setDetailLoading(true);
     try {
-      const response = await fetch(`/api/teams/${teamId}/leaderboards?category=${encodeURIComponent(category)}`);
+      const response = await fetch(`/api/teams/${teamId}/leaderboards?category=${encodeURIComponent(category)}${seasonQuery}`);
       const data = response.ok ? await response.json() : { rows: [] };
       setDetailRows(data.rows ?? []);
     } finally {

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { seasonClosedResponse } from "@/lib/seasons";
 import { EVENT_MANAGER_ROLES, requireActiveTeamMemberWithRoles, requireSession } from "@/lib/apiAuth";
 
 const updateSchema = z.object({
@@ -11,6 +12,11 @@ const updateSchema = z.object({
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   const session = await requireSession();
   if (!session.ok) return session.response;
+
+  const seriesGuard = seasonClosedResponse(
+    (await prisma.eventSeries.findUnique({ where: { id: params.id }, select: { season: { select: { closedAt: true } } } }))?.season
+  );
+  if (seriesGuard) return seriesGuard;
 
   const existing = await prisma.eventSeries.findUnique({
     where: { id: params.id },

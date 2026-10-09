@@ -149,7 +149,7 @@ export default function KalenderPage() {
   const { pushToast } = useToast();
   const router = useRouter();
   const { data: session, status: sessionStatus } = useSession();
-  const { teamId, userId, members, actingMember } = useDashboardTeam();
+  const { teamId, userId, members, actingMember, seasonQuery } = useDashboardTeam();
   const [range, setRange] = useState<{ start: string; end: string } | null>(null);
   const lastRangeRef = useRef<{ start: string; end: string } | null>(null);
   const loadedCalendarKeyRef = useRef<string | null>(null);
@@ -276,13 +276,13 @@ export default function KalenderPage() {
   useEffect(() => {
     async function loadCalendar() {
       if (!teamId || !range || !userId) return;
-      const key = `${teamId}:${userId}:${range.start}:${range.end}`;
+      const key = `${teamId}:${userId}:${range.start}:${range.end}:${seasonQuery}`;
       if (loadedCalendarKeyRef.current === key) return;
       loadedCalendarKeyRef.current = key;
       setLoadingCalendar(true);
       try {
         const response = await fetch(
-          `/api/calendar?teamId=${teamId}&start=${range.start}&end=${range.end}&userId=${userId}`
+          `/api/calendar?teamId=${teamId}&start=${range.start}&end=${range.end}&userId=${userId}${seasonQuery}`
         );
         const data = await response.json();
         const combined = [...(data.events ?? []), ...(data.occurrences ?? [])];
@@ -293,7 +293,7 @@ export default function KalenderPage() {
     }
 
     loadCalendar();
-  }, [teamId, range, userId]);
+  }, [teamId, range, userId, seasonQuery]);
 
   useEffect(() => {
     async function loadSeries() {

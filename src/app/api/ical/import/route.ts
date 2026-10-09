@@ -4,6 +4,7 @@ import { z } from "zod";
 import { authOptions } from "@/lib/auth";
 import { createNotifications } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
+import { getActiveSeason } from "@/lib/seasons";
 
 const bodySchema = z.object({
   teamId: z.string().min(1),
@@ -283,6 +284,8 @@ export async function POST(request: Request) {
 
     const deadlineHours = 24;
 
+    const activeSeason = await getActiveSeason(body.teamId);
+
     for (const event of events) {
       const start = event.start instanceof Date ? event.start : null;
       if (!start) continue;
@@ -305,6 +308,7 @@ export async function POST(request: Request) {
       });
 
       if (existing) {
+        if (existing.seasonId !== activeSeason.id) continue; // arkiveret kamp i lukket sæson røres ikke
         await prisma.event.update({
           where: { id: existing.id },
           data: {
@@ -324,6 +328,7 @@ export async function POST(request: Request) {
         await prisma.event.create({
           data: {
             teamId: body.teamId,
+            seasonId: activeSeason.id,
             title,
             date: start,
             location,

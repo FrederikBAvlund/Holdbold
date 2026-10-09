@@ -1,6 +1,7 @@
 import type { FineAutomationAction } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { createNotifications } from "@/lib/notifications";
+import { getActiveSeason } from "@/lib/seasons";
 import {
   isPostDeadlineWithdrawal,
   isSameCalendarDayAsEvent,
@@ -12,6 +13,7 @@ export async function processMissedSignupFines(teamId: string) {
   const now = new Date();
   const nowMs = now.getTime();
 
+  const activeSeason = await getActiveSeason(teamId);
   const [players, managers, dueEvents] = await Promise.all([
     prisma.membership.findMany({
       where: { teamId, status: "ACTIVE" },
@@ -24,6 +26,7 @@ export async function processMissedSignupFines(teamId: string) {
     prisma.event.findMany({
       where: {
         teamId,
+        seasonId: activeSeason.id,
         canceledAt: null,
         signupDeadline: { lte: now }
       },
@@ -192,6 +195,7 @@ export async function processMissedSignupFines(teamId: string) {
     await prisma.fine.createMany({
       data: rows.map((row) => ({
         teamId,
+        seasonId: activeSeason.id,
         userId: row.userId,
         eventId: event.id,
         templateId: row.templateId,

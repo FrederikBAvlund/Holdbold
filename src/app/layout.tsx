@@ -1,6 +1,6 @@
 import "./globals.css";
 import type { Metadata, Viewport } from "next";
-import { Space_Grotesk, Manrope } from "next/font/google";
+import localFont from "next/font/local";
 import { getServerSession } from "next-auth";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import ThemeColorMeta from "@/components/ThemeColorMeta";
@@ -9,16 +9,24 @@ import ToastProvider from "@/components/ToastProvider";
 import PwaRegister from "@/components/PwaRegister";
 import { authOptions } from "@/lib/auth";
 
-const display = Space_Grotesk({
-  subsets: ["latin"],
-  variable: "--font-display",
-  weight: ["500", "600", "700"]
+// Skrifttyper self-hostes (via @fontsource) så build ikke afhænger af fonts.googleapis.com.
+const display = localFont({
+  src: [
+    { path: "../../node_modules/@fontsource/space-grotesk/files/space-grotesk-latin-500-normal.woff2", weight: "500", style: "normal" },
+    { path: "../../node_modules/@fontsource/space-grotesk/files/space-grotesk-latin-600-normal.woff2", weight: "600", style: "normal" },
+    { path: "../../node_modules/@fontsource/space-grotesk/files/space-grotesk-latin-700-normal.woff2", weight: "700", style: "normal" }
+  ],
+  variable: "--font-display"
 });
 
-const sans = Manrope({
-  subsets: ["latin"],
-  variable: "--font-sans",
-  weight: ["400", "500", "600", "700"]
+const sans = localFont({
+  src: [
+    { path: "../../node_modules/@fontsource/manrope/files/manrope-latin-400-normal.woff2", weight: "400", style: "normal" },
+    { path: "../../node_modules/@fontsource/manrope/files/manrope-latin-500-normal.woff2", weight: "500", style: "normal" },
+    { path: "../../node_modules/@fontsource/manrope/files/manrope-latin-600-normal.woff2", weight: "600", style: "normal" },
+    { path: "../../node_modules/@fontsource/manrope/files/manrope-latin-700-normal.woff2", weight: "700", style: "normal" }
+  ],
+  variable: "--font-sans"
 });
 
 export const metadata: Metadata = {

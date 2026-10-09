@@ -4,6 +4,7 @@ import { resolveAutomationTemplate, roleExcludedFromFineAutomation } from "@/lib
 import { buildScoreRowsFromPollBallots, buildMotmPollApiView } from "@/lib/motmPolls";
 import { createNotifications } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
+import { ensureEventSeasonOpen } from "@/lib/seasons";
 
 const pollInclude = {
   ballots: {
@@ -30,6 +31,9 @@ const pollInclude = {
 } as const;
 
 export async function POST(_request: Request, { params }: { params: { id: string } }) {
+  const seasonGuard = await ensureEventSeasonOpen(params.id);
+  if (seasonGuard) return seasonGuard;
+
   const session = await requireSession();
   if (!session.ok) return session.response;
 
@@ -37,7 +41,8 @@ export async function POST(_request: Request, { params }: { params: { id: string
     where: { id: params.id },
     select: {
       id: true,
-      teamId: true
+      teamId: true,
+      seasonId: true
     }
   });
   if (!event) {
@@ -146,6 +151,7 @@ export async function POST(_request: Request, { params }: { params: { id: string
       await prisma.fine.create({
         data: {
           teamId: event.teamId,
+          seasonId: event.seasonId,
           userId: closedWinnerUserId,
           eventId: event.id,
           templateId: resolved.template.id,
