@@ -39,6 +39,7 @@ export default function FineRow({
   event,
   actions,
   onClick,
+  select,
   className
 }: {
   title: string;
@@ -50,10 +51,23 @@ export default function FineRow({
   event?: { id: string; title: string; date: string } | null;
   actions?: ReactNode;
   onClick?: () => void;
+  /** Valgtilstand: viser afkrydsning, og hele rækken skifter valg. */
+  select?: { checked: boolean; onToggle: () => void };
   className?: string;
 }) {
   const body = (
     <>
+      {select ? (
+        <span
+          aria-hidden
+          className={cn(
+            "mt-1 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition",
+            select.checked ? "border-primary bg-primary text-on-primary" : "border-ink/25 bg-surface"
+          )}
+        >
+          {select.checked ? <Icon name="check" className="h-3.5 w-3.5" strokeWidth={3.5} /> : null}
+        </span>
+      ) : null}
       {person ? <Avatar name={person.name} image={person.image} size="md" className="mt-0.5" /> : null}
       <div className="min-w-0 flex-1">
         {person ? <p className="truncate text-sm font-semibold text-ink/60">{person.name}</p> : null}
@@ -79,6 +93,19 @@ export default function FineRow({
     </>
   );
   const base = cn("flex items-start gap-3 px-4 py-3.5 text-left", className);
+  if (select) {
+    return (
+      <button
+        type="button"
+        role="checkbox"
+        aria-checked={select.checked}
+        onClick={select.onToggle}
+        className={cn(base, "w-full transition active:bg-ink/[0.05]", select.checked ? "bg-primary/[0.07]" : "hover:bg-ink/[0.03]")}
+      >
+        {body}
+      </button>
+    );
+  }
   if (onClick) {
     return (
       <button type="button" onClick={onClick} className={cn(base, "w-full transition hover:bg-ink/[0.03] active:bg-ink/[0.05]")}>
