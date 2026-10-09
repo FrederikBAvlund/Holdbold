@@ -1,6 +1,6 @@
 import "./globals.css";
 import type { Metadata, Viewport } from "next";
-import { Space_Grotesk, Manrope } from "next/font/google";
+import { Barlow_Condensed, Inter } from "next/font/google";
 import { getServerSession } from "next-auth";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import ThemeColorMeta from "@/components/ThemeColorMeta";
@@ -9,16 +9,15 @@ import ToastProvider from "@/components/ToastProvider";
 import PwaRegister from "@/components/PwaRegister";
 import { authOptions } from "@/lib/auth";
 
-const display = Space_Grotesk({
+const display = Barlow_Condensed({
   subsets: ["latin"],
   variable: "--font-display",
-  weight: ["500", "600", "700"]
+  weight: ["600", "700", "800"]
 });
 
-const sans = Manrope({
+const sans = Inter({
   subsets: ["latin"],
-  variable: "--font-sans",
-  weight: ["400", "500", "600", "700"]
+  variable: "--font-sans"
 });
 
 export const metadata: Metadata = {

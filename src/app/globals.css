@@ -40,6 +40,11 @@
   --warning: #b45309;
   --danger: #dc2626;
   --scrim: color-mix(in srgb, var(--color-ink) 45%, transparent);
+  --in: #16a34a;
+  --out: #e11d48;
+  --pending: #d97706;
+  --kind-match: var(--primary);
+  --kind-training: color-mix(in srgb, var(--color-ink) 62%, #64748b);
 
   /* Bagudkompatible navne */
   --surface-glass: var(--surface);
@@ -72,6 +77,10 @@
     --warning: #fbbf24;
     --danger: #f05252;
     --scrim: rgba(0, 0, 0, 0.62);
+    --in: #4ade80;
+    --out: #fb7185;
+    --pending: #fbbf24;
+    --kind-training: #94a3b8;
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
     --shadow-md: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 28px -14px rgba(0, 0, 0, 0.6);
     --shadow-lg: 0 24px 60px -20px rgba(0, 0, 0, 0.8);
@@ -113,7 +122,105 @@ h1,
 h2,
 h3 {
   font-family: var(--font-display), system-ui, sans-serif;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.005em;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Sporty hero-flade: primærfarve med diagonale baneskrå-striber */
+.hero-surface {
+  /* Altid den mættede brandfarve med lys tekst – også i mørk tilstand. */
+  --primary: var(--color-button);
+  --on-primary: var(--color-button-text);
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: linear-gradient(
+    135deg,
+    var(--primary) 0%,
+    color-mix(in srgb, var(--primary) 78%, #000000) 100%
+  );
+  color: var(--on-primary);
+}
+
+.hero-surface::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image: repeating-linear-gradient(
+    -55deg,
+    transparent 0 22px,
+    color-mix(in srgb, #ffffff 7%, transparent) 22px 44px
+  );
+  mask-image: linear-gradient(90deg, transparent 0%, #000 55%);
+}
+
+.hero-surface::after {
+  content: "";
+  position: absolute;
+  right: -3.5rem;
+  bottom: -3.5rem;
+  z-index: -1;
+  width: 12rem;
+  height: 12rem;
+  border-radius: 999px;
+  border: 2px solid color-mix(in srgb, #ffffff 16%, transparent);
+  box-shadow: 0 0 0 2.25rem color-mix(in srgb, #ffffff 5%, transparent);
+}
+
+.no-scrollbar {
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    transition-duration: 1ms !important;
+  }
 }
 
 a {

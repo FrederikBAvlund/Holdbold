@@ -7,7 +7,7 @@ export type MePayload = {
     themePreset?: string | null;
     themeConfig?: Record<string, string> | null;
   } | null;
-  memberships?: Array<{ team?: { id?: string; name?: string; slug?: string } }>;
+  memberships?: Array<{ role?: string; status?: string; team?: { id?: string; name?: string; slug?: string } }>;
 };
 
 type MeFetchResult = { ok: boolean; data: MePayload };
