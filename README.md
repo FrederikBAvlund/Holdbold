@@ -22,6 +22,7 @@ npm run dev
 - Databasen koerer lokalt i Docker (`docker-compose.yml`, Postgres 16). Start med `npm run db:up`.
 - Nulstil databasen (migrationer + seed) med `npm run db:reset`.
 - Ny migration under udvikling: `npm run prisma:migrate`.
+- Efter at have hentet nye aendringer (fx nye migrationer): koer `npx prisma generate` og `npx prisma migrate deploy`, ellers fejler build/typecheck paa en foraeldet Prisma-klient.
 - Supabase-variablerne kan vaere tomme lokalt; profilbilleder gemmes saa i `public/uploads/` (ignoreres af git).
 - Log ind lokalt med `AUTH_CREDENTIALS_ENABLED=true` og seed-brugerne (Facebook-login er ikke noedvendigt).
 
