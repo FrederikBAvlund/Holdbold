@@ -196,7 +196,7 @@ export default function HomePage() {
         </h1>
       </header>
 
-      {/* Næste op */}
+      {/* Næste begivenhed */}
       <section aria-label="Næste begivenhed">
         {events === null ? (
           <Skeleton className="h-[19rem] rounded-[1.75rem]" />
@@ -332,7 +332,7 @@ function NextUpHero({
   return (
     <div className="hero-surface rounded-[1.75rem] p-5 shadow-[0_24px_48px_-24px_var(--primary)]">
       <div className="flex items-center justify-between gap-2">
-        <span className="font-display text-sm font-bold uppercase tracking-[0.14em] text-on-primary/75">Næste op</span>
+        <span className="font-display text-sm font-bold uppercase tracking-[0.14em] text-on-primary/75">Næste begivenhed</span>
         <KindTag kind={event.kind} onHero />
       </div>
 

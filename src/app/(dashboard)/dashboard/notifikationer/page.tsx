@@ -47,18 +47,19 @@ export default function NotifikationerPage() {
   const [items, setItems] = useState<NotificationItem[] | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
   const [markingAll, setMarkingAll] = useState(false);
+  const [showAll, setShowAll] = useState(false);
   const userId = session?.user?.id;
 
   const load = useCallback(async () => {
     try {
-      const response = await fetch("/api/notifications", { cache: "no-store" });
+      const response = await fetch(`/api/notifications${showAll ? "" : "?days=7"}`, { cache: "no-store" });
       if (!response.ok) return;
       const data = await response.json();
       setItems(data.notifications ?? []);
     } catch {
       setItems((prev) => prev ?? []);
     }
-  }, []);
+  }, [showAll]);
 
   useEffect(() => {
     if (!userId) return;
@@ -197,6 +198,12 @@ export default function NotifikationerPage() {
           ))}
         </div>
       )}
+
+      {items !== null && !showAll ? (
+        <Button variant="secondary" block onClick={() => setShowAll(true)}>
+          Vis ældre notifikationer
+        </Button>
+      ) : null}
     </div>
   );
 }
