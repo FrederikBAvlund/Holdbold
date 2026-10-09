@@ -74,6 +74,7 @@ export function createDialogueEventHandler(cb: Callbacks) {
       }
       if (response.status !== "completed") return;
       let toolHandled = false;
+      let onlySuccessfulWrites = true;
       for (const item of response.output ?? []) {
         if (item.type !== "function_call" || !item.call_id || completedCalls.has(item.call_id)) continue;
         completedCalls.add(item.call_id);
@@ -83,12 +84,21 @@ export function createDialogueEventHandler(cb: Callbacks) {
         } catch {
           output = { ok: false, error: "Ugyldigt værktøjskald. Prøv igen." };
         }
+        const acceptedWrite = (item.name === "add_fine_drafts" || item.name === "set_fine_drafts") &&
+          typeof output === "object" && output !== null && "ok" in output && output.ok === true;
+        onlySuccessfulWrites = onlySuccessfulWrites && acceptedWrite;
         cb.send({ type: "conversation.item.create", item: { type: "function_call_output", call_id: item.call_id, output: JSON.stringify(output) } });
         toolHandled = true;
       }
       if (toolHandled) {
         cb.onBusy(true);
-        cb.send({ type: "response.create" });
+        cb.send({ type: "response.create", ...(onlySuccessfulWrites ? {
+          response: {
+            instructions: "Bekræft kun den accepterede ændring i én kort dansk sætning på højst 15 ord. Ingen spørgsmål. Ved added: 0: sig at forslagene allerede findes. Bøderne er kun forslag, ikke tildelt.",
+            tool_choice: "none",
+            max_output_tokens: 256
+          }
+        } : {}) });
       }
     } else if (event.type === "error" || event.type === "conversation.item.input_audio_transcription.failed") {
       cb.onBusy(false);
