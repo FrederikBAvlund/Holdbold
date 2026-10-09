@@ -599,3 +599,16 @@ model VerificationToken {
 
   @@unique([identifier, token])
 }
+
+/// Engangskode til login via e-mail. Koden gemmes kun som HMAC-hash.
+model LoginCode {
+  id         String    @id @default(cuid())
+  email      String
+  codeHash   String
+  expiresAt  DateTime
+  attempts   Int       @default(0)
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([email, createdAt])
+}

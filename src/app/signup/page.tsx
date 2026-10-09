@@ -4,7 +4,6 @@ import AuthShell from "@/components/AuthShell";
 import Button from "@/components/ui/Button";
 import { inputClass } from "@/components/ui/primitives";
 import { useEffect, useState } from "react";
-import { getProviders, signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 
 export default function SignupPage() {
@@ -18,23 +17,6 @@ export default function SignupPage() {
   const [teamSlug, setTeamSlug] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [facebookEnabled, setFacebookEnabled] = useState(false);
-
-  useEffect(() => {
-    getProviders()
-      .then((providers) => setFacebookEnabled(Boolean(providers?.facebook)))
-      .catch(() => setFacebookEnabled(false));
-  }, []);
-
-  function handleFacebook() {
-    const slug = teamSlug.trim().toLowerCase();
-    if (!slug) {
-      setFieldErrors({ teamSlug: "Hold slug er paakraevet" });
-      setMessage("Udfyld holdslug, før du fortsætter med Facebook.");
-      return;
-    }
-    signIn("facebook", { callbackUrl: `/join?slug=${encodeURIComponent(slug)}` });
-  }
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -169,19 +151,6 @@ export default function SignupPage() {
         Opret bruger
       </Button>
     </form>
-
-      {facebookEnabled ? (
-        <>
-          <div className="my-5 flex items-center gap-3 text-xs text-ink/45">
-            <span className="h-px flex-1 bg-line" />
-            eller
-            <span className="h-px flex-1 bg-line" />
-          </div>
-          <Button variant="secondary" block onClick={handleFacebook}>
-            Opret med Facebook
-          </Button>
-        </>
-      ) : null}
 
       {message ? <p className="mt-4 text-sm font-semibold text-ink/80">{message}</p> : null}
       <p className="mt-5 text-center text-sm text-ink/70">

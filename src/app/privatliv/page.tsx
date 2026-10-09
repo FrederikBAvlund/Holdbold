@@ -16,7 +16,7 @@ export default function PrivatlivPage() {
             <li>Navn</li>
             <li>Email</li>
             <li>Krypteret adgangskode (password hash)</li>
-            <li>Ved login med Facebook: dit Facebook-id, navn, e-mail og profilbillede</li>
+            <li>Midlertidige engangskoder til login (kun som hash, de udløber efter 10 minutter)</li>
             <li>Holdmedlemskab, roller, tilmeldinger, bøder og notifikationer</li>
           </ul>
         </section>
