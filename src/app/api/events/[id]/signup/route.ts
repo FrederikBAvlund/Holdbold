@@ -4,6 +4,7 @@ import { z } from "zod";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { createNotifications } from "@/lib/notifications";
+import { ensureEventSeasonOpen } from "@/lib/seasons";
 import {
   isPostDeadlineWithdrawal,
   isSameCalendarDayAsEvent,
@@ -67,6 +68,9 @@ export async function GET(request: Request, { params }: { params: { id: string }
 }
 
 export async function POST(request: Request, { params }: { params: { id: string } }) {
+  const seasonGuard = await ensureEventSeasonOpen(params.id);
+  if (seasonGuard) return seasonGuard;
+
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Ikke logget ind" }, { status: 401 });
@@ -84,6 +88,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
     select: {
       id: true,
       teamId: true,
+      seasonId: true,
       title: true,
       date: true,
       kind: true,
@@ -234,6 +239,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
         await prisma.fine.create({
           data: {
             teamId: event.teamId,
+            seasonId: event.seasonId,
             userId: body.userId,
             eventId: event.id,
             templateId: template.id,

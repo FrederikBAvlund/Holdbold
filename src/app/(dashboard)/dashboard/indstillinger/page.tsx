@@ -7,6 +7,7 @@ import { getStoredTeamId, setStoredTeamId } from "@/components/appState";
 import { useToast } from "@/components/ToastProvider";
 import PushSettings from "@/components/PushSettings";
 import { CollapsibleCard } from "@/components/CollapsibleCard";
+import SeasonSettingsCard from "@/components/SeasonSettingsCard";
 import LoadingButton from "@/components/LoadingButton";
 import { invalidateDashboardTeam } from "@/components/DashboardTeamProvider";
 import { clearMeClientCache } from "@/lib/meClientCache";
@@ -1401,6 +1402,14 @@ export default function IndstillingerPage() {
           ) : null}
         </CollapsibleCard>
       </div>
+
+      {teamId ? (
+        <SeasonSettingsCard
+          teamId={teamId}
+          isAdmin={isAdmin}
+          storageKey={`holdbold:settings:${session.user.id}:saeson:${teamId}`}
+        />
+      ) : null}
 
       {isAdmin ? (
         <CollapsibleCard

@@ -2,6 +2,7 @@ import DashboardNav from "@/components/DashboardNav";
 import DashboardTeamProvider, {
   type DashboardMembership
 } from "@/components/DashboardTeamProvider";
+import SeasonReadOnlyMain from "@/components/SeasonReadOnlyMain";
 import PendingAccessGuard from "@/components/PendingAccessGuard";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
@@ -29,7 +30,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
             serverUserName={session.user?.name ?? null}
             serverUserEmail={session.user?.email ?? null}
           />
-          <main className="min-w-0 flex-1 space-y-6">{children}</main>
+          <SeasonReadOnlyMain>{children}</SeasonReadOnlyMain>
         </div>
       </DashboardTeamProvider>
     </div>

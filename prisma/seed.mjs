@@ -109,6 +109,11 @@ async function main() {
     update: { name: teamName }
   });
 
+  const hasSeason = await prisma.season.findFirst({ where: { teamId: team.id }, select: { id: true } });
+  if (!hasSeason) {
+    await prisma.season.create({ data: { teamId: team.id, name: "Sæson 1" } });
+  }
+
   const adminEmail = process.env.SEED_ADMIN_EMAIL;
   const adminPassword = process.env.SEED_ADMIN_PASSWORD;
   const playerEmail = process.env.SEED_PLAYER_EMAIL;

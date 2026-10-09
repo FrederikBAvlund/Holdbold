@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createNotifications } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
+import { getActiveSeason, resolveSeason } from "@/lib/seasons";
 import {
   EVENT_MANAGER_ROLES,
   requireActiveTeamMember,
@@ -33,8 +34,13 @@ export async function GET(request: Request) {
   const member = await requireActiveTeamMember(session.userId, parsedTeamId);
   if (!member.ok) return member.response;
 
+  const season = await resolveSeason(parsedTeamId, searchParams.get("seasonId"));
+  if (!season) {
+    return NextResponse.json({ error: "Sæson ikke fundet" }, { status: 404 });
+  }
+
   const events = await prisma.event.findMany({
-    where: { teamId: parsedTeamId },
+    where: { teamId: parsedTeamId, seasonId: season.id },
     orderBy: { date: "asc" },
     take: 100
   });
@@ -54,9 +60,11 @@ export async function POST(request: Request) {
 
   const createdById = session.userId;
 
+  const season = await getActiveSeason(body.teamId);
   const event = await prisma.event.create({
     data: {
       teamId: body.teamId,
+      seasonId: season.id,
       title: body.title,
       date: new Date(body.date),
       location: body.location,

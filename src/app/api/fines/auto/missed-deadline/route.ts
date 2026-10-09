@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createNotifications } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
+import { ensureEventSeasonOpen } from "@/lib/seasons";
 import { FINE_AUTOMATION_ROLES, requireActiveTeamMemberWithRoles, requireSession } from "@/lib/apiAuth";
 import { resolveAutomationTemplate, roleExcludedFromFineAutomation } from "@/lib/fineAutomation";
 
@@ -25,6 +26,7 @@ export async function POST(request: Request) {
     select: {
       id: true,
       teamId: true,
+      seasonId: true,
       title: true,
       kind: true,
       signupDeadline: true,
@@ -35,6 +37,8 @@ export async function POST(request: Request) {
   if (!event) {
     return NextResponse.json({ error: "Event ikke fundet" }, { status: 404 });
   }
+  const seasonGuard = await ensureEventSeasonOpen(event.id);
+  if (seasonGuard) return seasonGuard;
 
   if (new Date() < event.signupDeadline) {
     return NextResponse.json({ error: "Deadline er ikke passeret" }, { status: 400 });
@@ -71,6 +75,7 @@ export async function POST(request: Request) {
     await prisma.fine.create({
       data: {
         teamId: body.teamId,
+        seasonId: event.seasonId,
         userId: member.userId,
         eventId: event.id,
         templateId: template.id,

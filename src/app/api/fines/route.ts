@@ -4,6 +4,7 @@ import { z } from "zod";
 import { authOptions } from "@/lib/auth";
 import { createNotifications } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
+import { getActiveSeason, resolveSeason, seasonClosedResponse } from "@/lib/seasons";
 
 const FINE_STATUSES = [
   "UNPAID",
@@ -18,7 +19,8 @@ const listSchema = z.object({
   userId: z.string().optional(),
   createdById: z.string().optional(),
   since: z.string().optional(),
-  status: z.string().optional()
+  status: z.string().optional(),
+  seasonId: z.string().optional()
 });
 
 function parseStatusFilter(raw: string | undefined) {
@@ -105,9 +107,15 @@ export async function GET(request: Request) {
     Boolean(statuses) ||
     Boolean(since);
 
+  const season = await resolveSeason(parsed.teamId, parsed.seasonId);
+  if (!season) {
+    return NextResponse.json({ error: "Sæson ikke fundet" }, { status: 404 });
+  }
+
   const fines = await prisma.fine.findMany({
     where: {
       teamId: parsed.teamId,
+      seasonId: season.id,
       ...(parsed.userId ? { userId: parsed.userId } : {}),
       ...(parsed.createdById ? { createdById: parsed.createdById } : {}),
       ...(since ? { createdAt: { gte: since } } : {}),
@@ -189,9 +197,26 @@ export async function POST(request: Request) {
     templateId = template.id;
   }
 
+  let seasonId: string;
+  if (body.eventId) {
+    const fineEvent = await prisma.event.findFirst({
+      where: { id: body.eventId, teamId: body.teamId },
+      select: { seasonId: true, season: { select: { closedAt: true } } }
+    });
+    if (!fineEvent) {
+      return NextResponse.json({ error: "Begivenhed ikke fundet" }, { status: 404 });
+    }
+    const closed = seasonClosedResponse(fineEvent.season);
+    if (closed) return closed;
+    seasonId = fineEvent.seasonId;
+  } else {
+    seasonId = (await getActiveSeason(body.teamId)).id;
+  }
+
   const fine = await prisma.fine.create({
     data: {
       teamId: body.teamId,
+      seasonId,
       userId: body.userId,
       eventId: body.eventId,
       templateId,

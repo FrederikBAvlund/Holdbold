@@ -3,12 +3,14 @@ import { getServerSession } from "next-auth";
 import { z } from "zod";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { resolveSeason } from "@/lib/seasons";
 
 const querySchema = z.object({
   teamId: z.string().min(1),
   start: z.string().datetime(),
   end: z.string().datetime(),
-  userId: z.string().optional()
+  userId: z.string().optional(),
+  seasonId: z.string().optional()
 });
 
 function addDays(date: Date, days: number) {
@@ -55,7 +57,8 @@ export async function GET(request: Request) {
     teamId: searchParams.get("teamId") ?? "",
     start: searchParams.get("start") ?? "",
     end: searchParams.get("end") ?? "",
-    userId: searchParams.get("userId") ?? undefined
+    userId: searchParams.get("userId") ?? undefined,
+    seasonId: searchParams.get("seasonId") ?? undefined
   });
 
   const start = new Date(parsed.start);
@@ -77,9 +80,15 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Ikke adgang til andre spilleres tilmeldingsstatus" }, { status: 403 });
   }
 
+  const season = await resolveSeason(parsed.teamId, parsed.seasonId);
+  if (!season) {
+    return NextResponse.json({ error: "Sæson ikke fundet" }, { status: 404 });
+  }
+
   const events = await prisma.event.findMany({
     where: {
       teamId: parsed.teamId,
+      seasonId: season.id,
       date: { gte: start, lte: end }
     },
     include: {
@@ -97,9 +106,12 @@ export async function GET(request: Request) {
     }
   });
 
-  const seriesList = await prisma.eventSeries.findMany({
-    where: { teamId: parsed.teamId }
-  });
+  // Gentagelser i en lukket sæson er arkiveret og foldes ikke længere ud til nye datoer.
+  const seriesList = season.closedAt
+    ? []
+    : await prisma.eventSeries.findMany({
+        where: { teamId: parsed.teamId, seasonId: season.id }
+      });
 
   const occurrences = [] as Array<{
     id: string;

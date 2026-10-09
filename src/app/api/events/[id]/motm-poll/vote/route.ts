@@ -5,6 +5,7 @@ import { normalizeMotmSelections } from "@/lib/motm";
 import { buildMotmPollApiView, eventMotmAvailabilityError } from "@/lib/motmPolls";
 import { syncMotmSelfVoteProposedFines } from "@/lib/motmSelfVoteFines";
 import { prisma } from "@/lib/prisma";
+import { ensureEventSeasonOpen } from "@/lib/seasons";
 
 const voteSchema = z.object({
   selections: z.array(
@@ -40,6 +41,9 @@ const pollInclude = {
 } as const;
 
 export async function POST(request: Request, { params }: { params: { id: string } }) {
+  const seasonGuard = await ensureEventSeasonOpen(params.id);
+  if (seasonGuard) return seasonGuard;
+
   const session = await requireSession();
   if (!session.ok) return session.response;
 

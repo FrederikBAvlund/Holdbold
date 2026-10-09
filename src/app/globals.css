@@ -118,6 +118,11 @@ a {
   color: var(--color-fog);
 }
 
+[data-season-readonly="true"] .btn-primary {
+  pointer-events: none;
+  opacity: 0.45;
+}
+
 @layer components {
   .card {
     @apply w-full min-w-0 p-6;
