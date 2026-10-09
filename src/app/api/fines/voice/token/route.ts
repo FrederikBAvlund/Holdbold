@@ -33,17 +33,25 @@ export async function POST(request: Request) {
   });
   const names = memberships.map((m) => m.user.name).filter(Boolean).slice(0, 60);
 
-  const response = await fetch("https://api.openai.com/v1/realtime/transcription_sessions", {
+  const response = await fetch("https://api.openai.com/v1/realtime/client_secrets", {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      input_audio_transcription: {
-        model: "gpt-4o-transcribe",
-        language: "da",
-        prompt: `Danske bøder på et fodboldhold. Spillere: ${names.join(", ")}.`
-      },
-      turn_detection: { type: "server_vad", silence_duration_ms: 450, prefix_padding_ms: 200 },
-      input_audio_noise_reduction: { type: "near_field" }
+      expires_after: { anchor: "created_at", seconds: 600 },
+      session: {
+        type: "transcription",
+        audio: {
+          input: {
+            transcription: {
+              model: "gpt-4o-transcribe",
+              language: "da",
+              prompt: `Danske bøder på et fodboldhold. Spillere: ${names.join(", ")}.`
+            },
+            turn_detection: { type: "server_vad", silence_duration_ms: 450, prefix_padding_ms: 200 },
+            noise_reduction: { type: "near_field" }
+          }
+        }
+      }
     })
   });
 
@@ -69,10 +77,10 @@ export async function POST(request: Request) {
     }
     return NextResponse.json({ error }, { status: 502 });
   }
-  const data = (await response.json()) as { client_secret?: { value?: string; expires_at?: number } };
-  const token = data.client_secret?.value;
+  const data = (await response.json()) as { value?: string; expires_at?: number };
+  const token = data.value;
   if (!token) {
     return NextResponse.json({ error: "Kunne ikke starte transskription" }, { status: 502 });
   }
-  return NextResponse.json({ token, expiresAt: data.client_secret?.expires_at ?? null });
+  return NextResponse.json({ token, expiresAt: data.expires_at ?? null });
 }
