@@ -7,7 +7,7 @@ vi.mock("@/lib/apiAuth", () => ({
   requireActiveTeamMemberWithRoles: vi.fn(async () => ({ ok: true }))
 }));
 vi.mock("@/lib/prisma", () => ({
-  prisma: { membership: { findMany: vi.fn(async () => []) } }
+  prisma: { membership: { findMany: vi.fn(async () => [{ user: { id: "u1", name: "André Lundgren" } }]) }, fineTemplate: { findMany: vi.fn(async () => []) } }
 }));
 vi.mock("@/lib/seasons", () => ({
   getActiveSeason: vi.fn(async () => ({ closedAt: null })),
@@ -25,35 +25,24 @@ describe("voice token", () => {
     vi.unstubAllEnvs();
   });
 
-  it("opretter en dansk transskriptionssession og læser GA-tokenets format", async () => {
-    const fetchMock = vi.fn(async () => Response.json({
-      value: "ek-test", expires_at: 12345, session: { type: "transcription" }
+  it.each([true, false])("opretter dialog med spoken=%s uden spillerliste i transskriptionsprompten", async (spoken) => {
+    const fetchMock = vi.fn(async (_url: string, _options: RequestInit) => Response.json({
+      value: "ek-test", expires_at: 12345, session: { type: "realtime" }
     }));
     vi.stubGlobal("fetch", fetchMock);
     const response = await POST(new Request("http://localhost/api/fines/voice/token", {
-      method: "POST", body: JSON.stringify({ teamId: "team" })
+      method: "POST", body: JSON.stringify({ teamId: "team", spoken })
     }));
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ token: "ek-test", expiresAt: 12345 });
-    expect(fetchMock).toHaveBeenCalledWith("https://api.openai.com/v1/realtime/client_secrets", {
-      method: "POST",
-      headers: { Authorization: "Bearer test-key", "Content-Type": "application/json" },
-      body: JSON.stringify({
-        expires_after: { anchor: "created_at", seconds: 600 },
-        session: {
-          type: "transcription",
-          audio: {
-            input: {
-              transcription: {
-                model: "gpt-4o-transcribe", language: "da", prompt: "Danske bøder på et fodboldhold. Spillere: ."
-              },
-              turn_detection: { type: "server_vad", silence_duration_ms: 450, prefix_padding_ms: 200 },
-              noise_reduction: { type: "near_field" }
-            }
-          }
-        }
-      })
-    });
+    expect(fetchMock.mock.calls[0][0]).toBe("https://api.openai.com/v1/realtime/client_secrets");
+    const body = JSON.parse(String(fetchMock.mock.calls[0][1].body));
+    expect(body.session.type).toBe("realtime");
+    expect(body.session.model).toBe("gpt-realtime-2.1-mini");
+    expect(body.session.output_modalities).toEqual([spoken ? "audio" : "text"]);
+    expect(body.session.instructions).toContain("André Lundgren");
+    expect(body.session.audio.input.transcription).toEqual({ model: "gpt-4o-transcribe", language: "da" });
+    expect(body.session.tools.map((t: { name: string }) => t.name)).toEqual(["get_fine_drafts", "set_fine_drafts"]);
   });
 
   it("afviser et succesrespons uden et brugbart token", async () => {

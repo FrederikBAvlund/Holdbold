@@ -4,14 +4,14 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import { Combobox } from "@/components/ui/combobox";
 import LoadingButton from "@/components/LoadingButton";
 import { useToast } from "@/components/ToastProvider";
-import type { VoiceSuggestion } from "@/lib/voiceFines/matching";
+import { validateDraftUpdate } from "@/lib/voiceFines/dialogue";
 import {
-  emptyParseUsage,
+  emptyDialogueUsage,
   emptyTranscribeUsage,
-  parseCostUsd,
+  dialogueCostUsd,
   transcribeCostUsd,
   usdToDkk,
-  type ParseUsage,
+  type DialogueUsage,
   type TranscribeUsage
 } from "@/lib/voiceFines/pricing";
 import type { FineTemplate, Member } from "./boderTypes";
@@ -42,17 +42,18 @@ const nextKey = () => `row-${++rowCounter}`;
 export function VoiceFinesModal({ teamId, members, templates, onClose, onCreated }: Props) {
   const { pushToast } = useToast();
   const [rows, setRows] = useState<Row[]>([]);
-  const [segments, setSegments] = useState<string[]>([]);
-  const [pendingParses, setPendingParses] = useState(0);
+  const [messages, setMessages] = useState<Array<{ id: string; role: "user" | "assistant"; text: string }>>([]);
+  const [spoken, setSpoken] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [transcribeUsage, setTranscribeUsage] = useState<TranscribeUsage>(emptyTranscribeUsage);
-  const [parseUsage, setParseUsage] = useState<ParseUsage>(emptyParseUsage);
-
+  const [dialogueUsage, setDialogueUsage] = useState<DialogueUsage>(emptyDialogueUsage);
   const rowsRef = useRef<Row[]>([]);
-  rowsRef.current = rows;
-  const segmentsRef = useRef<string[]>([]);
-  segmentsRef.current = segments;
-  const queueRef = useRef<Promise<void>>(Promise.resolve());
+  const snapshotRef = useRef("initial");
+  const commitRows = useCallback((next: Row[]) => {
+    rowsRef.current = next;
+    snapshotRef.current = crypto.randomUUID();
+    setRows(next);
+  }, []);
 
   const approved = useMemo(() => templates.filter((t) => !t.status || t.status === "APPROVED"), [templates]);
   const memberOptions = useMemo(
@@ -68,83 +69,58 @@ export function VoiceFinesModal({ teamId, members, templates, onClose, onCreated
   );
   const nameById = useMemo(() => new Map(members.map((m) => [m.user.id, m.user.name])), [members]);
 
-  const addSuggestions = useCallback((suggestions: VoiceSuggestion[]) => {
-    if (!suggestions.length) return;
-    setRows((prev) => [
-      ...prev,
-      ...suggestions.map((s) => ({
-        key: nextKey(),
-        userId: s.userId,
-        templateId: s.templateId ?? "",
-        title: s.title,
-        amount: s.amount === null ? "" : String(s.amount),
-        confidence: s.confidence,
-        sourceText: s.sourceText
+  const draftMembers = useMemo(() => members.map((m) => ({ id: m.user.id, name: m.user.name })), [members]);
+  const draftTemplates = useMemo(() => approved.map((t) => ({ id: t.id, title: t.title, amount: t.amount })), [approved]);
+  const handleTool = (name: string, input: unknown) => {
+    const snapshot = () => ({
+      ok: true,
+      snapshotId: snapshotRef.current,
+      fines: rowsRef.current.map((r) => ({
+        userId: r.userId, templateId: r.templateId || null, title: r.title,
+        amount: parseIntegerAmountInput(r.amount).ok ? Number(r.amount) : null,
+        confidence: r.confidence, sourceText: r.sourceText
       }))
-    ]);
-  }, []);
+    });
+    if (name === "get_fine_drafts") return snapshot();
+    if (name !== "set_fine_drafts") return { ok: false, error: "Ukendt værktøj" };
+    const result = validateDraftUpdate(input, snapshotRef.current, draftMembers, draftTemplates);
+    if (!result.ok) return { ...snapshot(), ...result };
+    commitRows(result.fines.map((f) => ({
+      key: nextKey(), userId: f.userId, templateId: f.templateId ?? "", title: f.title,
+      amount: f.amount === null ? "" : String(f.amount), confidence: f.confidence, sourceText: f.sourceText
+    })));
+    return snapshot();
+  };
 
-  // Segmenter fortolkes i rækkefølge, så "allerede foreslået" altid er opdateret.
-  const handleSegment = useCallback(
-    (text: string) => {
-      const context = segmentsRef.current.slice(-2).join(" ");
-      setSegments((prev) => [...prev, text]);
-      setPendingParses((n) => n + 1);
-      queueRef.current = queueRef.current.then(async () => {
-        try {
-          const response = await fetch("/api/fines/voice/parse", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              teamId,
-              segment: text,
-              context,
-              existing: rowsRef.current.map((r) => ({
-                userId: r.userId,
-                title: r.title,
-                amount: parseIntegerAmountInput(r.amount).ok ? Number(r.amount) : null
-              }))
-            })
-          });
-          const data = await response.json().catch(() => ({}));
-          if (!response.ok) {
-            pushToast(data.error ?? "Kunne ikke fortolke udsagn", "error");
-            return;
-          }
-          addSuggestions(data.suggestions ?? []);
-          if (data.usage) {
-            setParseUsage((u) => ({
-              input: u.input + data.usage.input,
-              output: u.output + data.usage.output,
-              cacheRead: u.cacheRead + data.usage.cacheRead,
-              cacheWrite: u.cacheWrite + data.usage.cacheWrite
-            }));
-          }
-        } finally {
-          setPendingParses((n) => n - 1);
-        }
-      });
-    },
-    [teamId, addSuggestions, pushToast]
-  );
-
-  const { recording, connecting, liveText, start, stop } = useRealtimeTranscription({
+  const { recording, connecting, busy, liveText, audioRef, start, stop } = useRealtimeTranscription({
     teamId,
-    onSegment: handleSegment,
-    onUsage: (usage) =>
-      setTranscribeUsage((u) => ({
-        audioIn: u.audioIn + usage.audioIn,
-        textIn: u.textIn + usage.textIn,
-        textOut: u.textOut + usage.textOut
-      })),
+    spoken,
+    onSegment: (text) => setMessages((prev) => [...prev, { id: nextKey(), role: "user" as const, text }].slice(-30)),
+    onReply: (id, text) => setMessages((prev) => {
+      const existing = prev.find((m) => m.id === id);
+      return existing
+        ? prev.map((m) => m.id === id ? { ...m, text } : m)
+        : [...prev, { id, role: "assistant" as const, text }].slice(-30);
+    }),
+    onTool: handleTool,
+    onUsage: (usage) => setTranscribeUsage((u) => ({
+      audioIn: u.audioIn + usage.audioIn,
+      textIn: u.textIn + usage.textIn,
+      textOut: u.textOut + usage.textOut
+    })),
+    onDialogueUsage: (usage) => setDialogueUsage((u) => ({
+      audioIn: u.audioIn + usage.audioIn, audioOut: u.audioOut + usage.audioOut,
+      textIn: u.textIn + usage.textIn, textOut: u.textOut + usage.textOut,
+      cachedAudio: u.cachedAudio + usage.cachedAudio, cachedText: u.cachedText + usage.cachedText
+    })),
     onError: (message) => pushToast(message, "error")
   });
 
   const updateRow = (key: string, patch: Partial<Row>) =>
-    setRows((prev) => prev.map((r) => (r.key === key ? { ...r, ...patch, confidence: 1 } : r)));
-  const removeRow = (key: string) => setRows((prev) => prev.filter((r) => r.key !== key));
+    commitRows(rowsRef.current.map((r) => r.key === key ? { ...r, ...patch, confidence: 1 } : r));
+  const removeRow = (key: string) => commitRows(rowsRef.current.filter((r) => r.key !== key));
   const addEmptyRow = () =>
-    setRows((prev) => [...prev, { key: nextKey(), userId: "", templateId: "", title: "", amount: "", confidence: 1, sourceText: "" }]);
+    commitRows([...rowsRef.current, { key: nextKey(), userId: "", templateId: "", title: "", amount: "", confidence: 1, sourceText: "" }]);
 
   function selectTemplate(key: string, templateId: string) {
     const template = approved.find((t) => t.id === templateId);
@@ -176,13 +152,13 @@ export function VoiceFinesModal({ teamId, members, templates, onClose, onCreated
 
   const total = rows.reduce((sum, r) => sum + (r.templateId ? (approved.find((t) => t.id === r.templateId)?.amount ?? 0) : Number(r.amount) || 0), 0);
 
-  const costUsd = transcribeCostUsd(transcribeUsage) + parseCostUsd(parseUsage);
+  const costUsd = transcribeCostUsd(transcribeUsage) + dialogueCostUsd(dialogueUsage);
   const tokenTotal =
     transcribeUsage.audioIn + transcribeUsage.textIn + transcribeUsage.textOut +
-    parseUsage.input + parseUsage.output + parseUsage.cacheRead + parseUsage.cacheWrite;
+    Object.values(dialogueUsage).reduce((sum, n) => sum + n, 0);
 
   async function handleConfirm() {
-    if (!allValid || submitting) return;
+    if (!allValid || submitting || busy || connecting) return;
     stop();
     setSubmitting(true);
     try {
@@ -205,7 +181,7 @@ export function VoiceFinesModal({ teamId, members, templates, onClose, onCreated
         pushToast(`${rows.length} bøder tildelt`, "success");
         onClose();
       } else {
-        setRows((prev) => prev.filter((r) => failed.has(r.key)));
+        commitRows(rowsRef.current.filter((r) => failed.has(r.key)));
         pushToast(`${failed.size} bøder kunne ikke oprettes – de er beholdt så du kan prøve igen`, "error");
       }
     } finally {
@@ -214,7 +190,7 @@ export function VoiceFinesModal({ teamId, members, templates, onClose, onCreated
   }
 
   return (
-    <div className="modal-backdrop" onClick={() => (!recording && !submitting ? onClose() : undefined)}>
+    <div className="modal-backdrop" onClick={() => (!recording && !connecting && !submitting ? onClose() : undefined)}>
       <div className="modal-panel max-h-[92vh] w-full max-w-2xl overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between gap-3">
           <h3 className="text-xl font-semibold text-ink">Indtal bøder</h3>
@@ -229,6 +205,7 @@ export function VoiceFinesModal({ teamId, members, templates, onClose, onCreated
             onClick={recording ? stop : start}
             disabled={connecting || submitting}
             aria-pressed={recording}
+            aria-label={recording ? "Stop samtalen" : "Start samtalen"}
             className={`flex h-20 w-20 items-center justify-center rounded-full text-3xl text-white shadow-lg transition ${
               recording ? "animate-pulse bg-red-600" : "bg-ink"
             } disabled:opacity-50`}
@@ -236,14 +213,21 @@ export function VoiceFinesModal({ teamId, members, templates, onClose, onCreated
             {connecting ? "…" : recording ? "■" : "🎤"}
           </button>
           <p className="text-sm text-ink/70">
-            {connecting ? "Forbinder…" : recording ? "Lytter – tryk for at stoppe" : "Tryk for at tale. Rems bøder op, fx “Mikkel for sent, Jonas glemte veste”."}
+            {connecting ? "Forbinder…" : recording ? "Samtalen er i gang – tryk for at stoppe" : "Tryk for at tale. Du kan tilføje, rette og spørge om bøderne."}
           </p>
-          <div className="min-h-[2.5rem] w-full rounded-xl border border-ink/10 bg-white/60 p-2 text-sm text-ink/80">
-            {segments.slice(-3).map((s, i) => (
-              <p key={`${i}-${s}`} className="text-ink/50">{s}</p>
+          <label className="flex items-center gap-2 text-sm text-ink/70">
+            <input type="checkbox" checked={spoken} disabled={recording || connecting} onChange={(e) => setSpoken(e.target.checked)} />
+            Talte svar
+          </label>
+          <audio ref={audioRef} autoPlay controls hidden={!spoken || !recording} className="w-full" aria-label="Assistentens talte svar" />
+          <div className="min-h-[2.5rem] w-full space-y-2 rounded-xl border border-ink/10 bg-white/60 p-3 text-sm text-ink/80" role="log" aria-label="Samtale">
+            {messages.slice(-6).map((m) => (
+              <p key={m.id} className={m.role === "assistant" ? "text-ink" : "text-ink/60"}>
+                <span className="font-semibold">{m.role === "assistant" ? "Assistent: " : "Du: "}</span>{m.text}
+              </p>
             ))}
-            {liveText ? <p>{liveText}</p> : null}
-            {!segments.length && !liveText ? <span className="text-ink/40">Transskription vises her…</span> : null}
+            {liveText ? <p className="text-ink/60">Du: {liveText}</p> : null}
+            {!messages.length && !liveText ? <span className="text-ink/40">Samtalen vises her…</span> : null}
           </div>
         </div>
 
@@ -295,8 +279,8 @@ export function VoiceFinesModal({ teamId, members, templates, onClose, onCreated
               </div>
             </div>
           ))}
-          {pendingParses > 0 ? <p className="text-sm text-ink/60">Fortolker…</p> : null}
-          {!rows.length && pendingParses === 0 ? (
+          {busy ? <p className="text-sm text-ink/60">Assistenten svarer…</p> : null}
+          {!rows.length && !busy ? (
             <p className="text-sm text-ink/50">Ingen forslag endnu.</p>
           ) : null}
           <button type="button" className="btn-ghost w-full" onClick={addEmptyRow}>
@@ -308,13 +292,13 @@ export function VoiceFinesModal({ teamId, members, templates, onClose, onCreated
           <p className="text-xs text-ink/60">
             {tokenTotal.toLocaleString("da-DK")} tokens · ≈ {usdToDkk(costUsd).toFixed(2).replace(".", ",")} kr
             <br />
-            Transskription {transcribeUsage.audioIn + transcribeUsage.textIn + transcribeUsage.textOut} · Fortolkning{" "}
-            {parseUsage.input + parseUsage.output + parseUsage.cacheRead + parseUsage.cacheWrite}
+            Transskription {transcribeUsage.audioIn + transcribeUsage.textIn + transcribeUsage.textOut} · Samtale{" "}
+            {Object.values(dialogueUsage).reduce((sum, n) => sum + n, 0)}
           </p>
           <LoadingButton
             type="button"
             className="btn-primary"
-            disabled={!allValid || pendingParses > 0}
+            disabled={!allValid || busy || connecting}
             isLoading={submitting}
             onClick={handleConfirm}
             idleContent={`Tildel ${rows.length} bøder (${total} kr)`}
