@@ -8,6 +8,7 @@ import { useToast } from "@/components/ToastProvider";
 import PushSettings from "@/components/PushSettings";
 import { CollapsibleCard } from "@/components/CollapsibleCard";
 import Link from "next/link";
+import Avatar from "@/components/ui/Avatar";
 import TeamOpenAiSettings from "@/components/TeamOpenAiSettings";
 import SeasonSettingsCard from "@/components/SeasonSettingsCard";
 import LoadingButton from "@/components/LoadingButton";
@@ -920,34 +921,42 @@ export default function IndstillingerPage() {
       >
         <form className="grid gap-4 lg:grid-cols-2" onSubmit={handleProfileSave}>
           <div className="space-y-2 lg:col-span-2">
-            <label className="label" htmlFor="profile-avatar">Profilbillede</label>
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              <div className="h-16 w-16 overflow-hidden rounded-full border border-ink/10 bg-surface/80">
-                {profileImage ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={profileImage} alt="Profilbillede" className="h-full w-full object-cover" />
-                ) : null}
-              </div>
+            <div className="flex items-center gap-4">
+              {/* Tryk på billedet for at skifte det – blyanten viser, at det kan redigeres. */}
               <label
                 htmlFor="profile-avatar"
-                className="flex h-12 w-full items-center justify-between gap-3 rounded-2xl border border-ink/10 bg-surface/80 px-4 text-sm text-ink/60 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] sm:flex-1"
+                aria-label={profileImage ? "Skift profilbillede" : "Tilføj profilbillede"}
+                className={`group relative block h-24 w-24 shrink-0 cursor-pointer rounded-full ring-2 ring-line transition active:scale-95 ${
+                  uploading ? "pointer-events-none" : ""
+                }`}
               >
-                <span className="inline-flex items-center rounded-full bg-primary px-4 py-2 text-xs font-semibold text-on-primary">
-                  Vælg fil
+                <Avatar name={profileName || session.user.name} image={profileImage || null} size="xl" className="h-24 w-24 text-3xl" />
+                <span className="absolute inset-0 flex items-center justify-center rounded-full bg-black/0 transition group-hover:bg-black/25">
+                  {uploading ? <span className="h-7 w-7 animate-spin rounded-full border-[3px] border-white/40 border-t-white" /> : null}
                 </span>
-                <span className="truncate text-ink/60">
-                  {profileImage ? "Profilbillede valgt" : "Der er ikke valgt nogen fil"}
+                <span className="absolute -bottom-0.5 -right-0.5 inline-flex h-9 w-9 items-center justify-center rounded-full bg-primary text-on-primary shadow-[var(--shadow-md)] ring-[3px] ring-surface">
+                  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                  </svg>
                 </span>
               </label>
+              <div className="min-w-0">
+                <p className="font-semibold text-ink">Profilbillede</p>
+                <p className="text-sm text-ink/55">
+                  {uploading ? "Uploader…" : profileImage ? "Tryk på billedet for at skifte det." : "Tryk på cirklen for at tilføje et billede."}
+                </p>
+              </div>
               <input
                 id="profile-avatar"
                 type="file"
                 accept="image/*"
-                onChange={(event) => handleAvatarUpload(event.target.files?.[0] ?? null)}
+                onChange={(event) => {
+                  handleAvatarUpload(event.target.files?.[0] ?? null);
+                  event.target.value = "";
+                }}
                 className="sr-only"
               />
             </div>
-            {uploading ? <p className="text-xs text-ink/60">Uploader...</p> : null}
           </div>
           <div className="space-y-2">
             <label className="label" htmlFor="profile-name">Navn</label>
