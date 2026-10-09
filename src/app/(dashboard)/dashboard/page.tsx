@@ -379,10 +379,10 @@ export default function DashboardHome() {
             key={eventItem.id}
             type="button"
             onClick={() => openNextEvent(eventItem)}
-            className="w-full space-y-2 rounded-control border border-ink/10 bg-white p-4 text-left text-sm text-ink/70 shadow-sm transition hover:border-ink/14 hover:bg-white/88"
+            className="w-full space-y-2 rounded-control border border-ink/10 bg-surface p-4 text-left text-sm text-ink/70 shadow-sm transition hover:border-ink/14 hover:bg-surface/88"
           >
             <div className="text-base font-semibold text-ink">{eventItem.title}</div>
-            <div className="grid gap-2 rounded-control border border-ink/10 bg-white/80 p-3">
+            <div className="grid gap-2 rounded-control border border-ink/10 bg-surface/80 p-3">
               <div className="flex items-center justify-between gap-4">
                 <span className="text-xs font-semibold uppercase tracking-[0.08em] text-ink/55">Start</span>
                 <span className="font-semibold text-ink">{times.start}</span>
@@ -400,21 +400,22 @@ export default function DashboardHome() {
             </div>
             <div>{eventItem.location}</div>
             <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-ink/60">
-              <span className="rounded-full bg-green-100 px-3 py-1 text-green-700">Kommer: {counts.in}</span>
-              <span className="rounded-full bg-red-100 px-3 py-1 text-red-700">Kan ikke: {counts.out}</span>
-              <span className="rounded-full bg-amber-100 px-3 py-1 text-amber-700">
+              <span className="rounded-full bg-success/10 px-3 py-1 text-success">Kommer: {counts.in}</span>
+              <span className="rounded-full bg-danger/10 px-3 py-1 text-danger">Kan ikke: {counts.out}</span>
+              <span className="rounded-full bg-warning/10 px-3 py-1 text-warning">
                 Mangler svar: {counts.missing}
               </span>
             </div>
             {eventItem.signupStatus ? (
               <div
-                className="pt-2 text-xs font-semibold uppercase tracking-[0.2em] text-ink/60"
-                style={{ color: eventItem.signupStatus === "IN" ? "green" : "red" }}
+                className={`pt-2 text-xs font-semibold uppercase tracking-[0.2em] ${
+                  eventItem.signupStatus === "IN" ? "text-success" : "text-danger"
+                }`}
               >
                 {eventItem.signupStatus === "IN" ? "Du kommer" : "Du kan ikke"}
               </div>
             ) : (
-              <div className="pt-2 text-xs font-bold uppercase tracking-[0.2em] text-amber-500">
+              <div className="pt-2 text-xs font-bold uppercase tracking-[0.2em] text-warning">
                 Du mangler at svare
               </div>
             )}
@@ -426,8 +427,8 @@ export default function DashboardHome() {
 
   if (sessionStatus === "loading") {
     return (
-      <section className="space-y-6">
-        <header className="card">
+      <section className="space-y-4 sm:space-y-6">
+        <header className="page-header">
           <h2 className="font-display text-[1.65rem] font-semibold leading-tight text-ink sm:text-3xl">Indlæser…</h2>
         </header>
       </section>
@@ -436,8 +437,8 @@ export default function DashboardHome() {
 
   if (!session?.user?.id) {
     return (
-      <section className="space-y-6">
-        <header className="card">
+      <section className="space-y-4 sm:space-y-6">
+        <header className="page-header">
           <h2 className="font-display text-[1.65rem] font-semibold leading-tight text-ink sm:text-3xl">Overblik</h2>
           <p className="mt-2 text-ink/70">Du skal være logget ind for at se overblikket.</p>
         </header>
@@ -447,9 +448,9 @@ export default function DashboardHome() {
 
   if (!teamId) {
     return (
-      <section className="space-y-6">
-        <header className="card">
-          <h2 className="text-2xl font-semibold text-ink">Velkommen tilbage</h2>
+      <section className="space-y-4 sm:space-y-6">
+        <header className="page-header">
+          <h2>Velkommen tilbage</h2>
           <p className="mt-2 text-ink/70">Vælg aktivt hold i Indstillinger for at fortsætte.</p>
         </header>
       </section>
@@ -457,7 +458,7 @@ export default function DashboardHome() {
   }
 
   return (
-    <section className="space-y-6">
+    <section className="space-y-4 sm:space-y-6">
 
       <CollapsibleCard
         key={`welcome-${collapseVersion}`}
@@ -507,7 +508,7 @@ export default function DashboardHome() {
           surface="card-soft"
           storageKey={`${storagePrefix}:fines`}
           headerEnd={
-            <div className="shrink-0 rounded-2xl border border-ink/10 bg-white/90 px-5 py-3 font-semibold text-ink shadow-sm">
+            <div className="shrink-0 rounded-2xl border border-ink/10 bg-surface/90 px-5 py-3 font-semibold text-ink shadow-sm">
               {loadingFines ? "…" : `${totalFines} kr`}
             </div>
           }
@@ -537,7 +538,7 @@ export default function DashboardHome() {
                   key={category}
                   type="button"
                   onClick={() => openLeaderboardDetail(category)}
-                  className="rounded-control border border-ink/10 bg-white p-3 text-left transition hover:border-ink/20"
+                  className="rounded-control border border-ink/10 bg-surface p-3 text-left transition hover:border-ink/20"
                 >
                   <p className="text-xs font-semibold uppercase tracking-[0.12em] text-ink/55">
                     {LEADERBOARD_CATEGORY_LABELS_DA[category]}
@@ -579,7 +580,7 @@ export default function DashboardHome() {
                 {detailRows.map((row) => (
                   <div
                     key={`${row.userId}-${row.rank}`}
-                    className="flex items-center justify-between rounded-control border border-ink/10 bg-white px-3 py-2"
+                    className="flex items-center justify-between rounded-control border border-ink/10 bg-surface px-3 py-2"
                   >
                     <p className="font-medium text-ink">
                       {row.rank}. {row.name}

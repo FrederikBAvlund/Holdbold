@@ -341,7 +341,7 @@ export function DutyWheelModal({
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <div>
             <p className="text-xs font-medium text-ink/70">På hjulet ({wheelPeople.length})</p>
-            <ul className="mt-2 max-h-36 space-y-1 overflow-y-auto rounded-control border border-ink/10 bg-white/80 p-2 text-sm">
+            <ul className="mt-2 max-h-36 space-y-1 overflow-y-auto rounded-control border border-ink/10 bg-surface/80 p-2 text-sm">
               {wheelPeople.length === 0 ? (
                 <li className="text-ink/50">Ingen endnu — tilføj nedenfor.</li>
               ) : (

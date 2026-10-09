@@ -60,7 +60,7 @@ export function CollapsibleCard({
           {headerEnd}
           <button
             type="button"
-            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-ink/20 bg-white/80 text-ink transition hover:border-ink/35 hover:bg-white"
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-ink/[0.06] text-ink transition hover:bg-ink/10 active:scale-95"
             onClick={() => setOpen((prev) => !prev)}
             aria-label={open ? "Skjul kort" : "Vis kort"}
             title={open ? "Skjul" : "Vis"}
@@ -83,7 +83,7 @@ export function CollapsibleCard({
         </div>
       </div>
       {right ? <div className="mt-3">{right}</div> : null}
-      {open ? <div className="mt-6">{children}</div> : null}
+      {open ? <div className="mt-4">{children}</div> : null}
     </div>
   );
 }

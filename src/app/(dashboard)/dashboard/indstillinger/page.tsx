@@ -116,19 +116,15 @@ function emptyFineAutomationRuleDraft(): FineAutomationRuleDraft {
 }
 
 const presets = [
-  { id: "atlantic", label: "Atlantic" },
-  { id: "sandstone", label: "Sandstone" },
-  { id: "forest", label: "Forest" },
-  { id: "midnight", label: "Midnight" },
-  { id: "mono", label: "Mono" },
-  { id: "bk", label: "BK" },
-  { id: "crimson", label: "Crimson" },
-  { id: "ocean", label: "Ocean" },
-  { id: "lavender", label: "Lavender" },
-  { id: "sunset", label: "Sunset" },
-  { id: "citrus", label: "Citrus" },
-  { id: "neon", label: "Neon" },
-  { id: "custom", label: "Tilpasset" }
+  { id: "atlantic", label: "Atlantic", swatch: "#0b84d8" },
+  { id: "forest", label: "Forest", swatch: "#15803d" },
+  { id: "crimson", label: "Crimson", swatch: "#e11d48" },
+  { id: "mono", label: "Mono", swatch: "#334155" },
+  {
+    id: "custom",
+    label: "Tilpasset",
+    swatch: "conic-gradient(#0b84d8, #15803d, #e11d48, #f59e0b, #0b84d8)"
+  }
 ];
 
 export default function IndstillingerPage() {
@@ -868,8 +864,8 @@ export default function IndstillingerPage() {
   if (sessionStatus === "loading") {
     return (
       <section className="w-full min-w-0 space-y-6">
-        <header className="card">
-          <h2 className="text-2xl font-semibold text-ink">Indstillinger</h2>
+        <header className="page-header">
+          <h2>Indstillinger</h2>
           <p className="mt-2 text-ink/70">Indlæser...</p>
         </header>
       </section>
@@ -879,8 +875,8 @@ export default function IndstillingerPage() {
   if (!session?.user?.id) {
     return (
       <section className="w-full min-w-0 space-y-6">
-        <header className="card">
-          <h2 className="text-2xl font-semibold text-ink">Indstillinger</h2>
+        <header className="page-header">
+          <h2>Indstillinger</h2>
           <p className="mt-2 text-ink/70">Du skal være logget ind for at se indstillinger.</p>
         </header>
       </section>
@@ -889,11 +885,11 @@ export default function IndstillingerPage() {
 
   return (
     <section className="w-full min-w-0 space-y-6">
-      <header className="card">
-        <h2 className="text-2xl font-semibold text-ink">Indstillinger</h2>
+      <header className="page-header">
+        <h2>Indstillinger</h2>
         <p className="mt-2 text-ink/70">Team, roller og integrationsindstillinger.</p>
         {pendingApprovalNotice ? (
-          <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900">
+          <p className="mt-3 rounded-xl border border-warning/30 bg-warning/10 px-3 py-2 text-sm font-medium text-warning">
             Din bruger afventer godkendelse. Du kan allerede nu aktivere push-notifikationer her i Indstillinger.
           </p>
         ) : null}
@@ -918,7 +914,7 @@ export default function IndstillingerPage() {
           <div className="space-y-2 lg:col-span-2">
             <label className="label" htmlFor="profile-avatar">Profilbillede</label>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              <div className="h-16 w-16 overflow-hidden rounded-full border border-ink/10 bg-white/80">
+              <div className="h-16 w-16 overflow-hidden rounded-full border border-ink/10 bg-surface/80">
                 {profileImage ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={profileImage} alt="Profilbillede" className="h-full w-full object-cover" />
@@ -926,9 +922,9 @@ export default function IndstillingerPage() {
               </div>
               <label
                 htmlFor="profile-avatar"
-                className="flex h-12 w-full items-center justify-between gap-3 rounded-2xl border border-ink/10 bg-white/80 px-4 text-sm text-ink/60 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] sm:flex-1"
+                className="flex h-12 w-full items-center justify-between gap-3 rounded-2xl border border-ink/10 bg-surface/80 px-4 text-sm text-ink/60 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] sm:flex-1"
               >
-                <span className="inline-flex items-center rounded-full bg-ink px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-fog">
+                <span className="inline-flex items-center rounded-full bg-primary px-4 py-2 text-xs font-semibold text-on-primary">
                   Vælg fil
                 </span>
                 <span className="truncate text-ink/60">
@@ -997,7 +993,7 @@ export default function IndstillingerPage() {
               className="input"
             />
             {passwordValidationMessage ? (
-              <p className="text-xs font-semibold text-red-600">{passwordValidationMessage}</p>
+              <p className="text-xs font-semibold text-danger">{passwordValidationMessage}</p>
             ) : null}
           </div>
           <div className="flex items-end gap-3">
@@ -1038,7 +1034,7 @@ export default function IndstillingerPage() {
                     title={def.label}
                     description={def.hint}
                     storageKey={`holdbold:settings:${session.user.id}:fine-auto:${teamId}:${def.action}`}
-                    className="border border-ink/10 bg-white/80"
+                    className="border border-ink/10 bg-surface/80"
                     surface="card-soft"
                     titleClassName="text-sm font-semibold text-ink"
                     descriptionClassName="mt-1 text-xs text-ink/60"
@@ -1065,7 +1061,7 @@ export default function IndstillingerPage() {
                           className={`rounded-full border px-4 py-2 text-sm font-semibold ${
                             draft.appliesTraining
                               ? "border-moss bg-moss/15 text-ink"
-                              : "border-ink/15 bg-white/60 text-ink/70"
+                              : "border-ink/15 bg-surface/60 text-ink/70"
                           }`}
                         >
                           Træning {draft.appliesTraining ? "· til" : "· fra"}
@@ -1091,7 +1087,7 @@ export default function IndstillingerPage() {
                           className={`rounded-full border px-4 py-2 text-sm font-semibold ${
                             draft.appliesMatch
                               ? "border-moss bg-moss/15 text-ink"
-                              : "border-ink/15 bg-white/60 text-ink/70"
+                              : "border-ink/15 bg-surface/60 text-ink/70"
                           }`}
                         >
                           {def.supportsTraining ? "Kamp" : "Aktiveret ved kamp"}
@@ -1278,10 +1274,10 @@ export default function IndstillingerPage() {
                       setSelectedMember(member);
                       setMemberRole(member.role);
                     }}
-                    className="flex w-full min-w-0 items-center justify-between gap-3 overflow-hidden rounded-2xl border border-ink/10 bg-white/80 px-4 py-3 text-left hover:border-ink/30"
+                    className="flex w-full min-w-0 items-center justify-between gap-3 overflow-hidden rounded-2xl border border-ink/10 bg-surface/80 px-4 py-3 text-left hover:border-ink/30"
                   >
                     <div className="flex min-w-0 flex-1 items-center gap-3 overflow-hidden">
-                      <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full border border-ink/10 bg-white">
+                      <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full border border-ink/10 bg-surface">
                         {member.user.image ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img src={member.user.image} alt={member.user.name} className="h-full w-full object-cover" />
@@ -1320,19 +1316,28 @@ export default function IndstillingerPage() {
             {hasUserTheme ? "Du bruger dit personlige tema." : "Du bruger holdets standardtema."}
           </p>
           <div className="mt-4 grid w-full min-w-0 grid-cols-2 gap-2.5 sm:grid-cols-2">
-            {presets.map((preset) => (
-              <button
-                key={preset.id}
-                type="button"
-                onClick={() => handleTheme(preset.id)}
-                disabled={themeApplyingId !== null}
-                className={`w-full min-w-0 rounded-2xl border px-3 py-2.5 text-center text-sm font-semibold ${
-                  active === preset.id ? "border-ink bg-white" : "border-ink/10 bg-white/70"
-                }`}
-              >
-                {themeApplyingId === preset.id ? "Gemmer..." : preset.label}
-              </button>
-            ))}
+            {presets.map((preset) => {
+              const selected = (presets.some((item) => item.id === active) ? active : "atlantic") === preset.id;
+              return (
+                <button
+                  key={preset.id}
+                  type="button"
+                  onClick={() => handleTheme(preset.id)}
+                  disabled={themeApplyingId !== null}
+                  aria-pressed={selected}
+                  className={`flex min-h-[3.25rem] w-full min-w-0 items-center gap-3 rounded-2xl border px-3.5 py-2.5 text-left text-sm font-semibold transition active:scale-[0.98] ${
+                    selected ? "border-moss bg-moss/10 ring-1 ring-moss" : "border-ink/10 bg-surface hover:bg-surface-2"
+                  }`}
+                >
+                  <span
+                    aria-hidden
+                    className="h-6 w-6 shrink-0 rounded-full ring-2 ring-surface"
+                    style={{ background: preset.swatch }}
+                  />
+                  <span className="truncate">{themeApplyingId === preset.id ? "Gemmer..." : preset.label}</span>
+                </button>
+              );
+            })}
           </div>
           {hasUserTheme ? (
             <div className="mt-4 w-full">
@@ -1368,14 +1373,11 @@ export default function IndstillingerPage() {
                   { key: "ember", label: "Highlight" },
                   { key: "fog", label: "Kortbaggrund" },
                   { key: "button", label: "Knap baggrund" },
-                  { key: "buttonText", label: "Knap tekst" },
-                  { key: "gradientStart", label: "Baggrund start" },
-                  { key: "gradientMid", label: "Baggrund midt" },
-                  { key: "gradientEnd", label: "Baggrund slut" }
+                  { key: "buttonText", label: "Knap tekst" }
                 ].map((item) => (
                   <label
                     key={item.key}
-                    className="flex w-full min-w-0 items-center justify-between rounded-2xl border border-ink/10 bg-white/80 px-4 py-3 text-sm font-semibold text-ink/80"
+                    className="flex w-full min-w-0 items-center justify-between rounded-2xl border border-ink/10 bg-surface/80 px-4 py-3 text-sm font-semibold text-ink/80"
                   >
                     <span>{item.label}</span>
                     <input
@@ -1384,7 +1386,7 @@ export default function IndstillingerPage() {
                       onChange={(event) =>
                         setCustomThemeState((prev) => ({ ...prev, [item.key]: event.target.value }))
                       }
-                      className="h-8 w-12 cursor-pointer rounded-lg border border-ink/10 bg-white"
+                      className="h-8 w-12 cursor-pointer rounded-lg border border-ink/10 bg-surface"
                     />
                   </label>
                 ))}
@@ -1435,7 +1437,7 @@ export default function IndstillingerPage() {
               id="xlsx-file"
               type="file"
               accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-              className="input file:mr-4 file:rounded-full file:border-0 file:bg-ink file:px-4 file:py-2 file:text-xs file:font-semibold file:uppercase file:tracking-[0.2em] file:text-fog"
+              className="input file:mr-4 file:rounded-full file:border-0 file:bg-primary file:px-4 file:py-2 file:text-xs file:font-semibold file:text-on-primary file:tracking-[0.2em] file:text-fog"
               disabled={!isAdmin || !teamId || xlsxImporting}
               onChange={(event) => setXlsxFile(event.target.files?.[0] ?? null)}
             />
@@ -1456,7 +1458,7 @@ export default function IndstillingerPage() {
             <p className="text-sm text-ink/60">Ingen iCal feeds endnu.</p>
           ) : (
             icalFeeds.map((feed) => (
-              <div key={feed.id} className="rounded-2xl border border-ink/10 bg-white/80 px-4 py-3">
+              <div key={feed.id} className="rounded-2xl border border-ink/10 bg-surface/80 px-4 py-3">
                 <div className="text-sm font-semibold text-ink">{feed.name}</div>
                 <div className="truncate text-xs text-ink/60">{feed.url}</div>
                 <div className="mt-1 text-xs text-ink/50">

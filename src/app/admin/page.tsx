@@ -35,9 +35,9 @@ export default function AdminPage() {
   }
 
   return (
-    <main className="min-h-screen px-6 py-12">
-      <div className="card max-w-xl">
-        <h1 className="text-2xl font-semibold text-ink">Admin: iCal import</h1>
+    <main className="min-h-screen px-3 py-6 sm:px-6 sm:py-12">
+      <div className="card mx-auto max-w-xl">
+        <h1 className="page-title">Admin: iCal import</h1>
         <p className="mt-2 text-ink/70">
           Indsæt DBU iCal URL for at hente kampe. Importen kan køres manuelt efter behov.
         </p>

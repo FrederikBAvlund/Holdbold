@@ -187,40 +187,44 @@ export default function DashboardNav({
     setMobileNavMounted(true);
   }, []);
 
+  const isItemActive = (href: string) =>
+    href === "/dashboard" ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
+  const currentItem = visibleNavItems.find((item) => isItemActive(item.href));
+
+  const unreadBadge = (className: string) =>
+    unreadCount > 0 ? (
+      <span
+        className={`inline-flex min-w-[18px] items-center justify-center rounded-full bg-danger px-1 text-[10px] font-bold leading-[18px] text-white ring-2 ring-surface ${className}`}
+      >
+        {unreadCount > 99 ? "99+" : unreadCount}
+      </span>
+    ) : null;
+
   const mobileNavBar = (
     <nav
-      className="pointer-events-none fixed inset-x-0 bottom-0 z-50 flex justify-center px-3 pb-[max(0.78rem,calc(env(safe-area-inset-bottom,0px)+2px))] lg:hidden"
+      className="pointer-events-none fixed inset-x-0 bottom-0 z-50 flex justify-center px-3 pb-[max(0.6rem,calc(env(safe-area-inset-bottom,0px)+2px))] lg:hidden"
       aria-label="Hovednavigation"
     >
       <div className="pointer-events-auto w-full max-w-md">
-        <div className="grid grid-cols-5 gap-1 rounded-[1.35rem] border border-ink/10 bg-fog/95 p-2 shadow-[0_12px_40px_-12px_rgba(15,23,42,0.35)] ring-1 ring-black/[0.04] backdrop-blur-xl">
+        <div className="grid grid-cols-5 gap-0.5 rounded-[1.75rem] border border-ink/10 bg-[color:var(--surface)] p-1.5 shadow-[var(--shadow-lg)] backdrop-blur-xl">
           {visibleNavItems.map((item) => {
             const isNotifications = item.href === "/dashboard/notifikationer";
-            const isActive = pathname === item.href;
+            const isActive = isItemActive(item.href);
             return (
               <Link
                 key={item.href}
                 href={item.href}
                 aria-label={item.label}
-                className={`relative flex min-h-[3.4rem] min-w-0 flex-col items-center justify-center gap-1 rounded-control px-0.5 py-1 transition-colors duration-150 ${
-                  isActive ? "bg-moss/14 text-moss" : "text-ink/65 hover:bg-ink/[0.04]"
+                aria-current={isActive ? "page" : undefined}
+                className={`relative flex min-h-[3.5rem] min-w-0 flex-col items-center justify-center gap-0.5 rounded-[1.25rem] px-0.5 py-1 transition active:scale-95 ${
+                  isActive ? "bg-primary text-on-primary" : "text-ink/60 hover:text-ink"
                 }`}
               >
-                <span
-                  className={`relative flex h-9 w-9 shrink-0 items-center justify-center rounded-control border transition ${
-                    isActive
-                      ? "border-moss/40 bg-moss text-fog shadow-md"
-                      : "border-transparent bg-ink/[0.05] text-ink/70"
-                  }`}
-                >
+                <span className="relative flex h-6 w-6 items-center justify-center">
                   {icons[item.icon as keyof typeof icons]}
+                  {isNotifications ? unreadBadge("absolute -right-2 -top-1.5") : null}
                 </span>
-                <span className="text-nav-label max-w-[4.25rem] truncate text-center">{item.shortLabel}</span>
-                {isNotifications && unreadCount > 0 ? (
-                  <span className="absolute right-0.5 top-1 inline-flex min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold text-white shadow-sm">
-                    {unreadCount > 99 ? "99+" : unreadCount}
-                  </span>
-                ) : null}
+                <span className="text-nav-label max-w-[4.5rem] truncate text-center">{item.shortLabel}</span>
               </Link>
             );
           })}
@@ -231,64 +235,65 @@ export default function DashboardNav({
 
   return (
     <>
-      <aside className="hidden lg:block lg:w-[308px] lg:shrink-0">
-        <div className="sticky top-6 flex h-[calc(100vh-3rem)] flex-col overflow-hidden rounded-app border border-ink/10 bg-fog/95 shadow-[0_20px_50px_-28px_rgba(15,23,42,0.35)] backdrop-blur-xl">
-          <div className="relative shrink-0 overflow-hidden px-5 pb-6 pt-7">
-            <div
-              className="pointer-events-none absolute inset-0 opacity-[0.97]"
-              style={{
-                background: `linear-gradient(135deg, color-mix(in srgb, var(--color-moss) 92%, black) 0%, var(--color-button) 55%, color-mix(in srgb, var(--color-moss) 75%, var(--color-button)) 100%)`
-              }}
-            />
-            <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-white/15 blur-2xl" />
-            <div className="relative space-y-2 text-fog">
-              <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-white/75">Holdbold</p>
-              <h1 className="font-display text-[1.85rem] font-bold leading-[1.1] tracking-tight">Dashboard</h1>
-              <p className="max-w-[16rem] text-sm leading-snug text-white/88">
-                Kalender, bøder og hold samlet i ét overblik.
-              </p>
+      <header className="sticky top-0 z-40 -mx-3 flex items-center justify-between gap-3 border-b border-line bg-bg/90 px-4 pb-2.5 pt-[max(0.625rem,env(safe-area-inset-top,0px))] backdrop-blur-xl sm:-mx-5 lg:hidden">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-primary font-display text-sm font-bold text-on-primary">
+            H
+          </span>
+          <div className="min-w-0 leading-tight">
+            <p className="text-[0.625rem] font-semibold uppercase tracking-[0.18em] text-ink/50">Holdbold</p>
+            <h1 className="truncate font-display text-base font-bold text-ink">
+              {currentItem?.label ?? "Dashboard"}
+            </h1>
+          </div>
+        </div>
+        <Link
+          href="/dashboard/indstillinger"
+          aria-label="Din profil og indstillinger"
+          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-2 text-xs font-bold uppercase text-ink ring-1 ring-ink/10"
+        >
+          {initials}
+        </Link>
+      </header>
+
+      <aside className="hidden lg:block lg:w-[280px] lg:shrink-0">
+        <div className="sticky top-6 flex h-[calc(100vh-3rem)] flex-col overflow-hidden rounded-app border border-ink/10 bg-surface shadow-[var(--shadow-sm)]">
+          <div className="flex shrink-0 items-center gap-3 px-5 pb-4 pt-6">
+            <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-primary font-display text-lg font-bold text-on-primary">
+              H
+            </span>
+            <div className="leading-tight">
+              <h1 className="font-display text-xl font-bold tracking-tight text-ink">Holdbold</h1>
+              <p className="text-xs text-ink/55">Kalender, bøder og hold</p>
             </div>
           </div>
 
-          <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-3 py-4">
+          <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-3 py-2">
             {visibleNavItems.map((item) => {
-              const active = pathname === item.href;
+              const active = isItemActive(item.href);
               const isNotifications = item.href === "/dashboard/notifikationer";
               return (
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`group flex items-center justify-between rounded-control border px-3 py-2.5 text-sm font-semibold transition ${
-                    active
-                      ? "border-moss/20 bg-white text-ink shadow-[0_8px_24px_-16px_rgba(15,23,42,0.35)] ring-1 ring-moss/15"
-                      : "border-transparent text-ink/78 hover:bg-white/70 hover:text-ink"
+                  aria-current={active ? "page" : undefined}
+                  className={`group flex items-center justify-between rounded-control px-3 py-2.5 text-sm font-semibold transition ${
+                    active ? "bg-primary text-on-primary" : "text-ink/70 hover:bg-ink/[0.05] hover:text-ink"
                   }`}
                 >
                   <span className="flex min-w-0 items-center gap-3">
-                    <span
-                      className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-control border transition ${
-                        active
-                          ? "border-moss/30 bg-moss text-fog shadow-sm"
-                          : "border-ink/10 bg-white text-ink/65 group-hover:border-moss/25 group-hover:text-ink"
-                      }`}
-                    >
-                      {icons[item.icon as keyof typeof icons]}
-                    </span>
+                    {icons[item.icon as keyof typeof icons]}
                     <span className="truncate">{item.label}</span>
                   </span>
-                  {isNotifications && unreadCount > 0 ? (
-                    <span className="inline-flex min-w-[22px] shrink-0 items-center justify-center rounded-full bg-red-500 px-2 py-0.5 text-xs font-semibold text-white">
-                      {unreadCount}
-                    </span>
-                  ) : null}
+                  {isNotifications ? unreadBadge("") : null}
                 </Link>
               );
             })}
           </nav>
 
-          <div className="shrink-0 border-t border-ink/10 bg-white/55 px-4 py-4">
+          <div className="shrink-0 border-t border-ink/10 px-4 py-4">
             <div className="flex items-center gap-3">
-              <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-moss to-[color:var(--color-button)] text-xs font-bold uppercase tracking-wide text-fog shadow-md ring-2 ring-white/90">
+              <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold uppercase tracking-wide text-on-primary">
                 {initials}
               </span>
               <div className="min-w-0">

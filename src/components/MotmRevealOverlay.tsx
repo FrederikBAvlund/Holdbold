@@ -119,7 +119,7 @@ export function MotmRevealOverlay({ open, eventTitle, revealRows, scoreboard, wi
             {showFullResults ? (
               <div className="mt-6">
                 <p className="text-xs font-semibold uppercase tracking-[0.2em] text-ink/50">Resultat</p>
-                <div className="mt-3 overflow-hidden rounded-2xl border border-ink/10 bg-white/80">
+                <div className="mt-3 overflow-hidden rounded-2xl border border-ink/10 bg-surface/80">
                   <ul className="divide-y divide-ink/10">
                     {scoreboard.map((row) => (
                       <li key={row.userId} className="flex items-center justify-between gap-4 px-4 py-3 text-sm">

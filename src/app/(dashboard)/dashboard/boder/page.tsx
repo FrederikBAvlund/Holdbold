@@ -758,7 +758,7 @@ export default function BoderPage() {
   if (sessionStatus === "loading") {
     return (
       <section className="card">
-        <h2 className="text-2xl font-semibold text-ink">Bøder</h2>
+        <h2>Bøder</h2>
         <p className="mt-2 text-ink/70">Indlæser...</p>
       </section>
     );
@@ -767,7 +767,7 @@ export default function BoderPage() {
   if (!session?.user?.id) {
     return (
       <section className="card">
-        <h2 className="text-2xl font-semibold text-ink">Bøder</h2>
+        <h2>Bøder</h2>
         <p className="mt-2 text-ink/70">Du skal være logget ind for at se bøder.</p>
       </section>
     );
@@ -776,7 +776,7 @@ export default function BoderPage() {
   if (!teamId) {
     return (
       <section className="card">
-        <h2 className="text-2xl font-semibold text-ink">Bøder</h2>
+        <h2>Bøder</h2>
         <p className="mt-2 text-ink/70">Vælg aktivt hold i Indstillinger for at fortsætte.</p>
       </section>
     );
@@ -851,7 +851,7 @@ export default function BoderPage() {
   if (!teamId || !userId) {
     return (
       <section className="card">
-        <h2 className="text-2xl font-semibold text-ink">Bøder</h2>
+        <h2>Bøder</h2>
         <p className="mt-2 text-ink/70">
           Vælg aktivt team og bruger i Indstillinger for at fortsætte.
         </p>
@@ -871,19 +871,19 @@ export default function BoderPage() {
 
   return (
     <>
-      <div className="fixed inset-x-0 top-0 z-40 border-b border-ink/10 bg-fog/95 px-3 py-1.5 pt-[max(0.35rem,env(safe-area-inset-top,0px))] pb-1.5 shadow-md backdrop-blur-lg lg:hidden">
-        <div className="mx-auto w-full max-w-lg">
-          <button type="button" className="btn-primary w-full shadow-[0_10px_28px_-14px_rgba(0,0,0,0.35)]" onClick={() => setShowAssignModal(true)}>
-            {assignLabel}
-          </button>
-        </div>
-      </div>
+      <button
+        type="button"
+        className="btn-primary fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom,0px))] right-4 z-40 px-5 shadow-[var(--shadow-lg)] lg:hidden"
+        onClick={() => setShowAssignModal(true)}
+      >
+        <span aria-hidden className="text-lg leading-none">+</span>
+        {assignLabel}
+      </button>
 
-      <section className="space-y-6">
+      <section className="space-y-4 sm:space-y-6">
         <div className="flex flex-col gap-2 lg:contents">
-          <div className="shrink-0 lg:hidden" aria-hidden style={{ height: "3.65rem" }} />
-          <header className="card">
-            <h2 className="text-2xl font-semibold text-ink">Bøder</h2>
+          <header className="page-header">
+            <h2>Bøder</h2>
             <p className="mt-2 text-ink/70">Overblik over bøder og skabeloner.</p>
           </header>
         </div>
@@ -911,7 +911,7 @@ export default function BoderPage() {
             <span className="rounded-full bg-moss/10 px-3 py-1 text-xs font-semibold text-moss">Bødekasseformand</span>
           ) : null}
           {hasPendingPayment ? (
-            <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
+            <span className="rounded-full bg-warning/10 px-3 py-1 text-xs font-semibold text-warning">
               Betaling afventer godkendelse
             </span>
           ) : null}
@@ -929,7 +929,7 @@ export default function BoderPage() {
             <p className="text-sm text-ink/60">Ingen bøder fundet.</p>
           ) : (
             fines.map((fine) => (
-              <div key={fine.id} className="rounded-2xl border border-ink/10 bg-white/90 p-4">
+              <div key={fine.id} className="rounded-2xl border border-ink/10 bg-surface/90 p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <p className="text-sm font-semibold text-ink">{fine.reason}</p>
@@ -964,7 +964,7 @@ export default function BoderPage() {
         >
           <div className="space-y-3">
             {pendingPayments.map((payment) => (
-              <div key={payment.userId} className="rounded-2xl border border-amber-200 bg-amber-50/80 p-4">
+              <div key={payment.userId} className="rounded-2xl border border-warning/30 bg-warning/10/80 p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <p className="text-sm font-semibold text-ink">{payment.name}</p>
@@ -1011,7 +1011,7 @@ export default function BoderPage() {
         >
           <div className="space-y-3">
             {pendingFines.map((fine) => (
-              <div key={fine.id} className="rounded-2xl border border-amber-200 bg-amber-50/80 p-4">
+              <div key={fine.id} className="rounded-2xl border border-warning/30 bg-warning/10/80 p-4">
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <p className="text-sm font-semibold text-ink">{fine.reason}</p>
@@ -1044,7 +1044,7 @@ export default function BoderPage() {
                   {canDeleteFine(fine.status) ? (
                     <button
                       type="button"
-                      className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-red-200 bg-red-50 text-red-600 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-danger/30 bg-danger/10 text-danger transition hover:bg-danger/10 disabled:cursor-not-allowed disabled:opacity-50"
                       onClick={() => deleteFine(fine.id)}
                       aria-label="Slet bøde"
                       title="Slet bøde"
@@ -1052,7 +1052,7 @@ export default function BoderPage() {
                     >
                       {deletingFineId === fine.id ? (
                         <span
-                          className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-red-300 border-t-red-600"
+                          className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-danger/30 border-t-danger"
                           aria-hidden="true"
                         />
                       ) : (
@@ -1079,12 +1079,12 @@ export default function BoderPage() {
             myRequests.map((requestItem) => {
               const badgeClass =
                 requestItem.statusLabel === "Afventer godkendelse"
-                  ? "bg-amber-100 text-amber-800"
+                  ? "bg-warning/10 text-warning"
                   : requestItem.statusLabel === "Afvist"
-                  ? "bg-red-100 text-red-700"
-                  : "bg-green-100 text-green-700";
+                  ? "bg-danger/10 text-danger"
+                  : "bg-success/10 text-success";
               return (
-                <div key={requestItem.id} className="rounded-2xl border border-ink/10 bg-white/90 p-4">
+                <div key={requestItem.id} className="rounded-2xl border border-ink/10 bg-surface/90 p-4">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <p className="text-sm font-semibold text-ink">{requestItem.title}</p>
@@ -1179,7 +1179,7 @@ export default function BoderPage() {
         headerEnd={
           <button
             type="button"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-ink/20 bg-white/80 text-lg font-semibold leading-none text-ink transition hover:border-ink/35 hover:bg-white"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-ink/20 bg-surface/80 text-lg font-semibold leading-none text-ink transition hover:border-ink/35 hover:bg-surface"
             onClick={() => setShowCreateTemplateModal(true)}
             aria-label={canManageFines ? "Opret bødeskabelon" : "Foreslå bødeskabelon"}
             title={canManageFines ? "Opret bødeskabelon" : "Foreslå bødeskabelon"}
@@ -1193,7 +1193,7 @@ export default function BoderPage() {
             <p className="text-xs font-medium text-ink/70">Aktive indsamlingsflows</p>
             <div className="space-y-2">
               {collections.map((collection) => (
-                <div key={collection.id} className="rounded-2xl border border-ink/10 bg-white/80 px-4 py-3">
+                <div key={collection.id} className="rounded-2xl border border-ink/10 bg-surface/80 px-4 py-3">
                   <p className="text-sm font-semibold text-ink">{collection.template.title}</p>
                   <p className="text-xs text-ink/60">
                     Fra {new Date(collection.deadlineAt).toLocaleString("da-DK")} · hver {collection.intervalHours}. time ·{" "}
@@ -1220,7 +1220,7 @@ export default function BoderPage() {
           <div className="mt-6 space-y-3">
             <p className="text-xs font-medium text-ink/70">Afventer godkendelse (skabeloner)</p>
             {pendingTemplates.map((template) => (
-              <div key={template.id} className="rounded-2xl border border-amber-200 bg-amber-50/80 p-4">
+              <div key={template.id} className="rounded-2xl border border-warning/30 bg-warning/10/80 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
@@ -1267,7 +1267,7 @@ export default function BoderPage() {
             </p>
           ) : (
             filteredApprovedTemplates.map((template) => (
-              <div key={template.id} className="rounded-2xl border border-ink/10 bg-white/90 p-4">
+              <div key={template.id} className="rounded-2xl border border-ink/10 bg-surface/90 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
@@ -1334,7 +1334,7 @@ export default function BoderPage() {
                 fine.approvedBy?.name ?? (fine.approvedById ? memberNameById.get(fine.approvedById) : null);
               const rejectedByName = fine.rejectedById ? memberNameById.get(fine.rejectedById) : null;
               return (
-                <div key={fine.id} className="rounded-2xl border border-ink/10 bg-white/90 p-4">
+                <div key={fine.id} className="rounded-2xl border border-ink/10 bg-surface/90 p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-semibold text-ink">{fine.reason}</p>
@@ -1397,7 +1397,7 @@ export default function BoderPage() {
               </button>
             </div>
             <ol className="mt-4 space-y-3 text-sm text-ink/80">
-              <li className="rounded-2xl border border-ink/10 bg-white/80 p-3">
+              <li className="rounded-2xl border border-ink/10 bg-surface/80 p-3">
                 <p className="font-semibold text-ink">1) Kopiér MobilePay box</p>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   <code className="rounded-full bg-ink/10 px-3 py-1 text-xs font-semibold text-ink">
@@ -1426,11 +1426,11 @@ export default function BoderPage() {
                   </button>
                 </div>
               </li>
-              <li className="rounded-2xl border border-ink/10 bg-white/80 p-3">
+              <li className="rounded-2xl border border-ink/10 bg-surface/80 p-3">
                 <p className="font-semibold text-ink">2) Beløb der skal betales</p>
                 <p className="mt-2 text-base font-semibold text-ember">{unpaidTotal} kr</p>
               </li>
-              <li className="rounded-2xl border border-ink/10 bg-white/80 p-3">
+              <li className="rounded-2xl border border-ink/10 bg-surface/80 p-3">
                 <p className="font-semibold text-ink">3) Betal i MobilePay</p>
                 <p className="mt-2 text-ink/70">Åbn MobilePay og betal beløbet til boxen ovenfor.</p>
               </li>
@@ -1445,7 +1445,7 @@ export default function BoderPage() {
                 idleContent="Jeg har betalt mine bøder"
                 loadingContent="Sender..."
               />
-              {!teamMobilePayBox ? <p className="text-xs text-red-600">MobilePay box er ikke sat af admin endnu.</p> : null}
+              {!teamMobilePayBox ? <p className="text-xs text-danger">MobilePay box er ikke sat af admin endnu.</p> : null}
             </div>
             <p className="mt-3 text-xs text-ink/60">
               Når du markerer som betalt, skal en admin godkende betalingen.
@@ -1522,7 +1522,7 @@ export default function BoderPage() {
                 <p className="text-sm text-ink/60">Ingen bøder fundet.</p>
               ) : (
                 selectedDebtorFines.map((fine) => (
-                  <div key={fine.id} className="rounded-2xl border border-ink/10 bg-white/90 p-4">
+                  <div key={fine.id} className="rounded-2xl border border-ink/10 bg-surface/90 p-4">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div>
                         <p className="text-sm font-semibold text-ink">{fine.reason}</p>
@@ -1546,7 +1546,7 @@ export default function BoderPage() {
                         {canManageFines && canDeleteFine(fine.status) ? (
                           <button
                             type="button"
-                            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-red-200 bg-red-50 text-red-600 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+                            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-danger/30 bg-danger/10 text-danger transition hover:bg-danger/10 disabled:cursor-not-allowed disabled:opacity-50"
                             onClick={() => deleteFine(fine.id)}
                             aria-label="Slet bøde"
                             title="Slet bøde"
@@ -1554,7 +1554,7 @@ export default function BoderPage() {
                           >
                             {deletingFineId === fine.id ? (
                               <span
-                                className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-red-300 border-t-red-600"
+                                className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-danger/30 border-t-danger"
                                 aria-hidden="true"
                               />
                             ) : (
@@ -1717,12 +1717,12 @@ export default function BoderPage() {
                     className="input text-[14px] sm:text-[15px]"
                   />
                   <div className="flex flex-wrap items-center gap-2">
-                    <div className="inline-flex rounded-full border border-ink/15 bg-white/70 p-1">
+                    <div className="inline-flex rounded-full border border-ink/15 bg-surface/70 p-1">
                       <button
                         type="button"
                         className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
                           selectedUserIds.length > 0 && selectedUserIds.length === filteredMembers.length
-                            ? "bg-ink text-fog"
+                            ? "bg-primary text-on-primary"
                             : "text-ink/70 hover:bg-ink/5"
                         }`}
                         onClick={() => setSelectedUserIds(filteredMembers.map((member) => member.user.id))}
@@ -1732,7 +1732,7 @@ export default function BoderPage() {
                       <button
                         type="button"
                         className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-                          selectedUserIds.length === 0 ? "bg-ink text-fog" : "text-ink/70 hover:bg-ink/5"
+                          selectedUserIds.length === 0 ? "bg-primary text-on-primary" : "text-ink/70 hover:bg-ink/5"
                         }`}
                         onClick={() => setSelectedUserIds([])}
                       >
@@ -1743,7 +1743,7 @@ export default function BoderPage() {
                       {selectedUserIds.length} valgt
                     </span>
                   </div>
-                  <div className="max-h-[min(32dvh,220px)] space-y-2 overflow-y-auto rounded-2xl border border-ink/10 bg-white/80 p-3 sm:max-h-[34vh]">
+                  <div className="max-h-[min(32dvh,220px)] space-y-2 overflow-y-auto rounded-2xl border border-ink/10 bg-surface/80 p-3 sm:max-h-[34vh]">
                     {filteredMembers.length === 0 ? (
                       <p className="text-sm text-ink/60">Ingen spillere matcher.</p>
                     ) : (
@@ -1752,7 +1752,7 @@ export default function BoderPage() {
                         return (
                           <label
                             key={member.user.id}
-                            className="flex items-center justify-between gap-3 rounded-xl border border-ink/10 bg-white/70 px-3 py-2 text-sm text-ink/85"
+                            className="flex items-center justify-between gap-3 rounded-xl border border-ink/10 bg-surface/70 px-3 py-2 text-sm text-ink/85"
                           >
                             <span className="flex min-w-0 items-center gap-2">
                               <input
@@ -1860,7 +1860,7 @@ export default function BoderPage() {
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-red-200 bg-red-50 text-red-600 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-danger/30 bg-danger/10 text-danger transition hover:bg-danger/10 disabled:cursor-not-allowed disabled:opacity-50"
                   onClick={handleDeleteTemplate}
                   aria-label="Slet skabelon"
                   title="Slet skabelon"
@@ -1868,7 +1868,7 @@ export default function BoderPage() {
                 >
                   {deleteTemplateSubmitting ? (
                     <span
-                      className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-red-300 border-t-red-600"
+                      className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-danger/30 border-t-danger"
                       aria-hidden="true"
                     />
                   ) : (

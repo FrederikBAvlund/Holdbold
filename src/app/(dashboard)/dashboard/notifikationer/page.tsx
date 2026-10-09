@@ -98,7 +98,7 @@ export default function NotifikationerPage() {
   if (sessionStatus === "loading") {
     return (
       <section className="card">
-        <h2 className="text-2xl font-semibold text-ink">Notifikationer</h2>
+        <h2>Notifikationer</h2>
         <p className="mt-2 text-ink/70">Indlæser...</p>
       </section>
     );
@@ -107,18 +107,18 @@ export default function NotifikationerPage() {
   if (!session?.user?.id) {
     return (
       <section className="card">
-        <h2 className="text-2xl font-semibold text-ink">Notifikationer</h2>
+        <h2>Notifikationer</h2>
         <p className="mt-2 text-ink/70">Du skal være logget ind for at se notifikationer.</p>
       </section>
     );
   }
 
   return (
-    <section className="space-y-6">
-      <header className="card">
+    <section className="space-y-4 sm:space-y-6">
+      <header className="page-header">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h2 className="text-2xl font-semibold text-ink">Notifikationer</h2>
+            <h2>Notifikationer</h2>
             <p className="mt-2 text-ink/70">Log over nye begivenheder og bøder.</p>
           </div>
           <LoadingButton
@@ -142,9 +142,9 @@ export default function NotifikationerPage() {
                 key={item.id}
                 onClick={() => handleOpen(item)}
                 disabled={openingNotificationId !== null}
-                className="flex w-full items-start gap-3 rounded-2xl border border-ink/10 bg-white/90 px-4 py-3 text-left shadow-sm transition hover:border-ink/30"
+                className="flex w-full items-start gap-3 rounded-2xl border border-ink/10 bg-surface/90 px-4 py-3 text-left shadow-sm transition hover:border-ink/30"
               >
-                <span className="mt-1 h-2.5 w-2.5 rounded-full bg-red-500" />
+                <span className="mt-1 h-2.5 w-2.5 rounded-full bg-danger" />
                 <div className="flex-1">
                   <div className="flex items-center justify-between gap-3">
                     <p className="text-sm font-semibold text-ink">{item.title}</p>
@@ -166,7 +166,7 @@ export default function NotifikationerPage() {
                 key={item.id}
                 onClick={() => handleOpen(item)}
                 disabled={openingNotificationId !== null}
-                className="flex w-full items-start gap-3 rounded-2xl border border-transparent bg-white/70 px-4 py-3 text-left transition hover:border-ink/20"
+                className="flex w-full items-start gap-3 rounded-2xl border border-transparent bg-surface/70 px-4 py-3 text-left transition hover:border-ink/20"
               >
                 <span className="mt-1 h-2.5 w-2.5 rounded-full bg-ink/20" />
                 <div className="flex-1">

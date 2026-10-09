@@ -1756,7 +1756,7 @@ export default function KalenderPage() {
   if (sessionStatus === "loading") {
     return (
       <section className="card">
-        <h2 className="text-2xl font-semibold text-ink">Kalender</h2>
+        <h2>Kalender</h2>
         <p className="mt-2 text-ink/70">Indlæser...</p>
       </section>
     );
@@ -1765,7 +1765,7 @@ export default function KalenderPage() {
   if (!session?.user?.id) {
     return (
       <section className="card">
-        <h2 className="text-2xl font-semibold text-ink">Kalender</h2>
+        <h2>Kalender</h2>
         <p className="mt-2 text-ink/70">Du skal være logget ind for at se kalenderen.</p>
       </section>
     );
@@ -1774,14 +1774,14 @@ export default function KalenderPage() {
   if (!teamId) {
     return (
       <section className="card">
-        <h2 className="text-2xl font-semibold text-ink">Kalender</h2>
+        <h2>Kalender</h2>
         <p className="mt-2 text-ink/70">Vælg aktivt team i Indstillinger for at fortsætte.</p>
       </section>
     );
   }
 
   return (
-    <section className="space-y-6">
+    <section className="space-y-4 sm:space-y-6">
       <header className="card !p-4 sm:!p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
           <div className="min-w-0">
@@ -1789,11 +1789,11 @@ export default function KalenderPage() {
             <p className="mt-1 text-sm leading-snug text-ink/70">Overblik over kampe og træning.</p>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
-            <div className="inline-flex w-full rounded-full border border-ink/15 bg-white/80 p-1 sm:w-auto">
+            <div className="inline-flex w-full rounded-full border border-ink/15 bg-surface/80 p-1 sm:w-auto">
               <button
                 type="button"
                 className={`min-h-[2.75rem] flex-1 rounded-full px-4 py-2 text-sm font-semibold transition sm:min-h-0 sm:flex-none ${
-                  viewMode === "calendar" ? "bg-ink text-fog" : "text-ink/75 hover:text-ink"
+                  viewMode === "calendar" ? "bg-primary text-on-primary" : "text-ink/75 hover:text-ink"
                 }`}
                 onClick={showCalendarView}
               >
@@ -1802,7 +1802,7 @@ export default function KalenderPage() {
               <button
                 type="button"
                 className={`min-h-[2.75rem] flex-1 rounded-full px-4 py-2 text-sm font-semibold transition sm:min-h-0 sm:flex-none ${
-                  viewMode === "list" ? "bg-ink text-fog" : "text-ink/75 hover:text-ink"
+                  viewMode === "list" ? "bg-primary text-on-primary" : "text-ink/75 hover:text-ink"
                 }`}
                 onClick={showListView}
               >
@@ -1824,7 +1824,7 @@ export default function KalenderPage() {
 
       <div className="card !p-3 sm:!p-5">
         {viewMode === "calendar" ? (
-          <div className="overflow-hidden rounded-app-soft bg-white/40">
+          <div className="overflow-hidden rounded-app-soft bg-surface/40">
             <FullCalendar
               plugins={[dayGridPlugin, interactionPlugin]}
               initialView="dayGridMonth"
@@ -1897,7 +1897,7 @@ export default function KalenderPage() {
             />
           </div>
         ) : (
-          <div className="overflow-hidden rounded-2xl border border-ink/10 bg-white/95">
+          <div className="overflow-hidden rounded-2xl border border-ink/10 bg-surface/95">
             {loadingCalendar ? (
               <p className="p-4 text-sm text-ink/60">Indlæser kommende begivenheder...</p>
             ) : upcomingEvents.length === 0 ? (
@@ -1926,10 +1926,10 @@ export default function KalenderPage() {
                       const rowToneClass = eventItem.canceledAt
                         ? "border-l-4 border-l-ink/35 bg-ink/5"
                         : eventItem.signupStatus === "IN"
-                        ? "border-l-4 border-l-green-500 bg-green-50/60"
+                        ? "border-l-4 border-l-success bg-success/10"
                         : eventItem.signupStatus === "OUT"
-                        ? "border-l-4 border-l-red-500 bg-red-50/60"
-                        : "border-l-4 border-l-amber-500 bg-amber-50/60";
+                        ? "border-l-4 border-l-danger bg-danger/10"
+                        : "border-l-4 border-l-warning bg-warning/10";
 
                       return (
                         <tr
@@ -1970,7 +1970,7 @@ export default function KalenderPage() {
               <p className="text-sm text-ink/60">Ingen gentagelser endnu.</p>
             ) : (
               series.map((item) => (
-                <div key={item.id} className="rounded-2xl border border-ink/10 bg-white/90 p-4">
+                <div key={item.id} className="rounded-2xl border border-ink/10 bg-surface/90 p-4">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <p className="text-sm font-semibold text-ink">{item.title}</p>
@@ -2165,7 +2165,7 @@ export default function KalenderPage() {
                   </div>
                 ) : null}
                 {selectedEvent.canceledAt ? (
-                  <p className="mt-2 text-sm font-semibold text-red-600">
+                  <p className="mt-2 text-sm font-semibold text-danger">
                     Aflyst af {selectedEvent.canceledByName ?? "Administrator"}
                   </p>
                 ) : null}
@@ -2198,7 +2198,7 @@ export default function KalenderPage() {
                         </button>
                         <button
                           type="button"
-                          className="w-full rounded-control bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700 sm:w-auto"
+                          className="w-full rounded-control bg-danger px-4 py-2.5 text-sm font-semibold text-on-solid transition hover:brightness-110 sm:w-auto"
                           onClick={cancelEvent}
                           disabled={cancelSubmitting}
                         >
@@ -2290,7 +2290,7 @@ export default function KalenderPage() {
                       ) : (
                         <div className="input flex items-center justify-between gap-3">
                           <span className="min-w-0 truncate text-ink/75">{splitLocalDateTime(editableDeadlineAt).date}</span>
-                          <span className="rounded-full bg-amber-100 px-3 py-1 text-sm font-semibold text-amber-800">
+                          <span className="rounded-full bg-warning/10 px-3 py-1 text-sm font-semibold text-warning">
                             {splitLocalDateTime(editableDeadlineAt).time}
                           </span>
                         </div>
@@ -2303,7 +2303,7 @@ export default function KalenderPage() {
                     </p>
                   ) : null}
                   {isDeadlinePassed ? (
-                    <p className="mt-2 text-xs font-semibold text-amber-700">
+                    <p className="mt-2 text-xs font-semibold text-warning">
                       Deadline er passeret og kan ikke længere ændres.
                     </p>
                   ) : null}
@@ -2372,7 +2372,7 @@ export default function KalenderPage() {
                     <p className="text-xs font-medium text-ink/70">
                       Mål, assists og kort
                     </p>
-                    <div className="rounded-xl border border-ink/10 bg-white/70 px-3 py-2.5">
+                    <div className="rounded-xl border border-ink/10 bg-surface/70 px-3 py-2.5">
                       {matchStatSummaryEntries.length === 0 ? (
                         <p className="text-sm text-ink/60">Ingen registrerede mål, assists eller kort endnu.</p>
                       ) : (
@@ -2456,7 +2456,7 @@ export default function KalenderPage() {
                   ) : null}
                   {motmPoll?.status === "OPEN" ? (
                     <div className="mt-3 space-y-4">
-                      <div className="rounded-xl border border-ink/10 bg-white/70 px-3 py-2 text-xs text-ink/70">
+                      <div className="rounded-xl border border-ink/10 bg-surface/70 px-3 py-2 text-xs text-ink/70">
                         <p>
                           <span className="font-semibold text-ink">Stemmer pr. person:</span> {motmPoll.votesPerVoter}
                         </p>
@@ -2497,7 +2497,7 @@ export default function KalenderPage() {
                           {members.map((member) => (
                             <div
                               key={`motm-${member.user.id}`}
-                              className="flex items-center justify-between gap-3 rounded-xl border border-ink/10 bg-white/70 px-3 py-2 text-sm"
+                              className="flex items-center justify-between gap-3 rounded-xl border border-ink/10 bg-surface/70 px-3 py-2 text-sm"
                             >
                               <span className="min-w-0 flex-1 truncate font-medium text-ink">
                                 {member.user.name ?? "Ukendt"}
@@ -2511,7 +2511,7 @@ export default function KalenderPage() {
                                 >
                                   -
                                 </button>
-                                <span className="inline-flex h-9 min-w-[2.75rem] items-center justify-center rounded-control border border-ink/10 bg-white px-3 font-semibold text-ink">
+                                <span className="inline-flex h-9 min-w-[2.75rem] items-center justify-center rounded-control border border-ink/10 bg-surface px-3 font-semibold text-ink">
                                   {motmVoteDraft[member.user.id] ?? "0"}
                                 </span>
                                 <button
@@ -2621,7 +2621,7 @@ export default function KalenderPage() {
                         </label>
                         <button
                           type="button"
-                          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-control border border-ink/15 bg-white/80 text-ink/80 hover:border-ink/25 hover:bg-white"
+                          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-control border border-ink/15 bg-surface/80 text-ink/80 hover:border-ink/25 hover:bg-surface"
                           aria-label="Træk lod om tingene"
                           title="Træk lod"
                           disabled={dutyWheelOpening || eventDetailsLoading || Boolean(selectedEvent?.canceledAt)}
@@ -2651,7 +2651,7 @@ export default function KalenderPage() {
                         </label>
                         <button
                           type="button"
-                          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-control border border-ink/15 bg-white/80 text-ink/80 hover:border-ink/25 hover:bg-white"
+                          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-control border border-ink/15 bg-surface/80 text-ink/80 hover:border-ink/25 hover:bg-surface"
                           aria-label="Træk lod om øl"
                           title="Træk lod"
                           disabled={dutyWheelOpening || eventDetailsLoading || Boolean(selectedEvent?.canceledAt)}
@@ -2697,7 +2697,7 @@ export default function KalenderPage() {
               >
                 {signupLockedPastStart ? (
                   <div className="mb-4 border-b border-ink/10 pb-4">
-                    <p className="mt-3 rounded-control border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-950">
+                    <p className="mt-3 rounded-control border border-warning/30 bg-warning/10 px-3 py-2 text-xs font-medium text-warning">
                       Begivenheden er afviklet — dit svar kan ikke ændres her.
                     </p>
                   </div>
@@ -2707,10 +2707,10 @@ export default function KalenderPage() {
                     type="button"
                     className={`rounded-control flex min-h-[3rem] items-center justify-center gap-2 px-3 py-2.5 text-sm font-semibold transition ${
                       signupStatus === "IN"
-                        ? "bg-green-600 text-white shadow-md ring-2 ring-green-800 ring-offset-2 ring-offset-white"
+                        ? "bg-success text-on-solid shadow-md ring-2 ring-success ring-offset-2 ring-offset-surface"
                         : signupLockedPastStart || selectedEvent?.canceledAt
                           ? "cursor-not-allowed border-2 border-ink/10 bg-ink/[0.04] text-ink/35"
-                          : "border-2 border-green-200 bg-green-50 text-green-900 hover:border-green-300 hover:bg-green-100"
+                          : "border-2 border-success/30 bg-success/10 text-success hover:border-success/30 hover:bg-success/10"
                     } ${signupStatus === "IN" ? "cursor-not-allowed" : ""}`}
                     onClick={() => setSignup("IN")}
                     disabled={
@@ -2740,10 +2740,10 @@ export default function KalenderPage() {
                     type="button"
                     className={`rounded-control flex min-h-[3rem] items-center justify-center gap-2 px-3 py-2.5 text-sm font-semibold transition ${
                       signupStatus === "OUT"
-                        ? "bg-red-600 text-white shadow-md ring-2 ring-red-900 ring-offset-2 ring-offset-white"
+                        ? "bg-danger text-on-solid shadow-md ring-2 ring-danger ring-offset-2 ring-offset-surface"
                         : signupLockedPastStart || selectedEvent?.canceledAt
                           ? "cursor-not-allowed border-2 border-ink/10 bg-ink/[0.04] text-ink/35"
-                          : "border-2 border-red-200 bg-red-50 text-red-900 hover:border-red-300 hover:bg-red-100"
+                          : "border-2 border-danger/30 bg-danger/10 text-danger hover:border-danger/30 hover:bg-danger/10"
                     } ${signupStatus === "OUT" ? "cursor-not-allowed" : ""}`}
                     onClick={() => setSignup("OUT")}
                     disabled={
@@ -2773,7 +2773,7 @@ export default function KalenderPage() {
                 <div className="mt-5 space-y-2">
                   <div>
                     <label className="text-xs font-medium text-ink/70" htmlFor="reason">
-                      Begrundelse ved afbud <span className="text-red-700">*</span>
+                      Begrundelse ved afbud <span className="text-danger">*</span>
                     </label>
                     <p id="reason-hint" className="mt-0.5 text-xs text-ink/50">
                       Påkrævet, når du vælger <strong>Jeg kan ikke</strong>.
@@ -2791,7 +2791,7 @@ export default function KalenderPage() {
                     disabled={Boolean(selectedEvent?.canceledAt) || signupLockedPastStart}
                     aria-describedby="reason-hint"
                   />
-                  {error ? <p className="text-xs text-red-600">{error}</p> : null}
+                  {error ? <p className="text-xs text-danger">{error}</p> : null}
                 </div>
               </CollapsibleCard>
               <CollapsibleCard
@@ -2809,7 +2809,7 @@ export default function KalenderPage() {
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm font-semibold text-ink">
                       <span className="flex items-center gap-2">
-                        <span className="h-2.5 w-2.5 rounded-full bg-green-600" />
+                        <span className="h-2.5 w-2.5 rounded-full bg-success" />
                         Tilmeldte
                       </span>
                       <span className="text-ink/60">{signupGroups.in.length}</span>
@@ -2832,7 +2832,7 @@ export default function KalenderPage() {
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm font-semibold text-ink">
                       <span className="flex items-center gap-2">
-                        <span className="h-2.5 w-2.5 rounded-full bg-red-600" />
+                        <span className="h-2.5 w-2.5 rounded-full bg-danger" />
                         Frameldte
                       </span>
                       <span className="text-ink/60">{signupGroups.out.length}</span>
@@ -2855,7 +2855,7 @@ export default function KalenderPage() {
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm font-semibold text-ink">
                       <span className="flex items-center gap-2">
-                        <span className="h-2.5 w-2.5 rounded-full bg-amber-500" />
+                        <span className="h-2.5 w-2.5 rounded-full bg-warning" />
                         Mangler at svare
                       </span>
                       <span className="text-ink/60">{signupGroups.missing.length}</span>
@@ -2892,7 +2892,7 @@ export default function KalenderPage() {
                     <button
                       type="button"
                       className={`rounded-full px-4 py-2 text-sm font-semibold ${
-                        editingSignupStatus === "IN" ? "bg-green-600 text-white" : "bg-green-100 text-green-700"
+                        editingSignupStatus === "IN" ? "bg-success text-on-solid" : "bg-success/10 text-success"
                       }`}
                       onClick={() => setEditingSignupStatus("IN")}
                     >
@@ -2901,7 +2901,7 @@ export default function KalenderPage() {
                     <button
                       type="button"
                       className={`rounded-full px-4 py-2 text-sm font-semibold ${
-                        editingSignupStatus === "OUT" ? "bg-red-600 text-white" : "bg-red-100 text-red-700"
+                        editingSignupStatus === "OUT" ? "bg-danger text-on-solid" : "bg-danger/10 text-danger"
                       }`}
                       onClick={() => setEditingSignupStatus("OUT")}
                     >
@@ -2910,7 +2910,7 @@ export default function KalenderPage() {
                     <button
                       type="button"
                       className={`rounded-full px-4 py-2 text-sm font-semibold ${
-                        editingSignupStatus === "UNKNOWN" ? "bg-amber-500 text-white" : "bg-amber-100 text-amber-800"
+                        editingSignupStatus === "UNKNOWN" ? "bg-warning text-on-solid" : "bg-warning/10 text-warning"
                       }`}
                       onClick={() => setEditingSignupStatus("UNKNOWN")}
                     >
@@ -2920,7 +2920,7 @@ export default function KalenderPage() {
                   <div className="mt-3 space-y-2">
                     <div>
                       <label className="text-xs font-medium text-ink/70" htmlFor="editing-signup-reason">
-                        Begrundelse <span className="text-red-700">*</span>
+                        Begrundelse <span className="text-danger">*</span>
                       </label>
                       <p className="mt-0.5 text-xs text-ink/50">Påkrævet, når status er «Jeg kan ikke».</p>
                     </div>
@@ -2961,10 +2961,10 @@ export default function KalenderPage() {
                   defaultOpen={!isMobile}
                   className="order-10"
                   surface="card"
-                  titleClassName="text-xs font-medium text-red-700"
+                  titleClassName="text-xs font-medium text-danger"
                 >
                   <div>
-                    <p className="mt-1 text-xs text-red-700/80">
+                    <p className="mt-1 text-xs text-danger/80">
                       Deadline: {formatTimestamp(activeDeadlineAt)}
                     </p>
                   </div>
@@ -3030,7 +3030,7 @@ export default function KalenderPage() {
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-sm font-semibold text-ink">
                         <span className="flex items-center gap-2">
-                          <span className="h-2.5 w-2.5 rounded-full bg-red-600" />
+                          <span className="h-2.5 w-2.5 rounded-full bg-danger" />
                           Svar efter deadline
                         </span>
                         <span className="text-ink/60">{lateGroups.lateResponses.length}</span>
@@ -3052,7 +3052,7 @@ export default function KalenderPage() {
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-sm font-semibold text-ink">
                         <span className="flex items-center gap-2">
-                          <span className="h-2.5 w-2.5 rounded-full bg-amber-500" />
+                          <span className="h-2.5 w-2.5 rounded-full bg-warning" />
                           Mangler svar efter deadline
                         </span>
                         <span className="text-ink/60">{lateGroups.missingAfterDeadline.length}</span>
@@ -3111,14 +3111,14 @@ export default function KalenderPage() {
                             className={`mt-1 inline-block h-2.5 w-2.5 rounded-full ${
                               "status" in entry
                                 ? entry.status === "IN"
-                                  ? "bg-green-600"
+                                  ? "bg-success"
                                   : entry.status === "OUT"
-                                  ? "bg-red-600"
+                                  ? "bg-danger"
                                   : "bg-ink/40"
                                 : entry.type === "CANCEL"
-                                ? "bg-red-600"
+                                ? "bg-danger"
                                 : entry.type === "REOPEN"
-                                ? "bg-green-600"
+                                ? "bg-success"
                                 : "bg-ink/40"
                             }`}
                           />
@@ -3128,7 +3128,7 @@ export default function KalenderPage() {
                               {formatTimestamp(entry.createdAt)}
                             </div>
                             {"deadlineAt" in entry && entry.deadlineAt && new Date(entry.createdAt) > new Date(entry.deadlineAt) ? (
-                              <div className="text-xs font-semibold text-red-600">For sent efter deadline</div>
+                              <div className="text-xs font-semibold text-danger">For sent efter deadline</div>
                             ) : null}
                             {"reason" in entry && entry.reason ? (
                               <div className="text-xs text-ink/60">{entry.reason}</div>
@@ -3188,7 +3188,7 @@ export default function KalenderPage() {
                   {filteredMatchMembers.map((member) => (
                     <div
                       key={`stat-modal-${member.user.id}`}
-                      className="rounded-xl border border-ink/10 bg-white/70 p-2.5 text-sm"
+                      className="rounded-xl border border-ink/10 bg-surface/70 p-2.5 text-sm"
                     >
                       <span className="mb-2 block font-medium text-ink">{member.user.name ?? "Ukendt"}</span>
                       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">

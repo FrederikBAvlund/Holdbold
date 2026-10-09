@@ -5,6 +5,12 @@ import { getStoredTeamId, getStoredTheme, setStoredTeamId, setStoredTheme } from
 import { fetchMeCached } from "@/lib/meClientCache";
 
 const DEFAULT_THEME = "atlantic";
+const SUPPORTED_THEMES = ["atlantic", "forest", "crimson", "mono", "custom"];
+
+// Ældre presets (sandstone, neon osv.) er udgået og falder tilbage til standardtemaet.
+function normalizeTheme(theme: string | null | undefined) {
+  return theme && SUPPORTED_THEMES.includes(theme) ? theme : DEFAULT_THEME;
+}
 
 type ThemeConfig = {
   ink?: string;
@@ -58,7 +64,7 @@ function applyThemeConfig(config?: ThemeConfig | null) {
 export function ThemeProvider() {
   useEffect(() => {
     async function applyTheme() {
-      const storedTheme = getStoredTheme();
+      const storedTheme = normalizeTheme(getStoredTheme());
       if (storedTheme) {
         document.documentElement.dataset.theme = storedTheme;
         if (storedTheme !== "custom") {
@@ -69,7 +75,8 @@ export function ThemeProvider() {
       let teamId = getStoredTeamId();
       const { ok: meOk, data: meData } = await fetchMeCached();
       if (meOk) {
-        const userTheme = meData.user?.themePreset as string | null | undefined;
+        const rawUserTheme = meData.user?.themePreset as string | null | undefined;
+        const userTheme = rawUserTheme ? normalizeTheme(rawUserTheme) : null;
         const userThemeConfig = meData.user?.themeConfig as ThemeConfig | null | undefined;
         if (userTheme) {
           document.documentElement.dataset.theme = userTheme;
@@ -97,7 +104,7 @@ export function ThemeProvider() {
       const response = await fetch(`/api/team/${teamId}`, { cache: "no-store" });
       if (!response.ok) return;
       const data = await response.json();
-      const theme = data.team?.themePreset ?? DEFAULT_THEME;
+      const theme = normalizeTheme(data.team?.themePreset);
       document.documentElement.dataset.theme = theme;
       setStoredTheme(theme);
       if (theme === "custom") {
