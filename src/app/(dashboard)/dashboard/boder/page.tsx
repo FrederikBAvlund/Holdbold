@@ -9,6 +9,7 @@ import LoadingButton from "@/components/LoadingButton";
 import { TrashIcon } from "@/components/TrashIcon";
 import { CollapsibleCard } from "@/components/CollapsibleCard";
 import { FineEventLink } from "./FineEventLink";
+import { VoiceFinesModal } from "./VoiceFinesModal";
 import { categoryLabel, categoryOptions, fineRoles, roleLabel } from "./boderConstants";
 import type { FineCollection, FineItem, FineTemplate, Member, PendingPayment } from "./boderTypes";
 import {
@@ -22,7 +23,7 @@ import {
 export default function BoderPage() {
   const { pushToast } = useToast();
   const { data: session, status: sessionStatus } = useSession();
-  const { teamId, userId, members: teamMembers, actingMember, seasonQuery } = useDashboardTeam();
+  const { teamId, userId, members: teamMembers, actingMember, seasonQuery, isReadOnlySeason } = useDashboardTeam();
   const members = teamMembers as Member[];
   const loadedTemplatesKeyRef = useRef<string | null>(null);
   const loadedMyFinesKeyRef = useRef<string | null>(null);
@@ -54,6 +55,7 @@ export default function BoderPage() {
   const [fineDescription, setFineDescription] = useState("");
 
   const [showAssignModal, setShowAssignModal] = useState(false);
+  const [showVoiceModal, setShowVoiceModal] = useState(false);
   const [memberSearch, setMemberSearch] = useState("");
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -871,6 +873,15 @@ export default function BoderPage() {
 
   return (
     <>
+      {showVoiceModal ? (
+        <VoiceFinesModal
+          teamId={teamId}
+          members={members}
+          templates={templates}
+          onClose={() => setShowVoiceModal(false)}
+          onCreated={refreshFinesAndApprovals}
+        />
+      ) : null}
       <button
         type="button"
         className="btn-primary fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom,0px))] right-4 z-40 px-5 shadow-[var(--shadow-lg)] lg:hidden"
@@ -892,6 +903,11 @@ export default function BoderPage() {
         <button type="button" className="btn-primary hidden lg:inline-flex" onClick={() => setShowAssignModal(true)}>
           {assignLabel}
         </button>
+        {canManageFines && !isReadOnlySeason ? (
+          <button type="button" className="btn-ghost min-h-[2.75rem] lg:min-h-0" onClick={() => setShowVoiceModal(true)}>
+            🎤 Indtal bøder
+          </button>
+        ) : null}
         {unpaidTotal > 0 || canManageFines ? (
           <div className="flex w-full gap-2 lg:w-auto lg:gap-4">
             {unpaidTotal > 0 ? (

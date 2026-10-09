@@ -158,6 +158,14 @@ model Team {
   notifications Notification[]
   seasons     Season[]
   absences    Absence[]
+  openAiCredential TeamOpenAiCredential?
+}
+
+// Separate from Team so ordinary team queries never include credential material.
+model TeamOpenAiCredential {
+  teamId String @id
+  encryptedApiKey String
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
 }
 
 model Season {
