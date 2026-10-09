@@ -32,7 +32,13 @@ GitHub Actions (`.github/workflows/ci.yml`) koerer paa hver PR: `prisma validate
 ## API og sikkerhed
 
 - Beskyttede API-ruter kraever en gyldig NextAuth-session (cookie). `middleware` afviser uautentificerede kald til `/api/*` undtagen `api/auth`, `api/health` og `api/cron` (cron bruger `CRON_SECRET` i route-handleren).
-- Sæt `CRON_SECRET` i produktion til Vercel Cron / manuelle kald til `/api/cron/fines` med header `Authorization: Bearer <CRON_SECRET>`.
+- Sæt `CRON_SECRET` i produktion. Bøde-jobbet kaldes fra serverens crontab (ikke Vercel Cron) med header `Authorization: Bearer <CRON_SECRET>`:
+
+```cron
+2 * * * * . /root/.holdbold-cron-env && /usr/bin/curl -fsS -H "Authorization: Bearer $CRON_SECRET" https://www.holdbold.dk/api/cron/fines >> /var/log/holdbold-cron.log 2>&1
+```
+
+  Læg `CRON_SECRET=...` i `/root/.holdbold-cron-env` (`chmod 600`), så nøglen ikke står i `crontab -l`.
 
 ## Rollemodel (MVP)
 
