@@ -16,6 +16,14 @@ export const MOTM_MANAGER_ROLES: readonly Role[] = ["ADMIN", "BOEDEKASSEFORMAND"
 /** Kun admin og bødekasse kan køre visse automations-endpoints manuelt */
 export const FINE_AUTOMATION_ROLES: readonly Role[] = ["ADMIN", "BOEDEKASSEFORMAND"];
 
+/** Roller der må se andre spilleres tilmeldingsstatus */
+export const SIGNUP_VIEWER_ROLES: readonly Role[] = ["ADMIN", "BOEDEKASSEFORMAND", "TRAENER"];
+
+/** Spillere må kun se egen tilmelding; ledere må se alles */
+export function canViewSignupOf(actorId: string, actorRole: Role, targetUserId: string): boolean {
+  return actorId === targetUserId || SIGNUP_VIEWER_ROLES.includes(actorRole);
+}
+
 export async function requireSession(): Promise<
   { ok: true; userId: string } | { ok: false; response: NextResponse }
 > {
