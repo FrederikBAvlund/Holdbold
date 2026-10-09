@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createNotifications } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
+import { applyActiveAbsencesToEvent } from "@/lib/absences";
 import { getActiveSeason, resolveSeason } from "@/lib/seasons";
 import {
   EVENT_MANAGER_ROLES,
@@ -74,6 +75,8 @@ export async function POST(request: Request) {
       ...(body.kind ? { kind: body.kind } : {})
     }
   });
+
+  await applyActiveAbsencesToEvent(event);
 
   const members = await prisma.membership.findMany({
     where: { teamId: body.teamId, status: "ACTIVE" },

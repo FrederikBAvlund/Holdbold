@@ -7,6 +7,7 @@ import { getStoredTeamId, setStoredTeamId } from "@/components/appState";
 import { useToast } from "@/components/ToastProvider";
 import PushSettings from "@/components/PushSettings";
 import { CollapsibleCard } from "@/components/CollapsibleCard";
+import Link from "next/link";
 import SeasonSettingsCard from "@/components/SeasonSettingsCard";
 import LoadingButton from "@/components/LoadingButton";
 import { invalidateDashboardTeam } from "@/components/DashboardTeamProvider";
@@ -1402,6 +1403,16 @@ export default function IndstillingerPage() {
           ) : null}
         </CollapsibleCard>
       </div>
+
+      {teamId ? (
+        <section className="card flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 className="text-lg font-semibold text-ink">Skade og fravær</h3>
+            <p className="text-sm text-ink/70">Meld dig fraværende over længere tid, så du automatisk meldes fra begivenheder.</p>
+          </div>
+          <Link href="/dashboard/fravaer" className="btn-ghost">Åbn fravær</Link>
+        </section>
+      ) : null}
 
       {teamId ? (
         <SeasonSettingsCard

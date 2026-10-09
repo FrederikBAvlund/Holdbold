@@ -4,6 +4,7 @@ import { z } from "zod";
 import { authOptions } from "@/lib/auth";
 import { createNotifications } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
+import { applyActiveAbsencesToEvent } from "@/lib/absences";
 import { getActiveSeason } from "@/lib/seasons";
 
 const bodySchema = z.object({
@@ -325,7 +326,7 @@ export async function POST(request: Request) {
         });
         updated += 1;
       } else {
-        await prisma.event.create({
+        const createdEvent = await prisma.event.create({
           data: {
             teamId: body.teamId,
             seasonId: activeSeason.id,
@@ -340,6 +341,7 @@ export async function POST(request: Request) {
             kind: "MATCH"
           }
         });
+        await applyActiveAbsencesToEvent(createdEvent);
         created += 1;
       }
     }

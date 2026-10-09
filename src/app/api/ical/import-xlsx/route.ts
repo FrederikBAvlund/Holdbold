@@ -4,6 +4,7 @@ import * as XLSX from "xlsx";
 import { authOptions } from "@/lib/auth";
 import { createNotifications } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
+import { applyActiveAbsencesToEvent } from "@/lib/absences";
 import { getActiveSeason } from "@/lib/seasons";
 
 type Row = Record<string, unknown>;
@@ -166,7 +167,7 @@ export async function POST(request: Request) {
       });
       updated += 1;
     } else {
-      await prisma.event.create({
+      const createdEvent = await prisma.event.create({
         data: {
           teamId,
           seasonId: activeSeason.id,
@@ -180,6 +181,7 @@ export async function POST(request: Request) {
           kind: "MATCH"
         }
       });
+      await applyActiveAbsencesToEvent(createdEvent);
       created += 1;
     }
   }
