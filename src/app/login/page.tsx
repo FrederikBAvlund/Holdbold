@@ -3,7 +3,7 @@
 import AuthShell from "@/components/AuthShell";
 import Button from "@/components/ui/Button";
 import { inputClass } from "@/components/ui/primitives";
-import { signIn } from "next-auth/react";
+import { getProviders, signIn } from "next-auth/react";
 import { useEffect, useMemo, useState } from "react";
 
 export default function LoginPage() {
@@ -11,6 +11,14 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [identifier, setIdentifier] = useState("");
+  const [facebookEnabled, setFacebookEnabled] = useState(false);
+
+  useEffect(() => {
+    // Env-variabler er ikke tilgængelige i klienten; spørg i stedet NextAuth hvilke providers der er aktive.
+    getProviders()
+      .then((providers) => setFacebookEnabled(Boolean(providers?.facebook)))
+      .catch(() => setFacebookEnabled(false));
+  }, []);
 
   const errorMessages = useMemo(
     () =>
@@ -117,7 +125,7 @@ export default function LoginPage() {
         </Button>
       </form>
 
-      {process.env.FACEBOOK_CLIENT_ID && process.env.FACEBOOK_CLIENT_SECRET ? (
+      {facebookEnabled ? (
         <>
           <div className="my-5 flex items-center gap-3 text-xs text-ink/45">
             <span className="h-px flex-1 bg-line" />
