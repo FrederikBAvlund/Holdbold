@@ -40,7 +40,10 @@ export default function SeasonReadOnlyMain({ children }: { children: ReactNode }
           ) : null}
         </div>
       ) : null}
-      {children}
+      {/* Ny key pr. side giver en blød overgang ved sideskift */}
+      <div key={pathname} className="animate-rise space-y-4 sm:space-y-6">
+        {children}
+      </div>
     </main>
   );
 }

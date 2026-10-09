@@ -122,6 +122,7 @@ export default function BoderPage() {
         ]}
       />
 
+      <div key={data.loading ? "loading" : tab} className="animate-rise">
       {data.loading ? (
         <div className="space-y-3">
           <Skeleton className="h-40 rounded-[1.75rem]" />
@@ -169,6 +170,7 @@ export default function BoderPage() {
           pushError={(message) => pushToast(message, "error")}
         />
       )}
+      </div>
 
       {!isReadOnlySeason ? (
         <button

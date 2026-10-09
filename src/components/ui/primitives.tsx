@@ -226,7 +226,7 @@ export function ListRow({
 
 export function ListGroup({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <div className={cn("divide-y divide-line overflow-hidden rounded-[1.375rem] border border-line bg-surface", className)}>
+    <div className={cn("stagger divide-y divide-line overflow-hidden rounded-[1.375rem] border border-line bg-surface", className)}>
       {children}
     </div>
   );
@@ -259,7 +259,7 @@ export function SegmentedControl<T extends string>({
             aria-selected={active}
             onClick={() => onChange(option.value)}
             className={cn(
-              "flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 font-semibold transition",
+              "flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 font-semibold transition duration-200 active:scale-[0.97]",
               size === "sm" ? "min-h-9 text-sm" : "min-h-10 text-[0.9375rem]",
               active ? "bg-surface text-ink shadow-[var(--shadow-sm)]" : "text-ink/60 hover:text-ink"
             )}

@@ -163,7 +163,7 @@ export default function NotifikationerPage() {
           {groups.map((group) => (
             <section key={group.label} className="space-y-2">
               <h2 className="px-1 font-display text-lg font-bold uppercase tracking-wide text-ink/70">{group.label}</h2>
-              <ul className="divide-y divide-line overflow-hidden rounded-[1.375rem] border border-line bg-surface">
+              <ul className="stagger divide-y divide-line overflow-hidden rounded-[1.375rem] border border-line bg-surface">
                 {group.items.map((item) => {
                   const meta = TYPE_ICON[item.type] ?? TYPE_ICON.GENERAL;
                   const unread = !item.readAt;

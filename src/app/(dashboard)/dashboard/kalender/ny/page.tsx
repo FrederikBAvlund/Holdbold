@@ -8,6 +8,7 @@ import { useDashboardTeam } from "@/components/DashboardTeamProvider";
 import { useToast } from "@/components/ToastProvider";
 import Icon from "@/components/ui/Icon";
 import Button from "@/components/ui/Button";
+import { ConfirmSheet } from "@/components/ui/Sheet";
 import { Card, EmptyState, Field, ListGroup, PageHeader, Section, Stepper, inputClass } from "@/components/ui/primitives";
 import { eventHref, type EventKind } from "@/lib/events/client";
 import { buildRecurrenceSummary, deadlineLabel, type Recurrence } from "@/lib/events/eventUtils";
@@ -265,15 +266,33 @@ export default function NewEventPage() {
         </Button>
       </form>
 
-      {series && series.length > 0 ? <SeriesList series={series} onChange={setSeries} /> : null}
+      {series && series.length > 0 ? <SeriesList series={series} onChange={setSeries} isAdmin={actingMember?.role === "ADMIN"} /> : null}
     </div>
   );
 }
 
-function SeriesList({ series, onChange }: { series: Series[]; onChange: (series: Series[]) => void }) {
+function SeriesList({ series, onChange, isAdmin }: { series: Series[]; onChange: (series: Series[]) => void; isAdmin: boolean }) {
   const { pushToast } = useToast();
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState<string | null>(null);
+  const [closing, setClosing] = useState<Series | null>(null);
+  const [closeBusy, setCloseBusy] = useState(false);
+
+  async function closeDown(item: Series) {
+    setCloseBusy(true);
+    try {
+      const response = await fetch(`/api/event-series/${item.id}`, { method: "DELETE" });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(typeof data.error === "string" ? data.error : "Kunne ikke lukke serien");
+      onChange(series.map((entry) => (entry.id === item.id ? { ...entry, endDate: new Date().toISOString() } : entry)));
+      pushToast("Serien er lukket ned, og fremtidige begivenheder er fjernet", "success");
+      setClosing(null);
+    } catch (err) {
+      pushToast(err instanceof Error ? err.message : "Kunne ikke lukke serien", "error");
+    } finally {
+      setCloseBusy(false);
+    }
+  }
 
   async function save(item: Series) {
     const value = drafts[item.id] ?? "";
@@ -336,10 +355,24 @@ function SeriesList({ series, onChange }: { series: Series[]; onChange: (series:
                   <span className="w-16 text-right text-xs text-ink/45">{current ? "Slutter" : "Kører videre"}</span>
                 )}
               </div>
+              {isAdmin ? (
+                <Button variant="danger" size="sm" icon="x" onClick={() => setClosing(item)}>
+                  Luk serien ned
+                </Button>
+              ) : null}
             </div>
           );
         })}
       </ListGroup>
+      <ConfirmSheet
+        open={Boolean(closing)}
+        onClose={() => setClosing(null)}
+        onConfirm={() => closing && closeDown(closing)}
+        loading={closeBusy}
+        title={`Luk "${closing?.title ?? ""}" ned?`}
+        description="Alle fremtidige begivenheder i serien fjernes (undtagen dem med bøder), og serien slutter i dag. Afholdte begivenheder bevares."
+        confirmLabel="Luk serien ned"
+      />
     </Section>
   );
 }

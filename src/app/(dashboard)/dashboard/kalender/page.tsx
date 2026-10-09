@@ -186,7 +186,7 @@ export default function KalenderPage() {
           ) : (
             <div className="space-y-5">
               {grouped.map((group) => (
-                <section key={group.key} className="space-y-2">
+                <section key={group.key} className="stagger space-y-2">
                   <h2 className="sticky top-[3.6rem] z-10 -mx-3 bg-bg/90 px-4 py-1.5 font-display text-lg font-bold uppercase tracking-wide text-ink/70 backdrop-blur sm:-mx-5 sm:px-6 lg:top-0">
                     {group.label}
                   </h2>
