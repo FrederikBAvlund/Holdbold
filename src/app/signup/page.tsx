@@ -1,6 +1,8 @@
 "use client";
 
 import AuthShell from "@/components/AuthShell";
+import Button from "@/components/ui/Button";
+import { inputClass } from "@/components/ui/primitives";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -81,17 +83,17 @@ export default function SignupPage() {
     <AuthShell title="Opret bruger" subtitle="Navn, email, adgangskode og hold – så er du klar.">
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <label className="label">Navn*</label>
+        <label className="mb-1.5 block text-sm font-semibold text-ink/80">Navn*</label>
         <input
           value={name}
           onChange={(event) => setName(event.target.value)}
-          className="input mt-2"
+          className={inputClass}
           required
         />
         {fieldErrors.name ? <p className="mt-2 text-sm text-danger">{fieldErrors.name}</p> : null}
       </div>
       <div>
-        <label className="label">Email*</label>
+        <label className="mb-1.5 block text-sm font-semibold text-ink/80">Email*</label>
         <input
           type="email"
           inputMode="email"
@@ -101,41 +103,41 @@ export default function SignupPage() {
           spellCheck={false}
           value={email}
           onChange={(event) => setEmail(event.target.value.toLowerCase())}
-          className="input mt-2"
+          className={inputClass}
           placeholder="navn@klub.dk"
           required
         />
         {fieldErrors.email ? <p className="mt-2 text-sm text-danger">{fieldErrors.email}</p> : null}
       </div>
       <div>
-        <label className="label">Adgangskode*</label>
+        <label className="mb-1.5 block text-sm font-semibold text-ink/80">Adgangskode*</label>
         <input
           value={password}
           onChange={(event) => setPassword(event.target.value)}
           type="password"
-          className="input mt-2"
+          className={inputClass}
           required
         />
         {fieldErrors.password ? <p className="mt-2 text-sm text-danger">{fieldErrors.password}</p> : null}
       </div>
       <div>
-        <label className="label">Gentag adgangskode*</label>
+        <label className="mb-1.5 block text-sm font-semibold text-ink/80">Gentag adgangskode*</label>
         <input
           value={confirmPassword}
           onChange={(event) => setConfirmPassword(event.target.value)}
           onBlur={() => validatePassword()}
           type="password"
-          className="input mt-2"
+          className={inputClass}
           required
         />
         {fieldErrors.confirmPassword ? <p className="mt-2 text-sm text-danger">{fieldErrors.confirmPassword}</p> : null}
       </div>
       <div>
-        <label className="label">Hold slug*</label>
+        <label className="mb-1.5 block text-sm font-semibold text-ink/80">Hold slug*</label>
         <input
           value={teamSlug}
           onChange={(event) => setTeamSlug(event.target.value)}
-          className="input mt-2"
+          className={inputClass}
           placeholder="bk_skjold"
           readOnly={slugLocked}
           required
@@ -145,13 +147,9 @@ export default function SignupPage() {
         ) : null}
         {fieldErrors.teamSlug ? <p className="mt-2 text-sm text-danger">{fieldErrors.teamSlug}</p> : null}
       </div>
-      <button
-        type="submit"
-        disabled={loading}
-        className="btn-primary w-full"
-      >
-        {loading ? "Opretter..." : "Opret bruger"}
-      </button>
+      <Button type="submit" size="lg" block loading={loading}>
+        Opret bruger
+      </Button>
     </form>
 
 

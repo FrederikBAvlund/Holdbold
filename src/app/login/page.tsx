@@ -1,6 +1,8 @@
 "use client";
 
 import AuthShell from "@/components/AuthShell";
+import Button from "@/components/ui/Button";
+import { inputClass } from "@/components/ui/primitives";
 import { signIn } from "next-auth/react";
 import { useEffect, useMemo, useState } from "react";
 
@@ -75,12 +77,12 @@ export default function LoginPage() {
   return (
     <AuthShell title="Log ind" subtitle="Velkommen tilbage – brug din email og adgangskode.">
       {error ? (
-        <p className="mb-4 rounded-control border border-danger/30 bg-danger/10 px-3 py-2.5 text-sm font-medium text-danger">
+        <p className="mb-4 rounded-2xl border border-danger/30 bg-danger/10 px-3 py-2.5 text-sm font-medium text-danger">
           {error}
         </p>
       ) : null}
       {notice ? (
-        <p className="mb-4 rounded-control border border-success/30 bg-success/10 px-3 py-2.5 text-sm font-medium text-success">
+        <p className="mb-4 rounded-2xl border border-success/30 bg-success/10 px-3 py-2.5 text-sm font-medium text-success">
           {notice}
         </p>
       ) : null}
@@ -93,7 +95,7 @@ export default function LoginPage() {
           autoComplete="email"
           placeholder="Email"
           aria-label="Email"
-          className="input"
+          className={inputClass}
           autoCapitalize="none"
           autoCorrect="off"
           spellCheck={false}
@@ -107,27 +109,24 @@ export default function LoginPage() {
           autoComplete="current-password"
           placeholder="Adgangskode"
           aria-label="Adgangskode"
-          className="input"
+          className={inputClass}
           required
         />
-        <button className="btn-primary w-full" disabled={loading}>
-          {loading ? "Logger ind..." : "Log ind"}
-        </button>
+        <Button type="submit" size="lg" block loading={loading}>
+          Log ind
+        </Button>
       </form>
 
       {process.env.FACEBOOK_CLIENT_ID && process.env.FACEBOOK_CLIENT_SECRET ? (
         <>
           <div className="my-5 flex items-center gap-3 text-xs text-ink/45">
-            <span className="h-px flex-1 bg-ink/10" />
+            <span className="h-px flex-1 bg-line" />
             eller
-            <span className="h-px flex-1 bg-ink/10" />
+            <span className="h-px flex-1 bg-line" />
           </div>
-          <button
-            className="btn-ghost w-full"
-            onClick={() => signIn("facebook", { callbackUrl: getCallbackUrl() })}
-          >
+          <Button variant="secondary" block onClick={() => signIn("facebook", { callbackUrl: getCallbackUrl() })}>
             Fortsæt med Facebook
-          </button>
+          </Button>
         </>
       ) : null}
 

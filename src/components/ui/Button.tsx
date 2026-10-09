@@ -20,6 +20,27 @@ const sizes: Record<Size, string> = {
   lg: "min-h-[3.25rem] px-6 text-base gap-2 rounded-2xl"
 };
 
+/** Knap-udseende til links (<a>/<Link>), så de ligner Button. */
+export function buttonClasses({
+  variant = "primary",
+  size = "md",
+  block,
+  className
+}: {
+  variant?: Variant;
+  size?: Size;
+  block?: boolean;
+  className?: string;
+} = {}) {
+  return cn(
+    "inline-flex select-none items-center justify-center font-semibold transition duration-150 active:scale-[0.97]",
+    variants[variant],
+    sizes[size],
+    block && "w-full",
+    className
+  );
+}
+
 export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: Variant;
   size?: Size;

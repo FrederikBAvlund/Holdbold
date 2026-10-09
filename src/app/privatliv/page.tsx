@@ -1,7 +1,7 @@
 export default function PrivatlivPage() {
   return (
     <main className="px-3 pb-10 pt-[max(1rem,env(safe-area-inset-top,0px))] sm:px-8 sm:py-10">
-      <section className="card mx-auto max-w-4xl space-y-6 p-5 sm:p-10">
+      <section className="rounded-[1.375rem] border border-line bg-surface shadow-[var(--shadow-sm)] mx-auto max-w-4xl space-y-6 p-5 sm:p-10">
         <header className="space-y-2">
           <h1 className="font-display text-3xl font-bold text-ink">
             Privatlivspolitik

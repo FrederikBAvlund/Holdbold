@@ -298,7 +298,7 @@ export default function DashboardNav({
             <Avatar name={displayName || "?"} image={myImage} size="md" />
             <span className="min-w-0 flex-1">
               <span className="block truncate text-sm font-semibold text-ink">{displayName || "Din profil"}</span>
-              <span className="block truncate text-xs text-ink/55">{displayEmail || "Indstillinger"}</span>
+              <span className="block truncate text-xs text-ink/55">{displayEmail || ""}</span>
             </span>
             <Icon name="settings" className="h-4 w-4 text-ink/40" />
           </Link>

@@ -41,7 +41,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Holdets API-nøgle kunne ikke indlæses. Kontakt systemadministratoren." }, { status: 503 });
   }
   if (!apiKey) {
-    return NextResponse.json({ error: "Tilføj holdets OpenAI API-nøgle under Indstillinger for at bruge stemmefunktionen" }, { status: 503 });
+    return NextResponse.json({ error: "Tilføj holdets OpenAI API-nøgle under Holdindstillinger for at bruge stemmefunktionen" }, { status: 503 });
   }
 
   const [memberships, templates] = await Promise.all([

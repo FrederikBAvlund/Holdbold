@@ -7,7 +7,7 @@ import Icon from "@/components/ui/Icon";
 
 /**
  * Viser et banner når en lukket sæson er valgt og låser handlingsknapper
- * (.btn-primary og elementer markeret med .season-lock) på kalender/bøder/overblik.
+ * (elementer markeret med .season-lock, fx primære knapper) på kalender/bøder/overblik.
  * Indstillinger er undtaget, så sæsonen kan skiftes tilbage.
  * Serveren afviser alligevel alle ændringer i lukkede sæsoner.
  */

@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DashboardTeamMember } from "@/components/DashboardTeamProvider";
+import Button from "@/components/ui/Button";
+import Sheet from "@/components/ui/Sheet";
 
 export type DutyWheelKind = "thing" | "beer";
 
@@ -321,27 +323,12 @@ export function DutyWheelModal({
     : "none";
 
   return (
-    <div className="modal-backdrop z-[80]" onClick={onClose}>
-      <div
-        className="modal-panel max-h-[min(92vh,720px)] max-w-xl overflow-y-auto px-4 sm:px-5"
-        onClick={(e) => e.stopPropagation()}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="duty-wheel-title"
-      >
-        <div className="flex items-start justify-between gap-3">
-          <h3 id="duty-wheel-title" className="text-lg font-semibold text-ink">
-            {title}
-          </h3>
-          <button type="button" className="btn-ghost shrink-0" onClick={onClose}>
-            Luk
-          </button>
-        </div>
-
+    <Sheet open onClose={onClose} title={title} dismissible={!applying}>
+      <div>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <div>
             <p className="text-xs font-medium text-ink/70">På hjulet ({wheelPeople.length})</p>
-            <ul className="mt-2 max-h-36 space-y-1 overflow-y-auto rounded-control border border-ink/10 bg-surface/80 p-2 text-sm">
+            <ul className="mt-2 max-h-36 space-y-1 overflow-y-auto rounded-2xl border border-line bg-surface-2 p-2 text-sm">
               {wheelPeople.length === 0 ? (
                 <li className="text-ink/50">Ingen endnu — tilføj nedenfor.</li>
               ) : (
@@ -350,7 +337,7 @@ export function DutyWheelModal({
                     <span className="min-w-0 truncate">{p.name}</span>
                     <button
                       type="button"
-                      className="btn-ghost shrink-0 px-2 py-1 text-xs"
+                      className="shrink-0 rounded-lg px-2.5 py-1 text-xs font-semibold text-danger transition hover:bg-danger/10 active:scale-95 disabled:opacity-50"
                       onClick={() => removeFromWheel(p.userId)}
                       disabled={spinning}
                     >
@@ -368,7 +355,7 @@ export function DutyWheelModal({
             <div className="mt-2 flex flex-col gap-2">
               <select
                 id="duty-wheel-add"
-                className="input"
+                className="w-full min-h-12 rounded-2xl border border-line bg-surface-2 px-4 text-base text-ink focus:border-moss focus:outline-none focus:ring-4 focus:ring-moss/15"
                 value={addUserId}
                 onChange={(e) => setAddUserId(e.target.value)}
                 disabled={spinning || addableMembers.length === 0}
@@ -380,14 +367,9 @@ export function DutyWheelModal({
                   </option>
                 ))}
               </select>
-              <button
-                type="button"
-                className="btn-primary text-sm"
-                onClick={addToWheel}
-                disabled={!addUserId || spinning}
-              >
+              <Button onClick={addToWheel} disabled={!addUserId || spinning} icon="plus">
                 Tilføj
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -503,18 +485,19 @@ export function DutyWheelModal({
         </div>
 
         <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-          <button
-            type="button"
-            className="btn-primary min-h-[3.25rem] w-full px-8 py-3 text-base font-semibold sm:min-h-[3.5rem] sm:w-auto sm:px-12 sm:text-lg"
+          <Button
+            size="lg"
+            block
+            variant={winner ? "secondary" : "primary"}
             onClick={winner ? resetWheel : spin}
             disabled={spinning || (!winner && wheelPeople.length === 0)}
           >
             {spinning ? "Snurrer…" : winner ? "Nulstil" : "Træk lod"}
-          </button>
+          </Button>
         </div>
 
         {winner ? (
-          <div className="mt-5 space-y-3 border-t border-ink/10 pt-4">
+          <div className="mt-5 space-y-3 border-t border-line pt-4">
             <p className="text-xs font-semibold text-ink/70">Tildel til</p>
             <div className="flex flex-col gap-2">
               <label className="flex cursor-pointer items-center gap-2 text-sm">
@@ -553,17 +536,12 @@ export function DutyWheelModal({
                 )}
               </label>
             </div>
-            <button
-              type="button"
-              className="btn-primary w-full sm:w-auto"
-              onClick={() => void applyWinner()}
-              disabled={applying}
-            >
-              {applying ? "Gemmer…" : "Anvend"}
-            </button>
+            <Button block icon="check" onClick={() => void applyWinner()} loading={applying}>
+              Anvend
+            </Button>
           </div>
         ) : null}
       </div>
-    </div>
+    </Sheet>
   );
 }
