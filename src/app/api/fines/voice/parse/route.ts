@@ -3,12 +3,14 @@ import { z } from "zod";
 import { FINE_AUTOMATION_ROLES, requireActiveTeamMemberWithRoles, requireSession } from "@/lib/apiAuth";
 import { prisma } from "@/lib/prisma";
 import { getTeamOpenAiKey } from "@/lib/teamOpenAiKey";
-import { sanitizeSuggestions, type RawSuggestion } from "@/lib/voiceFines/matching";
-import { buildSystemPrompt, VOICE_FINES_MODEL, VOICE_FINES_SCHEMA } from "@/lib/voiceFines/prompt";
+import { resolveTextFines, type TextFine } from "@/lib/voiceFines/textMatching";
+import { textFinePrompt, TEXT_FINES_SCHEMA } from "@/lib/voiceFines/textPrompt";
+import { getActiveSeason, seasonClosedResponse } from "@/lib/seasons";
+import { VOICE_FINES_MODEL } from "@/lib/voiceFines/prompt";
 
 const bodySchema = z.object({
   teamId: z.string().min(1),
-  segment: z.string().trim().min(1).max(2000),
+  segment: z.string().min(1).max(6000),
   context: z.string().max(2000).optional(),
   existing: z
     .array(z.object({ userId: z.string(), title: z.string(), amount: z.number().nullable() }))
@@ -28,6 +30,9 @@ export async function POST(request: Request) {
 
   const member = await requireActiveTeamMemberWithRoles(session.userId, teamId, FINE_AUTOMATION_ROLES);
   if (!member.ok) return member.response;
+
+  const closed = seasonClosedResponse(await getActiveSeason(teamId));
+  if (closed) return closed;
 
   let apiKey: string | null;
   try {
@@ -55,7 +60,7 @@ export async function POST(request: Request) {
 
   const nameById = new Map(members.map((m) => [m.id, m.name]));
   const existingText = existing.length
-    ? existing.map((e) => `- ${nameById.get(e.userId) ?? e.userId}: ${e.title}${e.amount ? ` (${e.amount} kr)` : ""}`).join("\n")
+    ? existing.map((e) => `- ${nameById.get(e.userId) ?? "Ukendt spiller"}: ${e.title}${e.amount ? ` (${e.amount} kr)` : ""}`).join("\n")
     : "(ingen)";
 
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -67,10 +72,10 @@ export async function POST(request: Request) {
       max_completion_tokens: 2000,
       response_format: {
         type: "json_schema",
-        json_schema: { name: "fines", strict: true, schema: VOICE_FINES_SCHEMA }
+        json_schema: { name: "fines", strict: true, schema: TEXT_FINES_SCHEMA }
       },
       messages: [
-        { role: "system", content: buildSystemPrompt(members, templates) },
+        { role: "system", content: textFinePrompt(members, templates) },
         {
           role: "user",
           content: `Allerede foreslået:\n${existingText}\n\nTidligere udsagn (kontekst):\n${context || "(ingen)"}\n\nNyt udsagn:\n${segment}`
@@ -94,9 +99,9 @@ export async function POST(request: Request) {
     usage?: { prompt_tokens?: number; completion_tokens?: number; prompt_tokens_details?: { cached_tokens?: number } };
   };
 
-  let raw: RawSuggestion[] = [];
+  let raw: TextFine[] = [];
   try {
-    const json = JSON.parse(data.choices?.[0]?.message?.content ?? "{}") as { fines?: RawSuggestion[] };
+    const json = JSON.parse(data.choices?.[0]?.message?.content ?? "{}") as { fines?: TextFine[] };
     raw = Array.isArray(json.fines) ? json.fines : [];
   } catch {
     raw = [];
@@ -105,7 +110,7 @@ export async function POST(request: Request) {
   const promptTokens = data.usage?.prompt_tokens ?? 0;
   const cached = data.usage?.prompt_tokens_details?.cached_tokens ?? 0;
   return NextResponse.json({
-    suggestions: sanitizeSuggestions(raw, members, templates),
+    suggestions: resolveTextFines(raw, members, templates),
     usage: {
       input: Math.max(0, promptTokens - cached),
       output: data.usage?.completion_tokens ?? 0,
