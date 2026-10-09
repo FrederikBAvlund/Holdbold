@@ -220,8 +220,9 @@ h3 {
 }
 
 /* Børn toner ind efter hinanden (lister, kort). */
+/* "backwards" (ikke "both"): ellers bliver transform hængende og gør elementet til containing block for position: fixed. */
 .stagger > * {
-  animation: rise 380ms cubic-bezier(0.2, 0.9, 0.3, 1) both;
+  animation: rise 380ms cubic-bezier(0.2, 0.9, 0.3, 1) backwards;
 }
 .stagger > *:nth-child(2) { animation-delay: 50ms; }
 .stagger > *:nth-child(3) { animation-delay: 100ms; }
@@ -230,6 +231,29 @@ h3 {
 .stagger > *:nth-child(6) { animation-delay: 240ms; }
 .stagger > *:nth-child(7) { animation-delay: 280ms; }
 .stagger > *:nth-child(n + 8) { animation-delay: 320ms; }
+
+/* Sideskift: kun opacity, så svævende knapper (position: fixed) ikke påvirkes. */
+@keyframes page-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* iOS Safari giver dato-/tidsfelter en fast minimumsbredde, så de ellers løber ud over siden. */
+input[type="date"],
+input[type="datetime-local"],
+input[type="time"],
+input[type="month"] {
+  -webkit-appearance: none;
+  appearance: none;
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  text-align: left;
+}
 
 @keyframes shimmer {
   100% {
