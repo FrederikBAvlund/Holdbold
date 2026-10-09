@@ -112,7 +112,7 @@ export async function POST(request: Request) {
         type: "GENERAL",
         title: "Ny bruger afventer godkendelse",
         body: `${body.name} har oprettet sig med slug ${team.slug}`,
-        link: "/dashboard/indstillinger"
+        link: "/dashboard/profil"
       }))
     );
   }

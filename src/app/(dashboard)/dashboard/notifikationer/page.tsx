@@ -1,9 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import LoadingButton from "@/components/LoadingButton";
+import { cn } from "@/lib/utils";
+import Button from "@/components/ui/Button";
+import Icon, { type IconName } from "@/components/ui/Icon";
+import { EmptyState, FilterChips, PageHeader, Skeleton } from "@/components/ui/primitives";
+import { dayDiff, formatRelativePast } from "@/lib/format";
 
 type NotificationItem = {
   id: string;
@@ -15,172 +19,184 @@ type NotificationItem = {
   type: string;
 };
 
-function formatTimestamp(value: string) {
-  const date = new Date(value);
-  const pad = (num: number) => String(num).padStart(2, "0");
-  return `${pad(date.getHours())}:${pad(date.getMinutes())} ${pad(date.getDate())}.${pad(
-    date.getMonth() + 1
-  )}.${date.getFullYear()}`;
+type Filter = "all" | "unread";
+
+const TYPE_ICON: Record<string, { icon: IconName; tone: string }> = {
+  EVENT: { icon: "calendar", tone: "bg-primary/12 text-moss" },
+  FINE: { icon: "receipt", tone: "bg-warning/15 text-warning" },
+  FINE_PROPOSED: { icon: "receipt", tone: "bg-pending/15 text-pending" },
+  FINE_SYSTEM: { icon: "receipt", tone: "bg-warning/15 text-warning" },
+  GENERAL: { icon: "bell", tone: "bg-ink/[0.07] text-ink/70" }
+};
+
+function groupLabel(value: string) {
+  const diff = dayDiff(value);
+  if (diff === 0) return "I dag";
+  if (diff === -1) return "I går";
+  if (diff > -7) return "Denne uge";
+  return "Tidligere";
+}
+
+function broadcastUnread(count: number) {
+  window.dispatchEvent(new CustomEvent("notifications:unread", { detail: count }));
 }
 
 export default function NotifikationerPage() {
   const { data: session, status: sessionStatus } = useSession();
-  const [items, setItems] = useState<NotificationItem[]>([]);
-  const [markAllSubmitting, setMarkAllSubmitting] = useState(false);
-  const [openingNotificationId, setOpeningNotificationId] = useState<string | null>(null);
   const router = useRouter();
-  const loadedForUserRef = useRef<string | null>(null);
+  const [items, setItems] = useState<NotificationItem[] | null>(null);
+  const [filter, setFilter] = useState<Filter>("all");
+  const [markingAll, setMarkingAll] = useState(false);
+  const userId = session?.user?.id;
 
-  useEffect(() => {
-    async function loadNotifications() {
-      const sessionUserId = session?.user?.id;
-      if (!sessionUserId) {
-        loadedForUserRef.current = null;
-        return;
-      }
-      if (loadedForUserRef.current === sessionUserId) return;
-      loadedForUserRef.current = sessionUserId;
-
+  const load = useCallback(async () => {
+    try {
       const response = await fetch("/api/notifications", { cache: "no-store" });
       if (!response.ok) return;
       const data = await response.json();
       setItems(data.notifications ?? []);
+    } catch {
+      setItems((prev) => prev ?? []);
     }
+  }, []);
 
-    loadNotifications();
-  }, [session?.user?.id]);
+  useEffect(() => {
+    if (!userId) return;
+    void load();
+    const onVisible = () => {
+      if (!document.hidden) void load();
+    };
+    window.addEventListener("focus", onVisible);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.removeEventListener("focus", onVisible);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [userId, load]);
 
-  const [unread, read] = useMemo(() => {
-    const unreadItems = items.filter((item) => !item.readAt);
-    const readItems = items.filter((item) => item.readAt);
-    return [unreadItems, readItems];
-  }, [items]);
+  const unreadCount = useMemo(() => (items ?? []).filter((item) => !item.readAt).length, [items]);
 
-  async function handleOpen(notification: NotificationItem) {
-    if (openingNotificationId) return;
-    setOpeningNotificationId(notification.id);
+  const groups = useMemo(() => {
+    const visible = (items ?? []).filter((item) => filter === "all" || !item.readAt);
+    const result: { label: string; items: NotificationItem[] }[] = [];
+    for (const item of visible) {
+      const label = groupLabel(item.createdAt);
+      const last = result[result.length - 1];
+      if (last && last.label === label) last.items.push(item);
+      else result.push({ label, items: [item] });
+    }
+    return result;
+  }, [items, filter]);
+
+  async function open(notification: NotificationItem) {
     if (!notification.readAt) {
-      try {
-        const response = await fetch(`/api/notifications/${notification.id}/read`, { method: "POST" });
-        const data = await response.json();
-        setItems((prev) =>
-          prev.map((item) => (item.id === notification.id ? { ...item, readAt: new Date().toISOString() } : item))
-        );
-        if (typeof window !== "undefined") {
-          window.dispatchEvent(new CustomEvent("notifications:unread", { detail: data.unreadCount ?? 0 }));
-        }
-      } finally {
-        setOpeningNotificationId(null);
-      }
-    } else {
-      setOpeningNotificationId(null);
+      setItems((prev) =>
+        (prev ?? []).map((item) => (item.id === notification.id ? { ...item, readAt: new Date().toISOString() } : item))
+      );
+      fetch(`/api/notifications/${notification.id}/read`, { method: "POST" })
+        .then((response) => response.json())
+        .then((data) => broadcastUnread(data.unreadCount ?? 0))
+        .catch(() => undefined);
     }
-    if (notification.link) {
-      router.push(notification.link);
-    }
+    if (notification.link) router.push(notification.link);
   }
 
   async function markAllRead() {
-    if (markAllSubmitting) return;
-    setMarkAllSubmitting(true);
+    if (markingAll) return;
+    setMarkingAll(true);
     try {
       const response = await fetch("/api/notifications/read-all", { method: "POST" });
-      const data = await response.json();
-      setItems((prev) => prev.map((item) => ({ ...item, readAt: item.readAt ?? new Date().toISOString() })));
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new CustomEvent("notifications:unread", { detail: data.unreadCount ?? 0 }));
-      }
+      const data = await response.json().catch(() => ({}));
+      setItems((prev) => (prev ?? []).map((item) => ({ ...item, readAt: item.readAt ?? new Date().toISOString() })));
+      broadcastUnread(data.unreadCount ?? 0);
     } finally {
-      setMarkAllSubmitting(false);
+      setMarkingAll(false);
     }
   }
 
-  if (sessionStatus === "loading") {
-    return (
-      <section className="card">
-        <h2>Notifikationer</h2>
-        <p className="mt-2 text-ink/70">Indlæser...</p>
-      </section>
-    );
-  }
-
-  if (!session?.user?.id) {
-    return (
-      <section className="card">
-        <h2>Notifikationer</h2>
-        <p className="mt-2 text-ink/70">Du skal være logget ind for at se notifikationer.</p>
-      </section>
-    );
+  if (sessionStatus !== "loading" && !userId) {
+    return <p className="pt-4 text-ink/70">Du skal være logget ind for at se notifikationer.</p>;
   }
 
   return (
-    <section className="space-y-4 sm:space-y-6">
-      <header className="page-header">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h2>Notifikationer</h2>
-            <p className="mt-2 text-ink/70">Log over nye begivenheder og bøder.</p>
-          </div>
-          <LoadingButton
-            className="btn-ghost"
-            onClick={markAllRead}
-            isLoading={markAllSubmitting}
-            disabled={openingNotificationId !== null}
-            idleContent="Marker alle som læst"
-            loadingContent="Markerer..."
-          />
-        </div>
-      </header>
+    <div className="space-y-5 pb-8 pt-1">
+      <PageHeader
+        title="Notifikationer"
+        subtitle={unreadCount > 0 ? `${unreadCount} ulæst${unreadCount === 1 ? "" : "e"}` : "Du er helt opdateret"}
+        action={
+          unreadCount > 0 ? (
+            <Button variant="secondary" size="sm" icon="check" onClick={markAllRead} loading={markingAll}>
+              Læs alle
+            </Button>
+          ) : undefined
+        }
+      />
 
-      <div className="space-y-4">
-        <div className="card-soft">
-          <h3 className="text-lg font-semibold text-ink">Ulæste</h3>
-          <div className="mt-4 space-y-3">
-            {unread.length === 0 ? <p className="text-sm text-ink/70">Ingen ulæste notifikationer.</p> : null}
-            {unread.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => handleOpen(item)}
-                disabled={openingNotificationId !== null}
-                className="flex w-full items-start gap-3 rounded-2xl border border-ink/10 bg-surface/90 px-4 py-3 text-left shadow-sm transition hover:border-ink/30"
-              >
-                <span className="mt-1 h-2.5 w-2.5 rounded-full bg-danger" />
-                <div className="flex-1">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-sm font-semibold text-ink">{item.title}</p>
-                    <span className="text-xs text-ink/50">{formatTimestamp(item.createdAt)}</span>
-                  </div>
-                  {item.body ? <p className="mt-1 text-sm text-ink/70">{item.body}</p> : null}
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
+      <FilterChips<Filter>
+        value={filter}
+        onChange={setFilter}
+        options={[
+          { value: "all", label: "Alle" },
+          { value: "unread", label: "Ulæste", count: unreadCount }
+        ]}
+      />
 
-        <div className="card-soft">
-          <h3 className="text-lg font-semibold text-ink">Læste</h3>
-          <div className="mt-4 space-y-3">
-            {read.length === 0 ? <p className="text-sm text-ink/70">Ingen læste notifikationer.</p> : null}
-            {read.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => handleOpen(item)}
-                disabled={openingNotificationId !== null}
-                className="flex w-full items-start gap-3 rounded-2xl border border-transparent bg-surface/70 px-4 py-3 text-left transition hover:border-ink/20"
-              >
-                <span className="mt-1 h-2.5 w-2.5 rounded-full bg-ink/20" />
-                <div className="flex-1">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-sm font-semibold text-ink">{item.title}</p>
-                    <span className="text-xs text-ink/50">{formatTimestamp(item.createdAt)}</span>
-                  </div>
-                  {item.body ? <p className="mt-1 text-sm text-ink/70">{item.body}</p> : null}
-                </div>
-              </button>
-            ))}
-          </div>
+      {items === null ? (
+        <div className="space-y-2">
+          <Skeleton className="h-20 rounded-[1.375rem]" />
+          <Skeleton className="h-20 rounded-[1.375rem]" />
+          <Skeleton className="h-20 rounded-[1.375rem]" />
         </div>
-      </div>
-    </section>
+      ) : groups.length === 0 ? (
+        <EmptyState
+          icon="bell"
+          title={filter === "unread" ? "Ingen ulæste" : "Ingen notifikationer endnu"}
+          description={
+            filter === "unread"
+              ? "Alt er læst. Flot!"
+              : "Her dukker nye begivenheder og bøder op, så du ikke går glip af noget."
+          }
+        />
+      ) : (
+        <div className="space-y-6">
+          {groups.map((group) => (
+            <section key={group.label} className="space-y-2">
+              <h2 className="px-1 font-display text-lg font-bold uppercase tracking-wide text-ink/70">{group.label}</h2>
+              <ul className="divide-y divide-line overflow-hidden rounded-[1.375rem] border border-line bg-surface">
+                {group.items.map((item) => {
+                  const meta = TYPE_ICON[item.type] ?? TYPE_ICON.GENERAL;
+                  const unread = !item.readAt;
+                  return (
+                    <li key={item.id}>
+                      <button
+                        type="button"
+                        onClick={() => open(item)}
+                        className="flex w-full items-start gap-3 px-4 py-3.5 text-left transition hover:bg-ink/[0.03] active:bg-ink/[0.06]"
+                      >
+                        <span className={cn("mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl", meta.tone)}>
+                          <Icon name={meta.icon} />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="flex items-start justify-between gap-3">
+                            <span className={cn("text-[0.95rem] leading-snug text-ink", unread ? "font-bold" : "font-semibold text-ink/80")}>
+                              {item.title}
+                            </span>
+                            <span className="flex shrink-0 items-center gap-1.5 pt-0.5 text-xs text-ink/45">
+                              {formatRelativePast(item.createdAt)}
+                              {unread ? <span aria-label="Ulæst" className="h-2.5 w-2.5 rounded-full bg-primary" /> : null}
+                            </span>
+                          </span>
+                          {item.body ? <span className="mt-0.5 block text-sm text-ink/60">{item.body}</span> : null}
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

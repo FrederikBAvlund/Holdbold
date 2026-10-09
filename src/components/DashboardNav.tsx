@@ -24,7 +24,7 @@ const NAV_ITEMS: NavItem[] = [
 
 const SECONDARY_ITEMS: NavItem[] = [{ href: "/dashboard/fravaer", label: "Skade & fravær", icon: "heart" }];
 
-const PROFILE_HREF = "/dashboard/indstillinger";
+const PROFILE_HREF = "/dashboard/profil";
 const NOTIFICATIONS_HREF = "/dashboard/notifikationer";
 
 function useUnreadCount(sessionUserId: string | undefined, pathname: string) {

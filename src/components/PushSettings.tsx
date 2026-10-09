@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useToast } from "@/components/ToastProvider";
+import Switch from "@/components/ui/Switch";
+import Icon from "@/components/ui/Icon";
 
 function urlBase64ToUint8Array(base64String: string) {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
@@ -14,9 +16,10 @@ function urlBase64ToUint8Array(base64String: string) {
   return outputArray;
 }
 
+/** Række med kontakt til push-notifikationer på denne enhed. */
 export default function PushSettings() {
   const { pushToast } = useToast();
-  const [supported, setSupported] = useState(false);
+  const [supported, setSupported] = useState(true);
   const [permission, setPermission] = useState<NotificationPermission>("default");
   const [subscribed, setSubscribed] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -41,27 +44,22 @@ export default function PushSettings() {
       .catch(() => setSubscribed(false));
   }, []);
 
-  const statusText = useMemo(() => {
-    if (!supported) return "Push-notifikationer understøttes ikke på denne enhed/browser.";
-    if (!publicKey) return "Push er ikke konfigureret endnu (mangler public key).";
-    if (permission === "denied") return "Notifikationer er blokeret i browser/telefon-indstillinger.";
-    if (subscribed) return "Push-notifikationer er aktive på denne enhed.";
-    return "Aktivér push for at få notifikationer direkte på telefonen.";
-  }, [permission, publicKey, subscribed, supported]);
+  const blocked = permission === "denied";
+  const unavailable = !supported || !publicKey;
+
+  let description = "Få besked på telefonen om nye begivenheder og bøder.";
+  if (!supported) description = "Understøttes ikke i denne browser. På iPhone: føj Holdbold til hjemmeskærmen først.";
+  else if (!publicKey) description = "Push er ikke sat op endnu.";
+  else if (blocked) description = "Blokeret. Slå notifikationer til for Holdbold i telefonens eller browserens indstillinger.";
+  else if (subscribed) description = "Slået til på denne enhed.";
 
   async function enablePush() {
-    if (!supported) return;
-    if (!publicKey) {
-      pushToast("Push er ikke konfigureret endnu.", "error");
-      return;
-    }
-
     setBusy(true);
     try {
       const nextPermission = await Notification.requestPermission();
       setPermission(nextPermission);
       if (nextPermission !== "granted") {
-        pushToast("Notifikationer blev ikke tilladt.", "error");
+        pushToast("Notifikationer blev ikke tilladt", "error");
         return;
       }
 
@@ -86,16 +84,15 @@ export default function PushSettings() {
       }
 
       setSubscribed(true);
-      pushToast("Push-notifikationer er aktiveret", "success");
+      pushToast("Push er slået til", "success");
     } catch {
-      pushToast("Kunne ikke aktivere push-notifikationer", "error");
+      pushToast("Kunne ikke aktivere push", "error");
     } finally {
       setBusy(false);
     }
   }
 
   async function disablePush() {
-    if (!supported) return;
     setBusy(true);
     try {
       const registration = await navigator.serviceWorker.getRegistration("/sw.js");
@@ -109,7 +106,7 @@ export default function PushSettings() {
         await subscription.unsubscribe();
       }
       setSubscribed(false);
-      pushToast("Push-notifikationer er slået fra på denne enhed", "success");
+      pushToast("Push er slået fra på denne enhed", "success");
     } catch {
       pushToast("Kunne ikke slå push fra", "error");
     } finally {
@@ -118,33 +115,21 @@ export default function PushSettings() {
   }
 
   return (
-    <>
-      <p className="text-sm text-ink/70">{statusText}</p>
-      <div className="mt-4 flex flex-wrap gap-2">
-        {!subscribed ? (
-          <button
-            type="button"
-            className="btn-primary w-full min-[380px]:w-auto"
-            onClick={enablePush}
-            disabled={busy || !supported}
-          >
-            {busy ? "Aktiverer..." : "Aktivér push"}
-          </button>
-        ) : (
-          <button
-            type="button"
-            className="btn-ghost w-full min-[380px]:w-auto"
-            onClick={disablePush}
-            disabled={busy}
-          >
-            {busy ? "Gemmer..." : "Slå push fra"}
-          </button>
-        )}
-      </div>
-      <p className="mt-2 text-xs text-ink/60">
-        På iPhone virker push kun når Holdbold er installeret på hjemmeskærmen.
-      </p>
-    </>
+    <div className="flex min-h-[3.75rem] items-center gap-3 px-4 py-3">
+      <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/12 text-moss">
+        <Icon name="bell" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block font-semibold text-ink">Push-notifikationer</span>
+        <span className="block text-sm text-ink/55">{description}</span>
+      </span>
+      <Switch
+        label="Push-notifikationer"
+        checked={subscribed}
+        busy={busy}
+        disabled={unavailable || (blocked && !subscribed)}
+        onChange={(next) => (next ? enablePush() : disablePush())}
+      />
+    </div>
   );
 }
-

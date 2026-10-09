@@ -14,7 +14,7 @@ import Icon from "@/components/ui/Icon";
 export default function SeasonReadOnlyMain({ children }: { children: ReactNode }) {
   const pathname = usePathname() ?? "";
   const { isReadOnlySeason, selectedSeason, activeSeason, selectSeason } = useDashboardTeam();
-  const locked = isReadOnlySeason && !pathname.includes("/indstillinger");
+  const locked = isReadOnlySeason && !pathname.includes("/indstillinger") && !pathname.includes("/profil");
 
   return (
     <main className="min-w-0 flex-1 space-y-4 sm:space-y-6" data-season-readonly={locked ? "true" : undefined}>

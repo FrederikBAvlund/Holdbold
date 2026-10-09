@@ -9,6 +9,7 @@ import Icon from "@/components/ui/Icon";
 import Button from "@/components/ui/Button";
 import { Card, EmptyState, Field, ListGroup, PageHeader, Section, inputClass } from "@/components/ui/primitives";
 import TeamOpenAiCard from "@/components/team/TeamOpenAiCard";
+import { SeasonCloseCard } from "@/components/SeasonSettingsCard";
 import { clearMeClientCache } from "@/lib/meClientCache";
 import { THEME_PRESETS } from "@/lib/themePresets";
 import { formatRelativePast } from "@/lib/format";
@@ -41,6 +42,10 @@ export default function TeamSettingsPage() {
 
       <Section title="Kampprogram">
         <CalendarImport teamId={teamId} />
+      </Section>
+
+      <Section title="Sæson">
+        <SeasonCloseCard teamId={teamId} />
       </Section>
 
       <Section title="Indtalte bøder">
