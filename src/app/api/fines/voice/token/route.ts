@@ -48,7 +48,26 @@ export async function POST(request: Request) {
   });
 
   if (!response.ok) {
-    return NextResponse.json({ error: "Kunne ikke starte transskription" }, { status: 502 });
+    const failure = await response.json().catch(() => null);
+    // Log metadata only: upstream messages may contain credentials or player names.
+    console.error("OpenAI transcription session failed", {
+      status: response.status,
+      requestId: response.headers.get("x-request-id"),
+      code: failure?.error?.code,
+      type: failure?.error?.type,
+      param: failure?.error?.param
+    });
+    let error = "Kunne ikke starte transskription. Prøv igen senere.";
+    if (response.status === 401) {
+      error = "OpenAI API-nøglen er ugyldig. Kontakt holdets administrator.";
+    } else if (response.status === 403) {
+      error = "OpenAI API-nøglen har ikke adgang til transskription. Kontakt holdets administrator.";
+    } else if (failure?.error?.code === "insufficient_quota") {
+      error = "OpenAI-kontoen mangler kredit eller har nået sin forbrugsgrænse. Kontakt holdets administrator.";
+    } else if (response.status === 429) {
+      error = "OpenAI modtager for mange forespørgsler. Vent lidt og prøv igen.";
+    }
+    return NextResponse.json({ error }, { status: 502 });
   }
   const data = (await response.json()) as { client_secret?: { value?: string; expires_at?: number } };
   const token = data.client_secret?.value;
