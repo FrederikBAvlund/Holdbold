@@ -283,7 +283,7 @@ function MonthView({
   }
 
   return (
-    <div className="space-y-4 lg:grid lg:grid-cols-[minmax(0,25rem)_minmax(0,1fr)] lg:items-start lg:gap-6 lg:space-y-0">
+    <div className="space-y-4 lg:grid lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] lg:items-start lg:gap-6 lg:space-y-0">
       <div className="rounded-[1.375rem] border border-line bg-surface p-3 shadow-[var(--shadow-sm)]">
         <div className="mb-2 flex items-center justify-between">
           <button
@@ -336,7 +336,7 @@ function MonthView({
                 aria-pressed={isSelected}
                 aria-label={`${formatDayLabel(date)}${dayEvents.length ? `, ${dayEvents.length} begivenheder` : ""}`}
                 className={cn(
-                  "flex aspect-square flex-col items-center lg:aspect-auto lg:h-11 justify-center gap-1 rounded-xl text-[0.9375rem] font-semibold transition active:scale-95",
+                  "flex aspect-square flex-col items-center lg:aspect-auto lg:h-14 justify-center gap-1 rounded-xl text-[0.9375rem] font-semibold transition active:scale-95",
                   isSelected ? "bg-ink text-bg" : isToday ? "bg-primary/12 text-moss" : "text-ink hover:bg-ink/[0.05]"
                 )}
               >
