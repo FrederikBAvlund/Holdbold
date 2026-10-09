@@ -8,10 +8,10 @@ export const TRANSCRIBE_RATES = {
 } as const;
 
 export const PARSE_RATES = {
-  input: 0.1,
-  output: 0.5,
-  cacheRead: 0.01,
-  cacheWrite: 0.125
+  input: 0.15,
+  output: 0.6,
+  cacheRead: 0.075,
+  cacheWrite: 0
 } as const;
 
 export type TranscribeUsage = {

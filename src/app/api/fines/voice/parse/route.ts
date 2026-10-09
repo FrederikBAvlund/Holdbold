@@ -1,4 +1,3 @@
-import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { FINE_AUTOMATION_ROLES, requireActiveTeamMemberWithRoles, requireSession } from "@/lib/apiAuth";
@@ -16,8 +15,6 @@ const bodySchema = z.object({
     .default([])
 });
 
-let client: Anthropic | null = null;
-
 export async function POST(request: Request) {
   const session = await requireSession();
   if (!session.ok) return session.response;
@@ -31,10 +28,10 @@ export async function POST(request: Request) {
   const member = await requireActiveTeamMemberWithRoles(session.userId, teamId, FINE_AUTOMATION_ROLES);
   if (!member.ok) return member.response;
 
-  if (!process.env.ANTHROPIC_API_KEY) {
-    return NextResponse.json({ error: "Stemmefunktion er ikke sat op (ANTHROPIC_API_KEY mangler)" }, { status: 503 });
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    return NextResponse.json({ error: "Stemmefunktion er ikke sat op (OPENAI_API_KEY mangler)" }, { status: 503 });
   }
-  client ??= new Anthropic();
 
   const [memberships, templates] = await Promise.all([
     prisma.membership.findMany({
@@ -55,44 +52,59 @@ export async function POST(request: Request) {
     ? existing.map((e) => `- ${nameById.get(e.userId) ?? e.userId}: ${e.title}${e.amount ? ` (${e.amount} kr)` : ""}`).join("\n")
     : "(ingen)";
 
-  try {
-    const response = await client.messages.create({
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
       model: VOICE_FINES_MODEL,
+      temperature: 0,
       max_tokens: 2000,
-      system: [
-        { type: "text", text: buildSystemPrompt(members, templates), cache_control: { type: "ephemeral" } }
-      ],
-      output_config: { effort: "low", format: { type: "json_schema", schema: VOICE_FINES_SCHEMA } },
+      response_format: {
+        type: "json_schema",
+        json_schema: { name: "fines", strict: true, schema: VOICE_FINES_SCHEMA }
+      },
       messages: [
+        { role: "system", content: buildSystemPrompt(members, templates) },
         {
           role: "user",
           content: `Allerede foreslået:\n${existingText}\n\nTidligere udsagn (kontekst):\n${context || "(ingen)"}\n\nNyt udsagn:\n${segment}`
         }
       ]
-    } as Anthropic.MessageCreateParamsNonStreaming);
+    })
+  }).catch(() => null);
 
-    const textBlock = response.content.find((b): b is Anthropic.TextBlock => b.type === "text");
-    let raw: RawSuggestion[] = [];
-    try {
-      const json = JSON.parse(textBlock?.text ?? "{}") as { fines?: RawSuggestion[] };
-      raw = Array.isArray(json.fines) ? json.fines : [];
-    } catch {
-      raw = [];
-    }
-
-    return NextResponse.json({
-      suggestions: sanitizeSuggestions(raw, members, templates),
-      usage: {
-        input: response.usage.input_tokens,
-        output: response.usage.output_tokens,
-        cacheRead: response.usage.cache_read_input_tokens ?? 0,
-        cacheWrite: response.usage.cache_creation_input_tokens ?? 0
-      }
-    });
-  } catch (error) {
-    if (error instanceof Anthropic.RateLimitError) {
-      return NextResponse.json({ error: "For mange forespørgsler – prøv igen" }, { status: 429 });
-    }
+  if (!response) {
     return NextResponse.json({ error: "Kunne ikke fortolke udsagn" }, { status: 502 });
   }
+  if (response.status === 429) {
+    return NextResponse.json({ error: "For mange forespørgsler – prøv igen" }, { status: 429 });
+  }
+  if (!response.ok) {
+    return NextResponse.json({ error: "Kunne ikke fortolke udsagn" }, { status: 502 });
+  }
+
+  const data = (await response.json()) as {
+    choices?: Array<{ message?: { content?: string | null } }>;
+    usage?: { prompt_tokens?: number; completion_tokens?: number; prompt_tokens_details?: { cached_tokens?: number } };
+  };
+
+  let raw: RawSuggestion[] = [];
+  try {
+    const json = JSON.parse(data.choices?.[0]?.message?.content ?? "{}") as { fines?: RawSuggestion[] };
+    raw = Array.isArray(json.fines) ? json.fines : [];
+  } catch {
+    raw = [];
+  }
+
+  const promptTokens = data.usage?.prompt_tokens ?? 0;
+  const cached = data.usage?.prompt_tokens_details?.cached_tokens ?? 0;
+  return NextResponse.json({
+    suggestions: sanitizeSuggestions(raw, members, templates),
+    usage: {
+      input: Math.max(0, promptTokens - cached),
+      output: data.usage?.completion_tokens ?? 0,
+      cacheRead: cached,
+      cacheWrite: 0
+    }
+  });
 }
