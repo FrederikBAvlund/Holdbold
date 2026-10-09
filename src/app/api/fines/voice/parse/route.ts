@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { FINE_AUTOMATION_ROLES, requireActiveTeamMemberWithRoles, requireSession } from "@/lib/apiAuth";
 import { prisma } from "@/lib/prisma";
+import { getTeamOpenAiKey } from "@/lib/teamOpenAiKey";
 import { sanitizeSuggestions, type RawSuggestion } from "@/lib/voiceFines/matching";
 import { buildSystemPrompt, VOICE_FINES_MODEL, VOICE_FINES_SCHEMA } from "@/lib/voiceFines/prompt";
 
@@ -28,9 +29,14 @@ export async function POST(request: Request) {
   const member = await requireActiveTeamMemberWithRoles(session.userId, teamId, FINE_AUTOMATION_ROLES);
   if (!member.ok) return member.response;
 
-  const apiKey = process.env.OPENAI_API_KEY;
+  let apiKey: string | null;
+  try {
+    apiKey = await getTeamOpenAiKey(teamId);
+  } catch {
+    return NextResponse.json({ error: "Holdets API-nøgle kunne ikke indlæses. Kontakt systemadministratoren." }, { status: 503 });
+  }
   if (!apiKey) {
-    return NextResponse.json({ error: "Stemmefunktion er ikke sat op (OPENAI_API_KEY mangler)" }, { status: 503 });
+    return NextResponse.json({ error: "Tilføj holdets OpenAI API-nøgle under Indstillinger for at bruge stemmefunktionen" }, { status: 503 });
   }
 
   const [memberships, templates] = await Promise.all([
