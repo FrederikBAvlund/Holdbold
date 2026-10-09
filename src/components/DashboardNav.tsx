@@ -11,7 +11,7 @@ import Avatar from "@/components/ui/Avatar";
 import Sheet from "@/components/ui/Sheet";
 import { CountBadge } from "@/components/ui/Button";
 import { useDashboardTeam } from "@/components/DashboardTeamProvider";
-import { roleLabel } from "@/lib/roleLabels";
+import { FINE_MANAGER_ROLES, roleLabel } from "@/lib/roleLabels";
 
 type NavItem = { href: string; label: string; icon: IconName };
 
@@ -83,6 +83,48 @@ function useUnreadCount(sessionUserId: string | undefined, pathname: string) {
   return unreadCount;
 }
 
+/** Antal forslag/betalinger, der venter på bødekassen (kun for admin og bødekasseformand). */
+function useFineInboxCount(teamId: string, seasonQuery: string, enabled: boolean, pathname: string) {
+  const [count, setCount] = useState(0);
+
+  const load = useCallback(async () => {
+    if (!enabled || !teamId) {
+      setCount(0);
+      return;
+    }
+    try {
+      const response = await fetch(`/api/fines/inbox-count?teamId=${teamId}${seasonQuery}`, { cache: "no-store" });
+      if (!response.ok) return;
+      const data = await response.json();
+      setCount(typeof data.count === "number" ? data.count : 0);
+    } catch {
+      // badge er kun en hjælp – ignorér netværksfejl
+    }
+  }, [enabled, teamId, seasonQuery]);
+
+  useEffect(() => {
+    void load();
+  }, [load, pathname]);
+
+  useEffect(() => {
+    if (!enabled) return;
+    const onVisible = () => {
+      if (!document.hidden) void load();
+    };
+    const onUpdate = (event: Event) => setCount((event as CustomEvent<number>).detail ?? 0);
+    window.addEventListener("focus", onVisible);
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("fines:inbox", onUpdate);
+    return () => {
+      window.removeEventListener("focus", onVisible);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("fines:inbox", onUpdate);
+    };
+  }, [enabled, load]);
+
+  return enabled ? count : 0;
+}
+
 function TeamSwitcherSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { memberships, teamId, setTeamId } = useDashboardTeam();
   return (
@@ -127,10 +169,13 @@ export default function DashboardNav({
 }) {
   const { data: session } = useSession();
   const pathname = usePathname();
-  const { memberships, teamId, members, userId } = useDashboardTeam();
+  const { memberships, teamId, members, userId, actingMember, seasonQuery } = useDashboardTeam();
   const [mounted, setMounted] = useState(false);
   const [teamSheetOpen, setTeamSheetOpen] = useState(false);
   const unreadCount = useUnreadCount(session?.user?.id, pathname);
+  const canManageFines = FINE_MANAGER_ROLES.includes(actingMember?.role ?? "");
+  const fineInboxCount = useFineInboxCount(teamId, seasonQuery, canManageFines, pathname);
+  const badgeFor = (href: string) => (href === "/dashboard/boder" ? fineInboxCount : 0);
 
   const hasActiveMembership = session?.user?.hasActiveMembership === true;
   const hasPendingMembership = session?.user?.hasPendingMembership === true;
@@ -215,7 +260,7 @@ export default function DashboardNav({
               key={item.href}
               href={item.href}
               aria-current={active ? "page" : undefined}
-              aria-label={item.label}
+              aria-label={badgeFor(item.href) > 0 ? `${item.label}, ${badgeFor(item.href)} venter` : item.label}
               className={cn(
                 "flex h-12 items-center justify-center gap-2 rounded-full transition-all duration-300 ease-out active:scale-95",
                 active
@@ -223,7 +268,12 @@ export default function DashboardNav({
                   : "flex-1 text-ink/55 hover:text-ink"
               )}
             >
-              <Icon name={item.icon} className="h-[22px] w-[22px]" strokeWidth={active ? 2.3 : 1.9} />
+              <span className="relative inline-flex">
+                <Icon name={item.icon} className="h-[22px] w-[22px]" strokeWidth={active ? 2.3 : 1.9} />
+                {badgeFor(item.href) > 0 ? (
+                  <CountBadge count={badgeFor(item.href)} className="absolute -right-2.5 -top-2" />
+                ) : null}
+              </span>
               {active ? (
                 <span className="animate-fade-in font-display text-base font-bold uppercase tracking-wide">
                   {item.label}
@@ -262,7 +312,8 @@ export default function DashboardNav({
                   )}
                 >
                   <Icon name={item.icon} />
-                  {item.label}
+                  <span className="flex-1">{item.label}</span>
+                  {badgeFor(item.href) > 0 ? <CountBadge count={badgeFor(item.href)} className="ring-0" /> : null}
                 </Link>
               );
             })}

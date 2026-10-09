@@ -69,3 +69,57 @@ export function rankDebtors(debtors: Array<{ userId: string; name: string; total
 export function canDeleteFine(status: string) {
   return ["UNPAID", "PAID_PENDING", "AFVIST"].includes(status);
 }
+
+/* ---------- Indbakke (godkend/afvis flere ad gangen) ---------- */
+
+export type InboxKind = "payment" | "fine" | "template";
+
+export function inboxDecisionUrl(kind: InboxKind, id: string, approve: boolean) {
+  const action = approve ? "approve" : "reject";
+  if (kind === "payment") return `/api/fines/payments/${id}/${action}`;
+  if (kind === "fine") return `/api/fines/${id}/${action}`;
+  return `/api/fine-templates/${id}/${action}`;
+}
+
+/** Bødeforslag med samme tekst, hyppigste først – til hurtigvalg ("vælg alle med denne tekst"). */
+export function groupByReason<T extends { id: string; reason: string }>(fines: T[], minCount = 2) {
+  const map = new Map<string, T[]>();
+  for (const fine of fines) {
+    const key = fine.reason.trim().toLowerCase();
+    map.set(key, [...(map.get(key) ?? []), fine]);
+  }
+  return Array.from(map.values())
+    .filter((items) => items.length >= minCount)
+    .map((items) => ({ reason: items[0].reason.trim(), items }))
+    .sort((a, b) => b.items.length - a.items.length || a.reason.localeCompare(b.reason, "da"));
+}
+
+/** Kører async-opgaver med begrænset parallelitet og rapporterer fremdrift. */
+export async function runPool<T>(
+  items: T[],
+  worker: (item: T) => Promise<boolean>,
+  options: { concurrency?: number; onProgress?: (done: number, total: number) => void } = {}
+) {
+  const { concurrency = 4, onProgress } = options;
+  const failed: T[] = [];
+  let ok = 0;
+  let done = 0;
+  let next = 0;
+  async function lane() {
+    while (next < items.length) {
+      const item = items[next++];
+      let success = false;
+      try {
+        success = await worker(item);
+      } catch {
+        success = false;
+      }
+      if (success) ok += 1;
+      else failed.push(item);
+      done += 1;
+      onProgress?.(done, items.length);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, lane));
+  return { ok, failed };
+}

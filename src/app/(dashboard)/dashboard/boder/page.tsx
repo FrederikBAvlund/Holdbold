@@ -29,6 +29,7 @@ import { useFineActions } from "./hooks/useFineActions";
 import AssignFineSheet, { SearchInput } from "./components/AssignFineSheet";
 import { CollectionSheet, MemberFinesSheet, PaySheet, TemplateSheet } from "./components/FineSheets";
 import FineAutomationCard from "./components/FineAutomationCard";
+import FineInbox from "./components/FineInbox";
 import { VoiceFinesModal } from "./VoiceFinesModal";
 
 type Tab = "mine" | "holdet" | "kassen";
@@ -575,40 +576,6 @@ function KassenTab({
   pushError: (message: string) => void;
 }) {
   const pendingTemplates = data.templates.filter((t) => t.status === "PENDING");
-  const inboxEmpty = data.pendingPayments.length + data.proposed.length + pendingTemplates.length === 0;
-
-  const decide = (kind: "payment" | "fine" | "template", id: string, approve: boolean) => {
-    const url =
-      kind === "payment"
-        ? `/api/fines/payments/${id}/${approve ? "approve" : "reject"}`
-        : kind === "fine"
-          ? `/api/fines/${id}/${approve ? "approve" : "reject"}`
-          : `/api/fine-templates/${id}/${approve ? "approve" : "reject"}`;
-    const labels = {
-      payment: approve ? "Betaling godkendt" : "Betaling afvist",
-      fine: approve ? "Bøde godkendt" : "Bøde afvist",
-      template: approve ? "Tilføjet til kataloget" : "Forslag afvist"
-    };
-    return run(`${kind}-${id}-${approve ? "a" : "r"}`, url, {
-      // Betalings-endpoints kræver holdet i body.
-      body: kind === "payment" ? { teamId } : undefined,
-      success: labels[kind],
-      error: "Kunne ikke gemme"
-    });
-  };
-
-  const decisionButtons = (kind: "payment" | "fine" | "template", id: string) =>
-    readOnly ? null : (
-      <>
-        <Button size="sm" variant="success" icon="check" loading={busyKey === `${kind}-${id}-a`} onClick={() => decide(kind, id, true)}>
-          Godkend
-        </Button>
-        <Button size="sm" variant="secondary" loading={busyKey === `${kind}-${id}-r`} onClick={() => decide(kind, id, false)}>
-          Afvis
-        </Button>
-      </>
-    );
-
   const actions: Array<{ icon: IconName | "mic"; label: string; hint: string; onClick: () => void; hero?: boolean }> = [
     { icon: "mic", label: "Indtal bøder", hint: "Hold knappen nede og rems dem op – så laves forslagene", onClick: onVoice, hero: true },
     { icon: "receipt", label: "Giv bøde", hint: "Én eller flere spillere", onClick: onAssign },
@@ -646,61 +613,7 @@ function KassenTab({
         </div>
       ) : null}
 
-      <Section title="Indbakke">
-        {inboxEmpty ? (
-          <EmptyState icon="check" title="Alt er godkendt" description="Der er ingen forslag eller betalinger, der venter." />
-        ) : (
-          <div className="space-y-4">
-            {data.pendingPayments.length > 0 ? (
-              <InboxGroup title="Betalinger" count={data.pendingPayments.length}>
-                {data.pendingPayments.map((payment) => {
-                  const member = memberById.get(payment.userId);
-                  return (
-                    <FineRow
-                      key={payment.userId}
-                      title={`${payment.count} bøde${payment.count === 1 ? "" : "r"} markeret betalt`}
-                      person={{ name: member?.user.name ?? payment.name, image: member?.user.image }}
-                      meta={payment.requestedAt ? formatRelativePast(payment.requestedAt) : undefined}
-                      amount={payment.total}
-                      actions={decisionButtons("payment", payment.userId)}
-                    />
-                  );
-                })}
-              </InboxGroup>
-            ) : null}
-            {data.proposed.length > 0 ? (
-              <InboxGroup title="Bødeforslag" count={data.proposed.length}>
-                {data.proposed.map((fine) => (
-                  <FineRow
-                    key={fine.id}
-                    title={fine.reason}
-                    description={fine.description}
-                    person={fine.user ? { name: fine.user.name, image: memberById.get(fine.user.id)?.user.image } : null}
-                    meta={`${formatRelativePast(fine.createdAt)}${creatorName(fine) ? ` · foreslået af ${creatorName(fine)}` : ""}`}
-                    amount={fine.amount}
-                    event={fine.event}
-                    actions={decisionButtons("fine", fine.id)}
-                  />
-                ))}
-              </InboxGroup>
-            ) : null}
-            {pendingTemplates.length > 0 ? (
-              <InboxGroup title="Nye bøder til kataloget" count={pendingTemplates.length}>
-                {pendingTemplates.map((template) => (
-                  <FineRow
-                    key={template.id}
-                    title={template.title}
-                    description={template.description}
-                    meta={`${categoryLabel[template.category] ?? ""}${template.createdBy?.name ? ` · foreslået af ${template.createdBy.name}` : ""}`}
-                    amount={template.amount}
-                    actions={decisionButtons("template", template.id)}
-                  />
-                ))}
-              </InboxGroup>
-            ) : null}
-          </div>
-        )}
-      </Section>
+      <FineInbox teamId={teamId} data={data} memberById={memberById} readOnly={readOnly} />
 
       {data.collections.length > 0 ? (
         <Section title="Aktive indsamlinger">
@@ -763,18 +676,6 @@ function KassenTab({
       <Section title="Automatiske bøder">
         <FineAutomationCard teamId={teamId} />
       </Section>
-    </div>
-  );
-}
-
-function InboxGroup({ title, count, children }: { title: string; count: number; children: React.ReactNode }) {
-  return (
-    <div className="space-y-1.5">
-      <p className="flex items-center gap-2 px-1 text-xs font-semibold uppercase tracking-wider text-ink/50">
-        {title}
-        <span className="tabular rounded-full bg-pending px-1.5 text-[0.6875rem] text-on-solid">{count}</span>
-      </p>
-      <ListGroup>{children}</ListGroup>
     </div>
   );
 }

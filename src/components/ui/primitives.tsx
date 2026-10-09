@@ -338,7 +338,7 @@ export function Field({
   htmlFor?: string;
 }) {
   return (
-    <div className="space-y-1.5">
+    <div className="min-w-0 space-y-1.5">
       <label htmlFor={htmlFor} className="block text-sm font-semibold text-ink/80">
         {label}
       </label>

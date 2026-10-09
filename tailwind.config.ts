@@ -61,7 +61,8 @@ export default {
       animation: {
         "sheet-up": "sheet-up 260ms cubic-bezier(0.2, 0.9, 0.3, 1)",
         "fade-in": "fade-in 180ms ease-out",
-        rise: "rise 380ms cubic-bezier(0.2, 0.9, 0.3, 1) both",
+        rise: "rise 380ms cubic-bezier(0.2, 0.9, 0.3, 1) backwards",
+        page: "page-in 260ms ease-out backwards",
         "pop-in": "pop-in 220ms cubic-bezier(0.2, 0.9, 0.3, 1)"
       }
     }
