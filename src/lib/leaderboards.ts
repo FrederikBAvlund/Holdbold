@@ -64,7 +64,7 @@ async function loadActiveMembers(teamId: string): Promise<MemberUser[]> {
   return memberships.map((m) => m.user);
 }
 
-async function attendanceTotals(teamId: string, kind: EventKind, memberIds: Set<string>) {
+async function attendanceTotals(teamId: string, seasonId: string, kind: EventKind, memberIds: Set<string>) {
   const now = new Date();
   const rows = await prisma.signup.groupBy({
     by: ["userId"],
@@ -73,6 +73,7 @@ async function attendanceTotals(teamId: string, kind: EventKind, memberIds: Set<
       userId: { in: [...memberIds] },
       event: {
         teamId,
+        seasonId,
         kind,
         canceledAt: null,
         date: { lt: now }
@@ -83,10 +84,10 @@ async function attendanceTotals(teamId: string, kind: EventKind, memberIds: Set<
   return countsToMap(rows, memberIds);
 }
 
-async function attendanceStreaks(teamId: string, kind: EventKind, memberIds: Set<string>) {
+async function attendanceStreaks(teamId: string, seasonId: string, kind: EventKind, memberIds: Set<string>) {
   const now = new Date();
   const events = await prisma.event.findMany({
-    where: { teamId, kind, canceledAt: null, date: { lt: now } },
+    where: { teamId, seasonId, kind, canceledAt: null, date: { lt: now } },
     orderBy: [{ date: "asc" }, { id: "asc" }],
     select: { id: true }
   });
@@ -116,6 +117,7 @@ async function attendanceStreaks(teamId: string, kind: EventKind, memberIds: Set
 
 async function sumPlayerStats(
   teamId: string,
+  seasonId: string,
   field: "goals" | "assists" | "yellowCards" | "redCards",
   memberIds: Set<string>
 ) {
@@ -126,6 +128,7 @@ async function sumPlayerStats(
       userId: { in: [...memberIds] },
       event: {
         teamId,
+        seasonId,
         kind: "MATCH",
         canceledAt: null,
         date: { lt: now }
@@ -142,32 +145,15 @@ async function sumPlayerStats(
   return m;
 }
 
-/** Klub-sæson: 1. aug – 31. jul (lokalt). */
-function clubSeasonBounds(reference = new Date()): { from: Date; to: Date } {
-  const y = reference.getFullYear();
-  const m = reference.getMonth();
-  if (m >= 7) {
-    return {
-      from: new Date(y, 7, 1, 0, 0, 0, 0),
-      to: new Date(y + 1, 6, 31, 23, 59, 59, 999)
-    };
-  }
-  return {
-    from: new Date(y - 1, 7, 1, 0, 0, 0, 0),
-    to: new Date(y, 6, 31, 23, 59, 59, 999)
-  };
-}
-
-/** Sum af skyld i indeværende sæson (samme statusfilter som dashboardets bøder). */
-async function fineSeasonDebtTotals(teamId: string, memberIds: Set<string>) {
-  const { from, to } = clubSeasonBounds();
+/** Sum af skyld i den valgte sæson (samme statusfilter som dashboardets bøder). */
+async function fineSeasonDebtTotals(teamId: string, seasonId: string, memberIds: Set<string>) {
   const rows = await prisma.fine.groupBy({
     by: ["userId"],
     where: {
       teamId,
+      seasonId,
       userId: { in: [...memberIds] },
-      status: { in: ["UNPAID", "PAID_PENDING", "PAID_APPROVED"] },
-      createdAt: { gte: from, lte: to }
+      status: { in: ["UNPAID", "PAID_PENDING", "PAID_APPROVED"] }
     },
     _sum: { amount: true }
   });
@@ -182,11 +168,13 @@ async function fineSeasonDebtTotals(teamId: string, memberIds: Set<string>) {
 
 async function dutyCounts(
   teamId: string,
+  seasonId: string,
   field: "thingCarrierId" | "beerCarrierId",
   memberIds: Set<string>
 ) {
   const baseWhere = {
     teamId,
+    seasonId,
     canceledAt: null
   };
   const m = new Map<string, number>();
@@ -222,12 +210,13 @@ async function dutyCounts(
   return m;
 }
 
-async function motmWinsCounts(teamId: string, memberIds: Set<string>) {
+async function motmWinsCounts(teamId: string, seasonId: string, memberIds: Set<string>) {
   const now = new Date();
   const rows = await prisma.event.groupBy({
     by: ["matchMotmUserId"],
     where: {
       teamId,
+      seasonId,
       kind: "MATCH",
       canceledAt: null,
       date: { lt: now },
@@ -246,49 +235,51 @@ async function motmWinsCounts(teamId: string, memberIds: Set<string>) {
 
 async function valuesForCategory(
   teamId: string,
+  seasonId: string,
   category: LeaderboardCategory,
   memberUsers: MemberUser[]
 ): Promise<Map<string, number>> {
   const memberIds = new Set(memberUsers.map((u) => u.id));
   switch (category) {
     case "training_total":
-      return attendanceTotals(teamId, "TRAINING", memberIds);
+      return attendanceTotals(teamId, seasonId, "TRAINING", memberIds);
     case "match_total":
-      return attendanceTotals(teamId, "MATCH", memberIds);
+      return attendanceTotals(teamId, seasonId, "MATCH", memberIds);
     case "training_streak":
-      return attendanceStreaks(teamId, "TRAINING", memberIds);
+      return attendanceStreaks(teamId, seasonId, "TRAINING", memberIds);
     case "match_streak":
-      return attendanceStreaks(teamId, "MATCH", memberIds);
+      return attendanceStreaks(teamId, seasonId, "MATCH", memberIds);
     case "goals":
-      return sumPlayerStats(teamId, "goals", memberIds);
+      return sumPlayerStats(teamId, seasonId, "goals", memberIds);
     case "assists":
-      return sumPlayerStats(teamId, "assists", memberIds);
+      return sumPlayerStats(teamId, seasonId, "assists", memberIds);
     case "yellow_cards":
-      return sumPlayerStats(teamId, "yellowCards", memberIds);
+      return sumPlayerStats(teamId, seasonId, "yellowCards", memberIds);
     case "red_cards":
-      return sumPlayerStats(teamId, "redCards", memberIds);
+      return sumPlayerStats(teamId, seasonId, "redCards", memberIds);
     case "fines":
-      return fineSeasonDebtTotals(teamId, memberIds);
+      return fineSeasonDebtTotals(teamId, seasonId, memberIds);
     case "thing_duty":
-      return dutyCounts(teamId, "thingCarrierId", memberIds);
+      return dutyCounts(teamId, seasonId, "thingCarrierId", memberIds);
     case "beer_duty":
-      return dutyCounts(teamId, "beerCarrierId", memberIds);
+      return dutyCounts(teamId, seasonId, "beerCarrierId", memberIds);
     case "motm_wins":
-      return motmWinsCounts(teamId, memberIds);
+      return motmWinsCounts(teamId, seasonId, memberIds);
   }
 }
 
 export async function getLeaderboardRows(
   teamId: string,
-  category: LeaderboardCategory
+  category: LeaderboardCategory,
+  seasonId: string
 ): Promise<LeaderboardRow[]> {
   const memberUsers = await loadActiveMembers(teamId);
   if (memberUsers.length === 0) return [];
-  const values = await valuesForCategory(teamId, category, memberUsers);
+  const values = await valuesForCategory(teamId, seasonId, category, memberUsers);
   return sortRows(memberUsers, values);
 }
 
-export async function getLeaderboardSummary(teamId: string): Promise<{
+export async function getLeaderboardSummary(teamId: string, seasonId: string): Promise<{
   summary: Record<LeaderboardCategory, LeaderboardTop[]>;
 }> {
   const memberUsers = await loadActiveMembers(teamId);
@@ -300,7 +291,7 @@ export async function getLeaderboardSummary(teamId: string): Promise<{
   const tieSummary = new Set<LeaderboardCategory>(LEADERBOARD_TIE_SUMMARY_CATEGORIES);
   const categories = LEADERBOARD_CATEGORIES;
   const valueMaps = await Promise.all(
-    categories.map((cat) => valuesForCategory(teamId, cat, memberUsers))
+    categories.map((cat) => valuesForCategory(teamId, seasonId, cat, memberUsers))
   );
   const summary = {} as Record<LeaderboardCategory, LeaderboardTop[]>;
   for (let i = 0; i < categories.length; i++) {

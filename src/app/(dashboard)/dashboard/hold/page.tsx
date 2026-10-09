@@ -24,7 +24,7 @@ const ROLE_ORDER = ["ADMIN", "TRAENER", "BOEDEKASSEFORMAND", "SOME", "SPILLER"];
 
 export default function HoldPage() {
   const { pushToast } = useToast();
-  const { teamId, userId, members, memberships, membersLoading, actingMember } = useDashboardTeam();
+  const { teamId, userId, members, memberships, membersLoading, actingMember, seasonQuery } = useDashboardTeam();
   const [query, setQuery] = useState("");
   const [summary, setSummary] = useState<Record<LeaderboardCategory, LeaderboardTop[]> | null>(null);
   const [openCategory, setOpenCategory] = useState<LeaderboardCategory | null>(null);
@@ -38,27 +38,27 @@ export default function HoldPage() {
   useEffect(() => {
     if (!teamId) return;
     let alive = true;
-    fetch(`/api/teams/${teamId}/leaderboards`)
+    fetch(`/api/teams/${teamId}/leaderboards${seasonQuery ? `?${seasonQuery.slice(1)}` : ""}`)
       .then((response) => (response.ok ? response.json() : { summary: null }))
       .then((data) => alive && setSummary(data.summary ?? null))
       .catch(() => undefined);
     return () => {
       alive = false;
     };
-  }, [teamId]);
+  }, [teamId, seasonQuery]);
 
   useEffect(() => {
     if (!openCategory || !teamId) return;
     let alive = true;
     setRows(null);
-    fetch(`/api/teams/${teamId}/leaderboards?category=${openCategory}`)
+    fetch(`/api/teams/${teamId}/leaderboards?category=${openCategory}${seasonQuery}`)
       .then((response) => response.json())
       .then((data) => alive && setRows(data.rows ?? []))
       .catch(() => alive && setRows([]));
     return () => {
       alive = false;
     };
-  }, [openCategory, teamId]);
+  }, [openCategory, teamId, seasonQuery]);
 
   const grouped = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -108,6 +108,19 @@ export default function HoldPage() {
             <span className="block text-sm text-on-primary/80">Del linket – de lander direkte på holdet</span>
           </span>
         </button>
+        <Link
+          href="/dashboard/fravaer"
+          className="flex min-h-[4.5rem] items-center gap-3 rounded-[1.375rem] border border-line bg-surface px-4 transition hover:border-ink/20"
+        >
+          <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-out/12 text-out">
+            <Icon name="heart" />
+          </span>
+          <span className="flex-1">
+            <span className="block font-semibold text-ink">Skade & fravær</span>
+            <span className="block text-sm text-ink/55">Meld skade eller længere fravær</span>
+          </span>
+          <Icon name="chevron-right" className="h-4 w-4 text-ink/35" />
+        </Link>
         {isAdmin ? (
           <Link
             href="/dashboard/indstillinger"

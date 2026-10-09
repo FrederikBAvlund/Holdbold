@@ -27,6 +27,13 @@ enum SignupStatus {
   UNKNOWN
 }
 
+enum AbsenceStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELED
+}
+
 enum EventLogType {
   SIGNUP
   CANCEL
@@ -128,6 +135,8 @@ model User {
   eventMotmBallots EventMotmBallot[] @relation("EventMotmBallotVoter")
   receivedEventMotmVotes EventMotmVote[] @relation("EventMotmVoteTarget")
   wonMatchMotmEvents Event[] @relation("EventMatchMotmWinner")
+  absences Absence[] @relation("AbsenceUser")
+  decidedAbsences Absence[] @relation("AbsenceDecider")
 }
 
 model Team {
@@ -147,6 +156,23 @@ model Team {
   fines       Fine[]
   icalFeeds   IcalFeed[]
   notifications Notification[]
+  seasons     Season[]
+  absences    Absence[]
+}
+
+model Season {
+  id        String    @id @default(cuid())
+  teamId    String
+  name      String
+  startedAt DateTime  @default(now())
+  closedAt  DateTime?
+
+  team        Team          @relation(fields: [teamId], references: [id])
+  events      Event[]
+  eventSeries EventSeries[]
+  fines       Fine[]
+
+  @@index([teamId, closedAt])
 }
 
 model Membership {
@@ -177,10 +203,12 @@ model EventSeries {
   endDate                  DateTime?
   signupDeadlineHoursBefore Int      @default(24)
   kind                     EventKind @default(TRAINING)
+  seasonId                 String
   createdById              String
   createdAt                DateTime @default(now())
 
   team Team @relation(fields: [teamId], references: [id])
+  season Season @relation(fields: [seasonId], references: [id])
   createdBy User @relation(fields: [createdById], references: [id])
   events Event[]
 }
@@ -206,9 +234,11 @@ model Event {
   matchHomeGoals Int?
   matchAwayGoals Int?
   matchMotmUserId String?
+  seasonId       String
   createdAt      DateTime     @default(now())
 
   team Team @relation(fields: [teamId], references: [id])
+  season Season @relation(fields: [seasonId], references: [id])
   series EventSeries? @relation(fields: [seriesId], references: [id])
   feed IcalFeed? @relation(fields: [feedId], references: [id])
   createdBy User? @relation("EventCreatedBy", fields: [createdById], references: [id])
@@ -225,6 +255,7 @@ model Event {
 
   @@index([teamId, date])
   @@index([teamId, kind, date])
+  @@index([seasonId])
   @@index([externalUid])
   @@index([canceledAt])
   @@index([thingCarrierId])
@@ -316,14 +347,41 @@ model Signup {
   userId    String
   status    SignupStatus @default(UNKNOWN)
   reason    String?
+  /// Sat når svaret er afgivet automatisk af et godkendt fravær (ikke af spilleren selv)
+  absenceId String?
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
 
   event Event @relation(fields: [eventId], references: [id])
   user User @relation(fields: [userId], references: [id])
+  absence Absence? @relation(fields: [absenceId], references: [id], onDelete: SetNull)
   logs SignupLog[]
 
   @@unique([eventId, userId])
+  @@index([absenceId])
+}
+
+model Absence {
+  id          String        @id @default(cuid())
+  teamId      String
+  userId      String
+  startDate   DateTime
+  endDate     DateTime
+  reason      String
+  status      AbsenceStatus @default(PENDING)
+  decidedById String?
+  decidedAt   DateTime?
+  /// Sat hvis spilleren stopper et godkendt fravær før tid
+  endedAt     DateTime?
+  createdAt   DateTime      @default(now())
+
+  team      Team     @relation(fields: [teamId], references: [id])
+  user      User     @relation("AbsenceUser", fields: [userId], references: [id])
+  decidedBy User?    @relation("AbsenceDecider", fields: [decidedById], references: [id])
+  signups   Signup[]
+
+  @@index([teamId, status])
+  @@index([userId, status])
 }
 
 model SignupLog {
@@ -398,8 +456,10 @@ model Fine {
   rejectedAt    DateTime?
   rejectedById  String?
   automationAction FineAutomationAction?
+  seasonId      String
 
   team Team @relation(fields: [teamId], references: [id])
+  season Season @relation(fields: [seasonId], references: [id])
   user User @relation("FineRecipient", fields: [userId], references: [id])
   event Event? @relation(fields: [eventId], references: [id])
   template FineTemplate? @relation(fields: [templateId], references: [id])
@@ -409,6 +469,7 @@ model Fine {
 
   @@index([teamId, status])
   @@index([userId, status])
+  @@index([teamId, seasonId])
 }
 
 model FineTemplate {

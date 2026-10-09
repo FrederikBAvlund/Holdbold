@@ -22,6 +22,8 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard/hold", label: "Hold", icon: "users" }
 ];
 
+const SECONDARY_ITEMS: NavItem[] = [{ href: "/dashboard/fravaer", label: "Skade & fravær", icon: "heart" }];
+
 const PROFILE_HREF = "/dashboard/indstillinger";
 const NOTIFICATIONS_HREF = "/dashboard/notifikationer";
 
@@ -260,6 +262,20 @@ export default function DashboardNav({
                 </Link>
               );
             })}
+            {(pendingOnly ? [] : SECONDARY_ITEMS).map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                aria-current={isActive(item.href) ? "page" : undefined}
+                className={cn(
+                  "flex min-h-12 items-center gap-3 rounded-2xl px-3.5 font-display text-lg font-bold uppercase tracking-wide transition",
+                  isActive(item.href) ? "bg-primary text-on-primary" : "text-ink/65 hover:bg-ink/[0.05] hover:text-ink"
+                )}
+              >
+                <Icon name={item.icon} />
+                {item.label}
+              </Link>
+            ))}
             <Link
               href={NOTIFICATIONS_HREF}
               className={cn(

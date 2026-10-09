@@ -2,8 +2,12 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { ensureFineSeasonOpen } from "@/lib/seasons";
 
 export async function POST(_request: Request, { params }: { params: { id: string } }) {
+  const seasonGuard = await ensureFineSeasonOpen(params.id);
+  if (seasonGuard) return seasonGuard;
+
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Ikke logget ind" }, { status: 401 });

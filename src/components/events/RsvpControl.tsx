@@ -100,7 +100,7 @@ export default function RsvpControl({
   }
 
   return (
-    <div className={cn("space-y-2", className)}>
+    <div className={cn("season-lock space-y-2", className)}>
       <div className="flex gap-2">
         <button
           type="button"

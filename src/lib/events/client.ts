@@ -84,6 +84,8 @@ export async function fetchCalendarEvents(params: {
   userId: string;
   start: Date;
   end: Date;
+  /** Færdig querystring-del fra useDashboardTeam().seasonQuery ("&seasonId=…" eller tom). */
+  seasonQuery?: string;
 }): Promise<CalendarEvent[]> {
   const query = new URLSearchParams({
     teamId: params.teamId,
@@ -91,7 +93,7 @@ export async function fetchCalendarEvents(params: {
     end: params.end.toISOString(),
     userId: params.userId
   });
-  const response = await fetch(`/api/calendar?${query.toString()}`, { cache: "no-store" });
+  const response = await fetch(`/api/calendar?${query.toString()}${params.seasonQuery ?? ""}`, { cache: "no-store" });
   if (!response.ok) throw new Error("Kunne ikke hente kalenderen");
   const data = await readJson(response);
   const events = ((data.events ?? []) as CalendarEvent[]).map((event) => ({ ...event }));

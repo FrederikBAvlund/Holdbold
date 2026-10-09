@@ -3,12 +3,16 @@ import { getServerSession } from "next-auth";
 import { z } from "zod";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { ensureFineSeasonOpen } from "@/lib/seasons";
 
 const bodySchema = z.object({
   markedById: z.string().min(1)
 });
 
 export async function POST(request: Request, { params }: { params: { id: string } }) {
+  const seasonGuard = await ensureFineSeasonOpen(params.id);
+  if (seasonGuard) return seasonGuard;
+
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Ikke logget ind" }, { status: 401 });

@@ -52,6 +52,8 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
       className={cn(
         "inline-flex select-none items-center justify-center font-semibold transition duration-150 active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50",
         variants[variant],
+        // Handlingsknapper låses, når en lukket sæson vises (se SeasonReadOnlyMain).
+        (variant === "primary" || variant === "success" || variant === "danger") && "season-lock",
         sizes[size],
         block && "w-full",
         className

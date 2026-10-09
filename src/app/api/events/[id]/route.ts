@@ -4,6 +4,7 @@ import { z } from "zod";
 import { authOptions } from "@/lib/auth";
 import { EVENT_MANAGER_ROLES } from "@/lib/apiAuth";
 import { prisma } from "@/lib/prisma";
+import { ensureEventSeasonOpen } from "@/lib/seasons";
 
 const updateSchema = z.object({
   meetingTime: z.string().datetime().nullable().optional(),
@@ -82,6 +83,9 @@ export async function GET(_request: Request, { params }: { params: { id: string 
 }
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+  const seasonGuard = await ensureEventSeasonOpen(params.id);
+  if (seasonGuard) return seasonGuard;
+
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Ikke logget ind" }, { status: 401 });

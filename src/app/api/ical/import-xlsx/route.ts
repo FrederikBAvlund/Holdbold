@@ -4,6 +4,8 @@ import * as XLSX from "xlsx";
 import { authOptions } from "@/lib/auth";
 import { createNotifications } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
+import { applyActiveAbsencesToEvent } from "@/lib/absences";
+import { getActiveSeason } from "@/lib/seasons";
 
 type Row = Record<string, unknown>;
 
@@ -112,6 +114,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Excel-filen indeholder ingen rækker" }, { status: 400 });
   }
 
+  const activeSeason = await getActiveSeason(teamId);
   let created = 0;
   let updated = 0;
   const deadlineHours = 24;
@@ -149,6 +152,7 @@ export async function POST(request: Request) {
     });
 
     if (existing) {
+      if (existing.seasonId !== activeSeason.id) continue; // arkiveret kamp i lukket sæson røres ikke
       await prisma.event.update({
         where: { id: existing.id },
         data: {
@@ -163,9 +167,10 @@ export async function POST(request: Request) {
       });
       updated += 1;
     } else {
-      await prisma.event.create({
+      const createdEvent = await prisma.event.create({
         data: {
           teamId,
+          seasonId: activeSeason.id,
           title,
           date: matchDate,
           location,
@@ -176,6 +181,7 @@ export async function POST(request: Request) {
           kind: "MATCH"
         }
       });
+      await applyActiveAbsencesToEvent(createdEvent);
       created += 1;
     }
   }

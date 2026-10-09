@@ -32,6 +32,15 @@ export type DashboardTeamMember = {
   };
 };
 
+export type DashboardSeason = {
+  id: string;
+  name: string;
+  startedAt: string;
+  closedAt: string | null;
+};
+
+const STORAGE_SEASON_PREFIX = "holdbold:season:";
+
 type DashboardTeamContextValue = {
   userId: string;
   teamId: string;
@@ -42,6 +51,15 @@ type DashboardTeamContextValue = {
   membersLoading: boolean;
   membershipsLoading: boolean;
   refreshDashboardTeam: () => Promise<void>;
+  seasons: DashboardSeason[];
+  activeSeason: DashboardSeason | undefined;
+  selectedSeason: DashboardSeason | undefined;
+  selectSeason: (id: string) => void;
+  /** true når den valgte sæson er lukket – al data er kun til læsning */
+  isReadOnlySeason: boolean;
+  /** Færdig querystring-del ("&seasonId=…") – tom for den aktive sæson */
+  seasonQuery: string;
+  refreshSeasons: () => Promise<void>;
 };
 
 const DashboardTeamContext = createContext<DashboardTeamContextValue | null>(null);
@@ -78,6 +96,8 @@ export default function DashboardTeamProvider({
   const [membersLoading, setMembersLoading] = useState(false);
   const [membershipsLoading, setMembershipsLoading] = useState(false);
   const [membersReloadNonce, setMembersReloadNonce] = useState(0);
+  const [seasons, setSeasons] = useState<DashboardSeason[]>([]);
+  const [selectedSeasonId, setSelectedSeasonId] = useState<string | null>(null);
 
   const setTeamId = useCallback((id: string) => {
     setTeamIdState(id);
@@ -166,6 +186,54 @@ export default function DashboardTeamProvider({
     };
   }, [teamId, userId, membersReloadNonce]);
 
+  const refreshSeasons = useCallback(async () => {
+    if (!teamId || !userId) {
+      setSeasons([]);
+      return;
+    }
+    try {
+      const response = await fetch(`/api/team/${teamId}/seasons`, { cache: "no-store" });
+      if (!response.ok) return;
+      const data = await response.json();
+      setSeasons((data.seasons ?? []) as DashboardSeason[]);
+    } catch {
+      /* sæsoner er valgfri for visningen – ignorer netværksfejl */
+    }
+  }, [teamId, userId]);
+
+  useEffect(() => {
+    setSeasons([]);
+    setSelectedSeasonId(null);
+    if (!teamId) return;
+    try {
+      setSelectedSeasonId(window.localStorage.getItem(STORAGE_SEASON_PREFIX + teamId));
+    } catch {
+      /* localStorage kan være utilgængelig */
+    }
+    void refreshSeasons();
+  }, [teamId, refreshSeasons]);
+
+  const activeSeason = useMemo(() => seasons.find((s) => s.closedAt === null), [seasons]);
+  const selectedSeason = useMemo(
+    () => seasons.find((s) => s.id === selectedSeasonId) ?? activeSeason,
+    [seasons, selectedSeasonId, activeSeason]
+  );
+  const isReadOnlySeason = Boolean(selectedSeason && selectedSeason.closedAt !== null);
+  const seasonQuery =
+    selectedSeason && selectedSeason.id !== activeSeason?.id ? `&seasonId=${selectedSeason.id}` : "";
+
+  const selectSeason = useCallback(
+    (id: string) => {
+      setSelectedSeasonId(id);
+      try {
+        window.localStorage.setItem(STORAGE_SEASON_PREFIX + teamId, id);
+      } catch {
+        /* ignorer */
+      }
+    },
+    [teamId]
+  );
+
   const refreshDashboardTeam = useCallback(async () => {
     clearMeClientCache();
     const { ok, data } = await fetchMeCached();
@@ -199,7 +267,14 @@ export default function DashboardTeamProvider({
       actingMember,
       membersLoading,
       membershipsLoading,
-      refreshDashboardTeam
+      refreshDashboardTeam,
+      seasons,
+      activeSeason,
+      selectedSeason,
+      selectSeason,
+      isReadOnlySeason,
+      seasonQuery,
+      refreshSeasons
     }),
     [
       userId,
@@ -210,7 +285,14 @@ export default function DashboardTeamProvider({
       actingMember,
       membersLoading,
       membershipsLoading,
-      refreshDashboardTeam
+      refreshDashboardTeam,
+      seasons,
+      activeSeason,
+      selectedSeason,
+      selectSeason,
+      isReadOnlySeason,
+      seasonQuery,
+      refreshSeasons
     ]
   );
 

@@ -42,7 +42,7 @@ function monthKey(date: string | Date) {
 export default function KalenderPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { teamId, userId, actingMember } = useDashboardTeam();
+  const { teamId, userId, actingMember, seasonQuery } = useDashboardTeam();
   const canManage = EVENT_MANAGER_ROLES.includes(actingMember?.role ?? "");
 
   const [view, setView] = useState<View>("list");
@@ -81,11 +81,11 @@ export default function KalenderPage() {
     const start = new Date(Date.now() - (pastDays > 0 ? pastDays * 86_400_000 : 3 * 60 * 60 * 1000));
     const end = new Date(Date.now() + AHEAD_DAYS * 86_400_000);
     try {
-      setEvents(await fetchCalendarEvents({ teamId, userId, start, end }));
+      setEvents(await fetchCalendarEvents({ teamId, userId, start, end, seasonQuery }));
     } catch {
       setEvents([]);
     }
-  }, [teamId, userId, pastDays]);
+  }, [teamId, userId, pastDays, seasonQuery]);
 
   useEffect(() => {
     load();
@@ -205,7 +205,7 @@ export default function KalenderPage() {
           )}
         </>
       ) : (
-        <MonthView teamId={teamId} userId={userId} onStatusChange={handleStatusChange} />
+        <MonthView teamId={teamId} userId={userId} seasonQuery={seasonQuery} onStatusChange={handleStatusChange} />
       )}
 
       {canManage ? (
@@ -227,10 +227,12 @@ const WEEKDAYS = ["Man", "Tir", "Ons", "Tor", "Fre", "Lør", "Søn"];
 function MonthView({
   teamId,
   userId,
+  seasonQuery,
   onStatusChange
 }: {
   teamId: string;
   userId: string;
+  seasonQuery: string;
   onStatusChange: (originalId: string, status: SignupStatus, realId: string) => void;
 }) {
   const [cursor, setCursor] = useState(() => {
@@ -246,13 +248,13 @@ function MonthView({
     setEvents(null);
     const start = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
     const end = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
-    fetchCalendarEvents({ teamId, userId, start, end })
+    fetchCalendarEvents({ teamId, userId, start, end, seasonQuery })
       .then((data) => alive && setEvents(data))
       .catch(() => alive && setEvents([]));
     return () => {
       alive = false;
     };
-  }, [cursor, teamId, userId]);
+  }, [cursor, teamId, userId, seasonQuery]);
 
   const days = useMemo(() => {
     const first = new Date(cursor);

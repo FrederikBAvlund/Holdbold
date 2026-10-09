@@ -38,7 +38,7 @@ function greeting(now = new Date()) {
 
 export default function HomePage() {
   const { data: session } = useSession();
-  const { teamId, userId, members, memberships, actingMember } = useDashboardTeam();
+  const { teamId, userId, members, memberships, actingMember, seasonQuery } = useDashboardTeam();
   const [events, setEvents] = useState<CalendarEvent[] | null>(null);
   const [nextSignups, setNextSignups] = useState<EventSignup[] | null>(null);
   const [fines, setFines] = useState<Fine[] | null>(null);
@@ -55,11 +55,11 @@ export default function HomePage() {
     const start = new Date(Date.now() - 3 * 60 * 60 * 1000);
     const end = new Date(Date.now() + LOOKAHEAD_DAYS * 86_400_000);
     try {
-      setEvents(await fetchCalendarEvents({ teamId, userId, start, end }));
+      setEvents(await fetchCalendarEvents({ teamId, userId, start, end, seasonQuery }));
     } catch {
       setEvents([]);
     }
-  }, [teamId, userId]);
+  }, [teamId, userId, seasonQuery]);
 
   useEffect(() => {
     setEvents(null);
@@ -71,28 +71,28 @@ export default function HomePage() {
   useEffect(() => {
     if (!teamId || !userId) return;
     let alive = true;
-    fetch(`/api/fines?teamId=${teamId}&userId=${userId}`, { cache: "no-store" })
+    fetch(`/api/fines?teamId=${teamId}&userId=${userId}${seasonQuery}`, { cache: "no-store" })
       .then((response) => response.json())
       .then((data) => alive && setFines(data.fines ?? []))
       .catch(() => alive && setFines([]));
-    fetch(`/api/teams/${teamId}/leaderboards`)
+    fetch(`/api/teams/${teamId}/leaderboards${seasonQuery ? `?${seasonQuery.slice(1)}` : ""}`)
       .then((response) => (response.ok ? response.json() : { summary: null }))
       .then((data) => alive && setLeaderboards(data.summary ?? null))
       .catch(() => alive && setLeaderboards(null));
     return () => {
       alive = false;
     };
-  }, [teamId, userId]);
+  }, [teamId, userId, seasonQuery]);
 
   useEffect(() => {
     if (!teamId || !canManageFines) return;
     let alive = true;
-    fetch(`/api/fines?teamId=${teamId}&status=FORESLAET`, { cache: "no-store" })
+    fetch(`/api/fines?teamId=${teamId}&status=FORESLAET${seasonQuery}`, { cache: "no-store" })
       .then((response) => response.json())
       .then((data) => alive && setProposedFines((data.fines ?? []).length))
       .catch(() => undefined);
     if (isAdmin) {
-      fetch(`/api/fines/payments/pending?teamId=${teamId}`, { cache: "no-store" })
+      fetch(`/api/fines/payments/pending?teamId=${teamId}${seasonQuery}`, { cache: "no-store" })
         .then((response) => response.json())
         .then((data) => alive && setPendingPayments((data.payments ?? []).length))
         .catch(() => undefined);
@@ -100,7 +100,7 @@ export default function HomePage() {
     return () => {
       alive = false;
     };
-  }, [teamId, canManageFines, isAdmin]);
+  }, [teamId, canManageFines, isAdmin, seasonQuery]);
 
   // Aflyste begivenheder springes over som "næste".
   const upcoming = useMemo(

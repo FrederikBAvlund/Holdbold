@@ -34,6 +34,9 @@ export async function syncMotmSelfVoteProposedFines(params: {
     return;
   }
 
+  const voteEvent = await prisma.event.findUnique({ where: { id: eventId }, select: { seasonId: true } });
+  if (!voteEvent) return;
+
   const voter = await prisma.user.findUnique({
     where: { id: voterId },
     select: { name: true }
@@ -42,6 +45,7 @@ export async function syncMotmSelfVoteProposedFines(params: {
   await prisma.fine.createMany({
     data: Array.from({ length: selfWeight }, () => ({
       teamId,
+      seasonId: voteEvent.seasonId,
       userId: voterId,
       eventId,
       templateId: resolved.template.id,

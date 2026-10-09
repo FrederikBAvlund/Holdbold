@@ -1,6 +1,7 @@
 import type { FineAutomationAction } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { createNotifications } from "@/lib/notifications";
+import { getActiveSeason } from "@/lib/seasons";
 import {
   isPostDeadlineWithdrawal,
   isSameCalendarDayAsEvent,
@@ -12,6 +13,7 @@ export async function processMissedSignupFines(teamId: string) {
   const now = new Date();
   const nowMs = now.getTime();
 
+  const activeSeason = await getActiveSeason(teamId);
   const [players, managers, dueEvents] = await Promise.all([
     prisma.membership.findMany({
       where: { teamId, status: "ACTIVE" },
@@ -24,6 +26,7 @@ export async function processMissedSignupFines(teamId: string) {
     prisma.event.findMany({
       where: {
         teamId,
+        seasonId: activeSeason.id,
         canceledAt: null,
         signupDeadline: { lte: now }
       },
@@ -34,7 +37,7 @@ export async function processMissedSignupFines(teamId: string) {
         kind: true,
         signupDeadline: true,
         signups: {
-          select: { userId: true, status: true }
+          select: { userId: true, status: true, absenceId: true }
         },
         signupLogs: {
           select: { userId: true, status: true, createdAt: true },
@@ -59,6 +62,8 @@ export async function processMissedSignupFines(teamId: string) {
     if (Number.isNaN(deadlineMs) || deadlineMs > nowMs) continue;
 
     const statusByUser = new Map(event.signups.map((signup) => [signup.userId, signup.status]));
+    // Spillere med fravær på begivenheden bødes aldrig automatisk
+    const absentUserIds = new Set(event.signups.filter((s) => s.absenceId).map((s) => s.userId));
     const latestLogByUser = new Map<string, { createdAt: Date; status: "IN" | "OUT" | "UNKNOWN" }>();
     for (const log of event.signupLogs) {
       if (!latestLogByUser.has(log.userId)) {
@@ -78,6 +83,7 @@ export async function processMissedSignupFines(teamId: string) {
     for (const member of players) {
       if (member.createdAt > deadlineDate) continue;
       const targetUserId = member.userId;
+      if (absentUserIds.has(targetUserId)) continue;
       const status = statusByUser.get(targetUserId);
       const latestLog = latestLogByUser.get(targetUserId);
       const eventDate = new Date(event.date);
@@ -192,6 +198,7 @@ export async function processMissedSignupFines(teamId: string) {
     await prisma.fine.createMany({
       data: rows.map((row) => ({
         teamId,
+        seasonId: activeSeason.id,
         userId: row.userId,
         eventId: event.id,
         templateId: row.templateId,

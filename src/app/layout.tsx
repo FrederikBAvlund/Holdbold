@@ -1,6 +1,6 @@
 import "./globals.css";
 import type { Metadata, Viewport } from "next";
-import { Barlow_Condensed, Inter } from "next/font/google";
+import localFont from "next/font/local";
 import { getServerSession } from "next-auth";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import ThemeColorMeta from "@/components/ThemeColorMeta";
@@ -9,14 +9,23 @@ import ToastProvider from "@/components/ToastProvider";
 import PwaRegister from "@/components/PwaRegister";
 import { authOptions } from "@/lib/auth";
 
-const display = Barlow_Condensed({
-  subsets: ["latin"],
-  variable: "--font-display",
-  weight: ["600", "700", "800"]
+// Skrifttyper self-hostes (via @fontsource) så build ikke afhænger af fonts.googleapis.com.
+const display = localFont({
+  src: [
+    { path: "../../node_modules/@fontsource/barlow-condensed/files/barlow-condensed-latin-600-normal.woff2", weight: "600", style: "normal" },
+    { path: "../../node_modules/@fontsource/barlow-condensed/files/barlow-condensed-latin-700-normal.woff2", weight: "700", style: "normal" },
+    { path: "../../node_modules/@fontsource/barlow-condensed/files/barlow-condensed-latin-800-normal.woff2", weight: "800", style: "normal" }
+  ],
+  variable: "--font-display"
 });
 
-const sans = Inter({
-  subsets: ["latin"],
+const sans = localFont({
+  src: [
+    { path: "../../node_modules/@fontsource/inter/files/inter-latin-400-normal.woff2", weight: "400", style: "normal" },
+    { path: "../../node_modules/@fontsource/inter/files/inter-latin-500-normal.woff2", weight: "500", style: "normal" },
+    { path: "../../node_modules/@fontsource/inter/files/inter-latin-600-normal.woff2", weight: "600", style: "normal" },
+    { path: "../../node_modules/@fontsource/inter/files/inter-latin-700-normal.woff2", weight: "700", style: "normal" }
+  ],
   variable: "--font-sans"
 });
 

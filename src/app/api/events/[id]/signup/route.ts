@@ -4,6 +4,8 @@ import { z } from "zod";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { createNotifications } from "@/lib/notifications";
+import { ensureEventSeasonOpen } from "@/lib/seasons";
+import { canViewSignupOf, requireActiveTeamMember, requireSession } from "@/lib/apiAuth";
 import {
   isPostDeadlineWithdrawal,
   isSameCalendarDayAsEvent,
@@ -22,6 +24,24 @@ export async function GET(request: Request, { params }: { params: { id: string }
   const userId = searchParams.get("userId") ?? "";
   if (!userId) {
     return NextResponse.json({ error: "userId mangler" }, { status: 400 });
+  }
+
+  const session = await requireSession();
+  if (!session.ok) return session.response;
+
+  const eventTeam = await prisma.event.findUnique({
+    where: { id: params.id },
+    select: { teamId: true }
+  });
+  if (!eventTeam) {
+    return NextResponse.json({ error: "Begivenhed ikke fundet" }, { status: 404 });
+  }
+
+  const member = await requireActiveTeamMember(session.userId, eventTeam.teamId);
+  if (!member.ok) return member.response;
+
+  if (!canViewSignupOf(session.userId, member.role, userId)) {
+    return NextResponse.json({ error: "Ikke adgang til andre spilleres tilmeldingsstatus" }, { status: 403 });
   }
 
   const signup = await prisma.signup.findUnique({
@@ -67,6 +87,9 @@ export async function GET(request: Request, { params }: { params: { id: string }
 }
 
 export async function POST(request: Request, { params }: { params: { id: string } }) {
+  const seasonGuard = await ensureEventSeasonOpen(params.id);
+  if (seasonGuard) return seasonGuard;
+
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Ikke logget ind" }, { status: 401 });
@@ -84,6 +107,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
     select: {
       id: true,
       teamId: true,
+      seasonId: true,
       title: true,
       date: true,
       kind: true,
@@ -160,7 +184,9 @@ export async function POST(request: Request, { params }: { params: { id: string 
     },
     update: {
       status: body.status,
-      reason: body.reason ?? null
+      reason: body.reason ?? null,
+      // Et aktivt svar fra spiller/leder overtager fra fraværets automatiske afbud
+      absenceId: null
     },
     create: {
       eventId: params.id,
@@ -234,6 +260,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
         await prisma.fine.create({
           data: {
             teamId: event.teamId,
+            seasonId: event.seasonId,
             userId: body.userId,
             eventId: event.id,
             templateId: template.id,

@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { createNotifications } from "@/lib/notifications";
+import { getActiveSeason } from "@/lib/seasons";
 
 const HOURS_TO_MS = 60 * 60 * 1000;
 
@@ -62,9 +63,11 @@ export async function processDueFineCollections(teamId: string) {
       select: { userId: true }
     });
 
+    const activeSeason = await getActiveSeason(teamId);
     await prisma.fine.createMany({
       data: debtors.map((debtor) => ({
         teamId,
+        seasonId: activeSeason.id,
         userId: debtor.userId,
         templateId: collection.template.id,
         amount: collection.template.amount,

@@ -22,7 +22,7 @@ import {
 export default function BoderPage() {
   const { pushToast } = useToast();
   const { data: session, status: sessionStatus } = useSession();
-  const { teamId, userId, members: teamMembers, actingMember } = useDashboardTeam();
+  const { teamId, userId, members: teamMembers, actingMember, seasonQuery } = useDashboardTeam();
   const members = teamMembers as Member[];
   const loadedTemplatesKeyRef = useRef<string | null>(null);
   const loadedMyFinesKeyRef = useRef<string | null>(null);
@@ -99,32 +99,32 @@ export default function BoderPage() {
   useEffect(() => {
     async function loadFines() {
       if (!teamId || !userId) return;
-      const key = `${teamId}:${userId}`;
+      const key = `${teamId}:${userId}:${seasonQuery}`;
       if (loadedMyFinesKeyRef.current === key) return;
       loadedMyFinesKeyRef.current = key;
-      const response = await fetch(`/api/fines?teamId=${teamId}&userId=${userId}`);
+      const response = await fetch(`/api/fines?teamId=${teamId}${seasonQuery}&userId=${userId}`);
       const data = await response.json();
       setFines(data.fines ?? []);
     }
 
     loadFines();
-  }, [teamId, userId]);
+  }, [teamId, userId, seasonQuery]);
 
   useEffect(() => {
     async function loadTeamFineViews() {
       if (!teamId || !userId) return;
-      const key = `${teamId}:${userId}:${canManageFines ? "1" : "0"}`;
+      const key = `${teamId}:${userId}:${canManageFines ? "1" : "0"}:${seasonQuery}`;
       if (loadedTeamFineViewsKeyRef.current === key) return;
       loadedTeamFineViewsKeyRef.current = key;
 
       const since = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
       const tasks: Promise<Response>[] = [
-        fetch(`/api/fines/debtors?teamId=${teamId}`, { cache: "no-store" }),
-        fetch(`/api/fines?teamId=${teamId}&since=${encodeURIComponent(since)}`, { cache: "no-store" }),
-        fetch(`/api/fines?teamId=${teamId}&createdById=${userId}`, { cache: "no-store" })
+        fetch(`/api/fines/debtors?teamId=${teamId}${seasonQuery}`, { cache: "no-store" }),
+        fetch(`/api/fines?teamId=${teamId}${seasonQuery}&since=${encodeURIComponent(since)}`, { cache: "no-store" }),
+        fetch(`/api/fines?teamId=${teamId}${seasonQuery}&createdById=${userId}`, { cache: "no-store" })
       ];
       if (canManageFines) {
-        tasks.push(fetch(`/api/fines?teamId=${teamId}&status=FORESLAET`, { cache: "no-store" }));
+        tasks.push(fetch(`/api/fines?teamId=${teamId}${seasonQuery}&status=FORESLAET`, { cache: "no-store" }));
       }
 
       const [debtorsResponse, historyResponse, mySubmittedResponse, managementResponse] = await Promise.all(tasks);
@@ -159,7 +159,7 @@ export default function BoderPage() {
     }
 
     loadTeamFineViews();
-  }, [teamId, userId, canManageFines]);
+  }, [teamId, userId, canManageFines, seasonQuery]);
 
   useEffect(() => {
     async function loadSelectedDebtorFines() {
@@ -168,7 +168,7 @@ export default function BoderPage() {
         return;
       }
       const response = await fetch(
-        `/api/fines?teamId=${teamId}&userId=${selectedDebtorUserId}`,
+        `/api/fines?teamId=${teamId}${seasonQuery}&userId=${selectedDebtorUserId}`,
         { cache: "no-store" }
       );
       const data = await response.json().catch(() => ({}));
@@ -180,7 +180,7 @@ export default function BoderPage() {
     }
 
     loadSelectedDebtorFines();
-  }, [teamId, selectedDebtorUserId]);
+  }, [teamId, selectedDebtorUserId, seasonQuery]);
 
   useEffect(() => {
     async function loadTeamInfo() {
@@ -385,20 +385,20 @@ export default function BoderPage() {
     if (!teamId || !userId) return;
     const since = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
     const tasks: Promise<Response>[] = [
-      fetch(`/api/fines?teamId=${teamId}&userId=${userId}`, { cache: "no-store" }),
-      fetch(`/api/fines/debtors?teamId=${teamId}`, { cache: "no-store" }),
-      fetch(`/api/fines?teamId=${teamId}&since=${encodeURIComponent(since)}`, { cache: "no-store" }),
-      fetch(`/api/fines?teamId=${teamId}&createdById=${userId}`, { cache: "no-store" })
+      fetch(`/api/fines?teamId=${teamId}${seasonQuery}&userId=${userId}`, { cache: "no-store" }),
+      fetch(`/api/fines/debtors?teamId=${teamId}${seasonQuery}`, { cache: "no-store" }),
+      fetch(`/api/fines?teamId=${teamId}${seasonQuery}&since=${encodeURIComponent(since)}`, { cache: "no-store" }),
+      fetch(`/api/fines?teamId=${teamId}${seasonQuery}&createdById=${userId}`, { cache: "no-store" })
     ];
     if (canManageFines) {
-      tasks.push(fetch(`/api/fines?teamId=${teamId}&status=FORESLAET`, { cache: "no-store" }));
+      tasks.push(fetch(`/api/fines?teamId=${teamId}${seasonQuery}&status=FORESLAET`, { cache: "no-store" }));
     }
     if (isAdmin) {
       tasks.push(fetch(`/api/fines/payments/pending?teamId=${teamId}`, { cache: "no-store" }));
     }
     if (selectedDebtorUserId) {
       tasks.push(
-        fetch(`/api/fines?teamId=${teamId}&userId=${selectedDebtorUserId}`, { cache: "no-store" })
+        fetch(`/api/fines?teamId=${teamId}${seasonQuery}&userId=${selectedDebtorUserId}`, { cache: "no-store" })
       );
     }
 
