@@ -3,8 +3,9 @@ import { z } from "zod";
 import { FINE_AUTOMATION_ROLES, requireActiveTeamMemberWithRoles, requireSession } from "@/lib/apiAuth";
 import { prisma } from "@/lib/prisma";
 import { getActiveSeason, seasonClosedResponse } from "@/lib/seasons";
+import { buildDialogueSession } from "@/lib/voiceFines/dialogue";
 
-const bodySchema = z.object({ teamId: z.string().min(1) });
+const bodySchema = z.object({ teamId: z.string().min(1), spoken: z.boolean().default(true) });
 
 export async function POST(request: Request) {
   const session = await requireSession();
@@ -14,7 +15,7 @@ export async function POST(request: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: "Ugyldigt input" }, { status: 400 });
   }
-  const { teamId } = parsed.data;
+  const { teamId, spoken } = parsed.data;
 
   const member = await requireActiveTeamMemberWithRoles(session.userId, teamId, FINE_AUTOMATION_ROLES);
   if (!member.ok) return member.response;
@@ -27,31 +28,24 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Stemmefunktion er ikke sat op (OPENAI_API_KEY mangler)" }, { status: 503 });
   }
 
-  const memberships = await prisma.membership.findMany({
-    where: { teamId, status: "ACTIVE" },
-    select: { user: { select: { name: true } } }
-  });
-  const names = memberships.map((m) => m.user.name).filter(Boolean).slice(0, 60);
+  const [memberships, templates] = await Promise.all([
+    prisma.membership.findMany({
+      where: { teamId, status: "ACTIVE" },
+      select: { user: { select: { id: true, name: true } } }
+    }),
+    prisma.fineTemplate.findMany({
+      where: { teamId, status: "APPROVED" },
+      select: { id: true, title: true, amount: true }
+    })
+  ]);
+  const members = memberships.map((m) => ({ id: m.user.id, name: m.user.name ?? "" })).filter((m) => m.name);
 
   const response = await fetch("https://api.openai.com/v1/realtime/client_secrets", {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({
       expires_after: { anchor: "created_at", seconds: 600 },
-      session: {
-        type: "transcription",
-        audio: {
-          input: {
-            transcription: {
-              model: "gpt-4o-transcribe",
-              language: "da",
-              prompt: `Danske bøder på et fodboldhold. Spillere: ${names.join(", ")}.`
-            },
-            turn_detection: { type: "server_vad", silence_duration_ms: 450, prefix_padding_ms: 200 },
-            noise_reduction: { type: "near_field" }
-          }
-        }
-      }
+      session: buildDialogueSession(members, templates, spoken)
     })
   });
 
