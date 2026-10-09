@@ -4,7 +4,7 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import { Combobox } from "@/components/ui/combobox";
 import LoadingButton from "@/components/LoadingButton";
 import { useToast } from "@/components/ToastProvider";
-import { validateDraftUpdate } from "@/lib/voiceFines/dialogue";
+import { validateDraftAddition, validateDraftUpdate } from "@/lib/voiceFines/dialogue";
 import {
   emptyDialogueUsage,
   emptyTranscribeUsage,
@@ -82,6 +82,19 @@ export function VoiceFinesModal({ teamId, members, templates, onClose, onCreated
       }))
     });
     if (name === "get_fine_drafts") return snapshot();
+    if (name === "add_fine_drafts") {
+      const current = snapshot().fines;
+      const result = validateDraftAddition(input, current, draftMembers, draftTemplates);
+      if (!result.ok) return result;
+      if (result.added) {
+        // Keep current rows and keys; only append the newly validated suggestions.
+        commitRows([...rowsRef.current, ...result.fines.slice(current.length).map((fine) => ({
+          key: nextKey(), userId: fine.userId, templateId: fine.templateId ?? "", title: fine.title,
+          amount: fine.amount === null ? "" : String(fine.amount), confidence: fine.confidence, sourceText: fine.sourceText
+        }))]);
+      }
+      return { ok: true, added: result.added };
+    }
     if (name !== "set_fine_drafts") return { ok: false, error: "Ukendt værktøj" };
     const result = validateDraftUpdate(input, snapshotRef.current, draftMembers, draftTemplates);
     if (!result.ok) return { ...snapshot(), ...result };
@@ -232,6 +245,7 @@ export function VoiceFinesModal({ teamId, members, templates, onClose, onCreated
         </div>
 
         <div className="mt-4 space-y-3">
+          <p className="text-sm text-ink/60">Tjek spillere og beløb før tildeling. Usikre match og vurderede beløb markeres i listen.</p>
           {grouped.map((group) => (
             <div key={group.userId || "ukendt"} className="rounded-xl border border-ink/10 bg-white/70 p-3">
               <p className="mb-2 text-sm font-semibold text-ink">
@@ -267,7 +281,7 @@ export function VoiceFinesModal({ teamId, members, templates, onClose, onCreated
                     ) : null}
                     <div className="flex items-center justify-between gap-2 text-xs text-ink/50">
                       <span className="truncate">
-                        {row.confidence < 0.6 ? "Usikker – tjek · " : ""}
+                        {row.confidence < 0.6 ? "Vurderet / usikker – tjek · " : ""}
                         {row.sourceText ? `“${row.sourceText}”` : ""}
                       </span>
                       <button type="button" className="shrink-0 text-red-700 underline" onClick={() => removeRow(row.key)}>

@@ -58,7 +58,7 @@ describe("voice token", () => {
     expect(body.session.output_modalities).toEqual([spoken ? "audio" : "text"]);
     expect(body.session.instructions).toContain("André Lundgren");
     expect(body.session.audio.input.transcription).toEqual({ model: "gpt-4o-transcribe", language: "da" });
-    expect(body.session.tools.map((t: { name: string }) => t.name)).toEqual(["get_fine_drafts", "set_fine_drafts"]);
+    expect(body.session.tools.map((t: { name: string }) => t.name)).toEqual(["add_fine_drafts", "get_fine_drafts", "set_fine_drafts"]);
   });
 
   it("afviser et succesrespons uden et brugbart token", async () => {

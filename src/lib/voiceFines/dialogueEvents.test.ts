@@ -69,3 +69,38 @@ describe("Realtime dialogue protocol", () => {
     expect(dialogueCostUsd(usage)).toBeCloseTo((600 + 6 + 600 + 48 + 12 + 0.6) / 1_000_000);
   });
 });
+
+
+describe("short tool confirmations", () => {
+  it("adds in one tool call and requests only a bounded confirmation without more tools", () => {
+    const { cb, handle } = setup();
+    cb.onTool.mockReturnValueOnce({ ok: true, added: 3 } as never);
+    const event = { type: "response.done", response: { id: "new", status: "completed", output: [
+      { type: "function_call", call_id: "add", name: "add_fine_drafts", arguments: '{"fines":[],"allowDuplicates":false}' }
+    ] } };
+    handle(event);
+    handle(event);
+    expect(cb.onTool).toHaveBeenCalledExactlyOnceWith("add_fine_drafts", { fines: [], allowDuplicates: false });
+    expect(cb.send).toHaveBeenLastCalledWith({ type: "response.create", response: expect.objectContaining({
+      tool_choice: "none", max_output_tokens: 256
+    }) });
+    expect(JSON.parse(cb.send.mock.calls[0][0].item.output)).toEqual({ ok: true, added: 3 });
+  });
+
+  it("allows recovery after a rejected write and does not issue a success confirmation", () => {
+    const { cb, handle } = setup();
+    cb.onTool.mockReturnValueOnce({ ok: false, error: "Ukendt spiller" } as never);
+    handle({ type: "response.done", response: { id: "rejected", status: "completed", output: [
+      { type: "function_call", call_id: "add", name: "add_fine_drafts", arguments: '{}' }
+    ] } });
+    expect(cb.send).toHaveBeenLastCalledWith({ type: "response.create" });
+  });
+
+  it("allows the edit after reading a snapshot instead of prematurely confirming", () => {
+    const { cb, handle } = setup();
+    handle({ type: "response.done", response: { id: "read", status: "completed", output: [
+      { type: "function_call", call_id: "get", name: "get_fine_drafts", arguments: '{}' }
+    ] } });
+    expect(cb.send).toHaveBeenLastCalledWith({ type: "response.create" });
+  });
+});
