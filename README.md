@@ -10,12 +10,24 @@ Mobilvenlig webapp til holdkalender, tilmelding og boedekasse.
 4. Start dev-serveren
 
 ```bash
+nvm use            # Node 22 (.nvmrc)
 npm install
 cp .env.example .env
-npm run prisma:migrate
-npm run prisma:seed
+npm run dev:setup  # starter Postgres i Docker, koerer migrationer og seed
 npm run dev
 ```
+
+## Lokal udvikling
+
+- Databasen koerer lokalt i Docker (`docker-compose.yml`, Postgres 16). Start med `npm run db:up`.
+- Nulstil databasen (migrationer + seed) med `npm run db:reset`.
+- Ny migration under udvikling: `npm run prisma:migrate`.
+- Supabase-variablerne kan vaere tomme lokalt; profilbilleder gemmes saa i `public/uploads/` (ignoreres af git).
+- Log ind lokalt med `AUTH_CREDENTIALS_ENABLED=true` og seed-brugerne (Facebook-login er ikke noedvendigt).
+
+## CI
+
+GitHub Actions (`.github/workflows/ci.yml`) koerer paa hver PR: `prisma validate`, `migrate deploy` mod en Postgres-service, typecheck, tests og build.
 
 ## API og sikkerhed
 
@@ -49,11 +61,9 @@ Admin kan angive en iCal URL og starte en import manuelt.
 Miljoevariabler for at oprette en admin-bruger i seed:
 
 - `SEED_ADMIN_EMAIL`
-- `SEED_ADMIN_PHONE`
 - `SEED_ADMIN_PASSWORD`
 
 Miljoevariabler for at oprette en spiller i seed:
 
 - `SEED_PLAYER_EMAIL`
-- `SEED_PLAYER_PHONE`
 - `SEED_PLAYER_PASSWORD`
