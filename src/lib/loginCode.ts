@@ -34,6 +34,14 @@ export function codesMatch(expectedHash: string, email: string, code: string) {
   return actual.length === expected.length && timingSafeEqual(actual, expected);
 }
 
+/**
+ * Brugeren får altid samme svar, så årsagen til at der ikke sendes en kode logges kun på serveren
+ * (uden e-mailadressen), så det kan fejlfindes i driftsloggen uden at afsløre hvilke konti der findes.
+ */
+function skip(reason: string) {
+  console.info(`[login-code] ingen kode sendt: ${reason}`);
+}
+
 /** Spørger rate limits og opretter + sender koden. Gør intet synligt, hvis grænserne er nået. */
 async function issueCode(email: string, signup?: { name: string; teamId: string }): Promise<void> {
   const now = Date.now();
@@ -42,11 +50,11 @@ async function issueCode(email: string, signup?: { name: string; teamId: string 
     orderBy: { createdAt: "desc" },
     select: { createdAt: true }
   });
-  if (recent.length >= LOGIN_CODE_MAX_PER_HOUR) return;
-  if (recent[0] && now - recent[0].createdAt.getTime() < LOGIN_CODE_RESEND_COOLDOWN_MS) return;
+  if (recent.length >= LOGIN_CODE_MAX_PER_HOUR) return skip("hourly_limit_for_email");
+  if (recent[0] && now - recent[0].createdAt.getTime() < LOGIN_CODE_RESEND_COOLDOWN_MS) return skip("resend_cooldown");
 
   const global = await checkRateLimit("otp-request:global", LOGIN_CODE_GLOBAL_MAX_PER_HOUR, 60 * 60);
-  if (!global.allowed) return;
+  if (!global.allowed) return skip("global_hourly_cap");
 
   const code = generateLoginCode();
   await prisma.loginCode.create({
@@ -78,13 +86,13 @@ export async function requestLoginCode(rawEmail: string): Promise<void> {
     where: { email: { equals: email, mode: "insensitive" } },
     select: { id: true }
   });
-  if (!user) return;
+  if (!user) return skip("no_user_with_email");
 
   const hasMembership = await prisma.membership.findFirst({
     where: { userId: user.id, status: { in: ["ACTIVE", "PENDING"] } },
     select: { id: true }
   });
-  if (!hasMembership) return;
+  if (!hasMembership) return skip("user_has_no_membership");
 
   await issueCode(email);
 }
