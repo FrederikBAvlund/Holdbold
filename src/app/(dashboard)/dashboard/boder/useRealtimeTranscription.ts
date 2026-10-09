@@ -88,7 +88,7 @@ export function useRealtimeTranscription({ teamId, onSegment, onUsage, onError }
 
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
-      const sdpRes = await fetch("https://api.openai.com/v1/realtime?intent=transcription", {
+      const sdpRes = await fetch("https://api.openai.com/v1/realtime/calls", {
         method: "POST",
         body: offer.sdp,
         headers: { Authorization: `Bearer ${tokenData.token}`, "Content-Type": "application/sdp" }

@@ -14,7 +14,7 @@ vi.mock("@/lib/seasons", () => ({
   seasonClosedResponse: vi.fn(() => null)
 }));
 
-describe("voice token errors", () => {
+describe("voice token", () => {
   beforeEach(() => {
     vi.stubEnv("OPENAI_API_KEY", "test-key");
     vi.spyOn(console, "error").mockImplementation(() => {});
@@ -23,6 +23,46 @@ describe("voice token errors", () => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
     vi.unstubAllEnvs();
+  });
+
+  it("opretter en dansk transskriptionssession og læser GA-tokenets format", async () => {
+    const fetchMock = vi.fn(async () => Response.json({
+      value: "ek-test", expires_at: 12345, session: { type: "transcription" }
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    const response = await POST(new Request("http://localhost/api/fines/voice/token", {
+      method: "POST", body: JSON.stringify({ teamId: "team" })
+    }));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ token: "ek-test", expiresAt: 12345 });
+    expect(fetchMock).toHaveBeenCalledWith("https://api.openai.com/v1/realtime/client_secrets", {
+      method: "POST",
+      headers: { Authorization: "Bearer test-key", "Content-Type": "application/json" },
+      body: JSON.stringify({
+        expires_after: { anchor: "created_at", seconds: 600 },
+        session: {
+          type: "transcription",
+          audio: {
+            input: {
+              transcription: {
+                model: "gpt-4o-transcribe", language: "da", prompt: "Danske bøder på et fodboldhold. Spillere: ."
+              },
+              turn_detection: { type: "server_vad", silence_duration_ms: 450, prefix_padding_ms: 200 },
+              noise_reduction: { type: "near_field" }
+            }
+          }
+        }
+      })
+    });
+  });
+
+  it("afviser et succesrespons uden et brugbart token", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ expires_at: 12345 })));
+    const response = await POST(new Request("http://localhost/api/fines/voice/token", {
+      method: "POST", body: JSON.stringify({ teamId: "team" })
+    }));
+    expect(response.status).toBe(502);
+    expect(await response.json()).toEqual({ error: "Kunne ikke starte transskription" });
   });
 
   it.each([
