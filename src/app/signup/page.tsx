@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { getProviders, signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 
 export default function SignupPage() {
@@ -14,6 +15,23 @@ export default function SignupPage() {
   const [teamSlug, setTeamSlug] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [facebookEnabled, setFacebookEnabled] = useState(false);
+
+  useEffect(() => {
+    getProviders()
+      .then((providers) => setFacebookEnabled(Boolean(providers?.facebook)))
+      .catch(() => setFacebookEnabled(false));
+  }, []);
+
+  function handleFacebook() {
+    const slug = teamSlug.trim().toLowerCase();
+    if (!slug) {
+      setFieldErrors({ teamSlug: "Hold slug er paakraevet" });
+      setMessage("Udfyld holdslug, før du fortsætter med Facebook.");
+      return;
+    }
+    signIn("facebook", { callbackUrl: `/join?slug=${encodeURIComponent(slug)}` });
+  }
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -170,6 +188,15 @@ export default function SignupPage() {
             {loading ? "Opretter..." : "Opret bruger"}
           </button>
         </form>
+
+        {facebookEnabled ? (
+          <>
+            <div className="my-6 border-t border-ink/10" />
+            <button type="button" className="btn-ghost w-full" onClick={handleFacebook}>
+              Opret med Facebook
+            </button>
+          </>
+        ) : null}
 
         {message ? <p className="mt-4 text-sm font-semibold text-ink/80">{message}</p> : null}
         <p className="mt-4 text-xs text-ink/55">

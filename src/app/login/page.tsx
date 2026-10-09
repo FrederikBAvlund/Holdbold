@@ -1,6 +1,6 @@
 "use client";
 
-import { signIn } from "next-auth/react";
+import { getProviders, signIn } from "next-auth/react";
 import { useEffect, useMemo, useState } from "react";
 
 export default function LoginPage() {
@@ -8,6 +8,14 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [identifier, setIdentifier] = useState("");
+  const [facebookEnabled, setFacebookEnabled] = useState(false);
+
+  useEffect(() => {
+    // Env-variabler er ikke tilgængelige i klienten; spørg i stedet NextAuth hvilke providers der er aktive.
+    getProviders()
+      .then((providers) => setFacebookEnabled(Boolean(providers?.facebook)))
+      .catch(() => setFacebookEnabled(false));
+  }, []);
 
   const errorMessages = useMemo(
     () =>
@@ -122,10 +130,11 @@ export default function LoginPage() {
               </button>
             </form>
 
-            {process.env.FACEBOOK_CLIENT_ID && process.env.FACEBOOK_CLIENT_SECRET ? (
+            {facebookEnabled ? (
               <>
                 <div className="my-6 border-t border-ink/10" />
                 <button
+                  type="button"
                   className="btn-ghost w-full"
                   onClick={() => signIn("facebook", { callbackUrl: getCallbackUrl() })}
                 >
