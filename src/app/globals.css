@@ -259,7 +259,7 @@ button {
   position: fixed;
   left: 50%;
   transform: translateX(-50%);
-  bottom: calc(5.75rem + env(safe-area-inset-bottom, 0px));
+  bottom: calc(6rem + env(safe-area-inset-bottom, 0px));
   display: flex;
   flex-direction: column;
   align-items: center;

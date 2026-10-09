@@ -333,7 +333,7 @@ export default function MotmSection({
               <Icon name="chevron-down" className={cn("h-4 w-4 transition", showEveryone && "rotate-180")} />
             </button>
           ) : null}
-          <div className="sticky bottom-[calc(4rem+env(safe-area-inset-bottom,0px))] -mx-4 space-y-2 border-t border-line bg-surface px-4 pt-3 sm:static sm:mx-0 sm:px-0 lg:bottom-0">
+          <div className="sticky bottom-[calc(5.25rem+env(safe-area-inset-bottom,0px))] -mx-4 space-y-2 border-t border-line bg-surface px-4 pt-3 sm:static sm:mx-0 sm:px-0 lg:bottom-0">
             <Button block size="lg" loading={busy === "vote"} disabled={remaining !== 0} onClick={vote}>
               {hasVoted ? "Opdatér min stemme" : "Afgiv stemme"}
             </Button>

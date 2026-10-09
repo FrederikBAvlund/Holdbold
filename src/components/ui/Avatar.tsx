@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 
 const AVATAR_TONES = [
@@ -46,20 +49,28 @@ export default function Avatar({
   className?: string;
   ring?: boolean;
 }) {
+  const [failed, setFailed] = useState<string | null>(null);
+  const showImage = Boolean(image) && failed !== image;
   return (
     <span
       className={cn(
         "relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full font-bold",
         sizes[size],
-        !image && toneFor(name ?? "?"),
+        !showImage && toneFor(name ?? "?"),
         ring && "ring-2 ring-surface",
         className
       )}
       title={name ?? undefined}
     >
-      {image ? (
+      {showImage ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={image} alt="" className="h-full w-full object-cover" loading="lazy" />
+        <img
+          src={image ?? undefined}
+          alt=""
+          className="h-full w-full object-cover"
+          loading="lazy"
+          onError={() => setFailed(image ?? null)}
+        />
       ) : (
         initials(name)
       )}

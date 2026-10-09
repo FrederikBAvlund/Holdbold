@@ -201,12 +201,13 @@ export default function DashboardNav({
     </div>
   );
 
+  // Svævende dock: aktiv fane udvider sig til ikon + tekst, de øvrige er kun ikoner.
   const bottomNav = (
     <nav
       aria-label="Hovednavigation"
-      className="fixed inset-x-0 bottom-0 z-50 border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom,0px)] backdrop-blur-xl lg:hidden"
+      className="pointer-events-none fixed inset-x-0 bottom-0 z-50 flex justify-center px-4 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))] lg:hidden"
     >
-      <div className="mx-auto grid max-w-md grid-cols-4">
+      <div className="pointer-events-auto flex w-full max-w-sm items-center justify-between gap-1 rounded-full border border-line bg-surface/85 p-1.5 shadow-[0_18px_40px_-16px_rgba(0,0,0,0.35)] backdrop-blur-2xl backdrop-saturate-150">
         {items.map((item) => {
           const active = isActive(item.href);
           return (
@@ -214,17 +215,20 @@ export default function DashboardNav({
               key={item.href}
               href={item.href}
               aria-current={active ? "page" : undefined}
-              className="group flex min-h-[3.75rem] flex-col items-center justify-center gap-1"
+              aria-label={item.label}
+              className={cn(
+                "flex h-12 items-center justify-center gap-2 rounded-full transition-all duration-300 ease-out active:scale-95",
+                active
+                  ? "flex-[2.2] bg-primary px-4 text-on-primary shadow-[0_8px_20px_-10px_var(--primary)]"
+                  : "flex-1 text-ink/55 hover:text-ink"
+              )}
             >
-              <span
-                className={cn(
-                  "flex h-8 w-14 items-center justify-center rounded-full transition",
-                  active ? "bg-primary text-on-primary" : "text-ink/55 group-active:scale-90"
-                )}
-              >
-                <Icon name={item.icon} className="h-[22px] w-[22px]" strokeWidth={active ? 2.2 : 1.9} />
-              </span>
-              <span className={cn("text-nav-label", active ? "text-ink" : "text-ink/55")}>{item.label}</span>
+              <Icon name={item.icon} className="h-[22px] w-[22px]" strokeWidth={active ? 2.3 : 1.9} />
+              {active ? (
+                <span className="animate-fade-in font-display text-base font-bold uppercase tracking-wide">
+                  {item.label}
+                </span>
+              ) : null}
             </Link>
           );
         })}

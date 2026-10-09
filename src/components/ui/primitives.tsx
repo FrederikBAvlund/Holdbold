@@ -284,10 +284,10 @@ export function FilterChips<T extends string>({
 }: {
   value: T;
   onChange: (value: T) => void;
-  options: Array<{ value: T; label: string; count?: number }>;
+  options: Array<{ value: T; label: string; count?: number; icon?: IconName; countTone?: "pending" | "neutral" }>;
 }) {
   return (
-    <div className="no-scrollbar -mx-3 flex gap-2 overflow-x-auto px-3 sm:mx-0 sm:px-0">
+    <div className="no-scrollbar -mx-3 flex gap-2 overflow-x-auto px-3 py-1 sm:-mx-1 sm:px-1">
       {options.map((option) => {
         const active = option.value === value;
         return (
@@ -297,13 +297,21 @@ export function FilterChips<T extends string>({
             aria-pressed={active}
             onClick={() => onChange(option.value)}
             className={cn(
-              "inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full border px-3.5 text-sm font-semibold transition active:scale-95",
-              active ? "border-ink bg-ink text-bg" : "border-line bg-surface text-ink/75 hover:border-ink/25"
+              "inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-2xl px-3.5 text-[0.9375rem] font-semibold transition duration-200 active:scale-95",
+              active
+                ? "bg-primary/12 text-moss shadow-[inset_0_0_0_1.5px_var(--moss)]"
+                : "bg-surface text-ink/70 shadow-[var(--shadow-sm)] hover:text-ink"
             )}
           >
+            {option.icon ? <Icon name={option.icon} className="h-4 w-4" strokeWidth={2.1} /> : null}
             {option.label}
             {typeof option.count === "number" && option.count > 0 ? (
-              <span className={cn("tabular rounded-full px-1.5 text-xs", active ? "bg-bg/20" : "bg-ink/[0.07]")}>
+              <span
+                className={cn(
+                  "tabular inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-xs font-bold",
+                  option.countTone === "pending" ? "bg-pending text-on-solid" : active ? "bg-moss/15" : "bg-ink/[0.07]"
+                )}
+              >
                 {option.count}
               </span>
             ) : null}

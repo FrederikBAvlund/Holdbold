@@ -51,7 +51,7 @@ export default {
         control: "var(--radius-control)"
       },
       spacing: {
-        "nav-pad": "calc(6rem + env(safe-area-inset-bottom, 0px))",
+        "nav-pad": "calc(6.5rem + env(safe-area-inset-bottom, 0px))",
         "safe-top": "env(safe-area-inset-top, 0px)"
       },
       fontSize: {

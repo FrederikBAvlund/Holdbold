@@ -440,7 +440,7 @@ function LeaderboardStrip({
     return <p className="px-1 text-sm text-ink/55">Rekorderne dukker op, når sæsonen er i gang.</p>;
   }
   return (
-    <div className="no-scrollbar -mx-3 flex snap-x gap-3 overflow-x-auto px-3 pb-1 sm:mx-0 sm:px-0">
+    <div className="no-scrollbar -mx-3 flex snap-x scroll-px-4 gap-3 overflow-x-auto px-4 pb-2 pt-1 sm:-mx-5 sm:scroll-px-5 sm:px-5 lg:mx-0 lg:scroll-px-1 lg:px-1">
       {cards.map(({ category, top }) => {
         const meta = LEADERBOARD_SHORT[category];
         const leader = top[0];

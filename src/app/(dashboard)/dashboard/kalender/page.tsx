@@ -151,10 +151,10 @@ export default function KalenderPage() {
             value={filter}
             onChange={setFilter}
             options={[
-              { value: "all", label: "Alle" },
-              { value: "missing", label: "Mangler svar", count: counts.missing },
-              { value: "MATCH", label: "Kampe" },
-              { value: "TRAINING", label: "Træning" }
+              { value: "all", label: "Alle", icon: "calendar" },
+              { value: "missing", label: "Mangler svar", icon: "hourglass", count: counts.missing, countTone: "pending" },
+              { value: "MATCH", label: "Kampe", icon: "ball" },
+              { value: "TRAINING", label: "Træning", icon: "whistle" }
             ]}
           />
 
@@ -212,7 +212,7 @@ export default function KalenderPage() {
         <Link
           href="/dashboard/kalender/ny"
           aria-label="Ny begivenhed"
-          className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] right-4 z-40 inline-flex h-14 items-center gap-2 rounded-full bg-primary px-5 font-semibold text-on-primary shadow-[var(--shadow-lg)] transition active:scale-95 sm:hidden"
+          className="fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom,0px))] right-4 z-40 inline-flex h-14 items-center gap-2 rounded-full bg-primary px-5 font-semibold text-on-primary shadow-[var(--shadow-lg)] transition active:scale-95 sm:hidden"
         >
           <Icon name="plus" strokeWidth={2.6} />
           Ny
