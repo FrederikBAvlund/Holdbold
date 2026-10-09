@@ -1,11 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { POST } from "./route";
+import { getTeamOpenAiKey } from "@/lib/teamOpenAiKey";
 
 vi.mock("@/lib/apiAuth", () => ({
   FINE_AUTOMATION_ROLES: [],
   requireSession: vi.fn(async () => ({ ok: true, userId: "user" })),
   requireActiveTeamMemberWithRoles: vi.fn(async () => ({ ok: true }))
 }));
+vi.mock("@/lib/teamOpenAiKey", () => ({ getTeamOpenAiKey: vi.fn(async () => "test-key") }));
 vi.mock("@/lib/prisma", () => ({
   prisma: { membership: { findMany: vi.fn(async () => [{ user: { id: "u1", name: "André Lundgren" } }]) }, fineTemplate: { findMany: vi.fn(async () => []) } }
 }));
@@ -16,13 +18,26 @@ vi.mock("@/lib/seasons", () => ({
 
 describe("voice token", () => {
   beforeEach(() => {
-    vi.stubEnv("OPENAI_API_KEY", "test-key");
+    vi.mocked(getTeamOpenAiKey).mockResolvedValue("test-key");
     vi.spyOn(console, "error").mockImplementation(() => {});
   });
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
     vi.unstubAllEnvs();
+  });
+
+  it.each([null, new Error("secret")])("stops before OpenAI when the team key is unavailable", async (key) => {
+    if (key instanceof Error) vi.mocked(getTeamOpenAiKey).mockRejectedValueOnce(key);
+    else vi.mocked(getTeamOpenAiKey).mockResolvedValueOnce(key);
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const response = await POST(new Request("http://localhost", {
+      method: "POST", body: JSON.stringify({ teamId: "team" })
+    }));
+    expect(response.status).toBe(503);
+    expect(await response.text()).not.toContain("secret");
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it.each([true, false])("opretter dialog med spoken=%s uden spillerliste i transskriptionsprompten", async (spoken) => {
@@ -34,6 +49,7 @@ describe("voice token", () => {
       method: "POST", body: JSON.stringify({ teamId: "team", spoken })
     }));
     expect(response.status).toBe(200);
+    expect(getTeamOpenAiKey).toHaveBeenCalledWith("team");
     expect(await response.json()).toEqual({ token: "ek-test", expiresAt: 12345 });
     expect(fetchMock.mock.calls[0][0]).toBe("https://api.openai.com/v1/realtime/client_secrets");
     const body = JSON.parse(String(fetchMock.mock.calls[0][1].body));

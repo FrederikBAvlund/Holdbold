@@ -8,6 +8,7 @@ import { useToast } from "@/components/ToastProvider";
 import PushSettings from "@/components/PushSettings";
 import { CollapsibleCard } from "@/components/CollapsibleCard";
 import Link from "next/link";
+import TeamOpenAiSettings from "@/components/TeamOpenAiSettings";
 import SeasonSettingsCard from "@/components/SeasonSettingsCard";
 import LoadingButton from "@/components/LoadingButton";
 import { invalidateDashboardTeam } from "@/components/DashboardTeamProvider";
@@ -1413,6 +1414,8 @@ export default function IndstillingerPage() {
           <Link href="/dashboard/fravaer" className="btn-ghost">Åbn fravær</Link>
         </section>
       ) : null}
+
+      {isAdmin && teamId ? <TeamOpenAiSettings key={teamId} teamId={teamId} /> : null}
 
       {teamId ? (
         <SeasonSettingsCard

@@ -74,3 +74,22 @@ Miljoevariabler for at oprette en spiller i seed:
 
 - `SEED_PLAYER_EMAIL`
 - `SEED_PLAYER_PASSWORD`
+
+## OpenAI pr. hold
+
+Holdets admin tilføjer, udskifter eller fjerner OpenAI API-nøglen under **Indstillinger → OpenAI**.
+Transskription og fortolkning bruger kun det valgte holds nøgle; `OPENAI_API_KEY` bruges ikke længere.
+Eksisterende hold skal derfor tilføje deres nøgle i indstillingerne efter opdateringen.
+
+Før funktionen tages i brug:
+
+1. Kør `prisma migrate deploy` og `prisma generate`.
+2. Generér en krypteringsnøgle med `node -e 'console.log(require("crypto").randomBytes(32).toString("hex"))'`.
+3. Gem resultatet som `TEAM_API_KEY_ENCRYPTION_KEY` i serverens secret-konfiguration, og genstart serveren.
+
+API-nøgler gemmes i en separat tabel med AES-256-GCM, tilfældig nonce og hold-id som autentificeret kontekst.
+API'et returnerer kun, om en nøgle er gemt. Kun aktive administratorer for holdet må administrere den.
+Browseren modtager kun en kortlivet OpenAI-session til transskription, aldrig den gemte API-nøgle.
+Krypteringsnøglen må ikke gemmes i databasen, Git eller en `NEXT_PUBLIC_`-variabel; opbevar en sikker backup
+separat fra databasebackups. Ændres eller mistes krypteringsnøglen, skal holdene indtaste deres API-nøgler igen.
+Kryptering beskytter ved en isoleret databaselækage; adgang til både serverens secrets og databasen kan dekryptere nøglerne.
