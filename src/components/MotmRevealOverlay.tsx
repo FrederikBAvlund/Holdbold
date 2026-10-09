@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 
 export type MotmRevealRow = {
   rank: number;
@@ -78,65 +79,84 @@ export function MotmRevealOverlay({ open, eventTitle, revealRows, scoreboard, wi
   const activeCountdownRow = step > 0 && step <= countdownRows.length ? countdownRows[step - 1] : null;
   const winnerVisible = countdownRows.length === 0 ? step >= 1 : step > countdownRows.length;
 
-  return (
-    <div className="modal-backdrop z-[70]" onClick={onClose}>
-      <div className="modal-panel max-w-2xl" onClick={(event) => event.stopPropagation()}>
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-ink/50">Kampens spiller</p>
-            <h2 className="mt-2 text-2xl font-semibold text-ink">{eventTitle}</h2>
-          </div>
-          <button type="button" className="btn-ghost" onClick={onClose}>
-            Luk
-          </button>
+  const stage = activeCountdownRow ? `rank-${activeCountdownRow.userId}` : winnerVisible ? "winner" : "intro";
+
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[95]" role="dialog" aria-modal="true" aria-label="Kampens spiller">
+    <div className="hero-surface flex h-full flex-col overflow-y-auto px-5 pb-[max(1.5rem,env(safe-area-inset-bottom,0px))] pt-[max(1rem,env(safe-area-inset-top,0px))]">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-xs font-bold uppercase tracking-[0.2em] text-on-primary/70">Kampens spiller</p>
+          <p className="truncate font-display text-xl font-bold uppercase">{eventTitle}</p>
         </div>
-
-        {scoreboard.length === 0 ? (
-          <div className="mt-6 rounded-3xl border border-ink/10 bg-ink/[0.04] px-5 py-10 text-center">
-            <p className="text-lg font-semibold text-ink">Ingen stemmer afgivet</p>
-            <p className="mt-2 text-sm text-ink/70">Afstemningen blev lukket uden nogen stemmer.</p>
-          </div>
-        ) : (
-          <>
-            <div className="mt-6 rounded-3xl border border-moss/15 bg-moss/[0.05] px-5 py-10 text-center">
-              {activeCountdownRow ? (
-                <>
-                  <p className="text-sm font-medium text-ink/60">{activeCountdownRow.rank}. plads</p>
-                  <p className="mt-3 text-3xl font-semibold text-ink">{activeCountdownRow.name}</p>
-                  <p className="mt-2 text-sm text-ink/70">{activeCountdownRow.votes} stemmer</p>
-                </>
-              ) : winnerVisible && winner ? (
-                <>
-                  <p className="text-sm font-medium uppercase tracking-[0.2em] text-moss">Vinderen er</p>
-                  <p className="mt-3 text-4xl font-semibold text-ink">{winner.name}</p>
-                  <p className="mt-2 text-base text-ink/75">{winner.votes} stemmer</p>
-                </>
-              ) : (
-                <p className="text-lg font-semibold text-ink">Gør klar til afsløringen...</p>
-              )}
-            </div>
-
-            {showFullResults ? (
-              <div className="mt-6">
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-ink/50">Resultat</p>
-                <div className="mt-3 overflow-hidden rounded-2xl border border-ink/10 bg-surface/80">
-                  <ul className="divide-y divide-ink/10">
-                    {scoreboard.map((row) => (
-                      <li key={row.userId} className="flex items-center justify-between gap-4 px-4 py-3 text-sm">
-                        <div className="flex items-center gap-3">
-                          <span className="w-8 text-center font-semibold text-ink/55">{row.rank}</span>
-                          <span className="font-medium text-ink">{row.name}</span>
-                        </div>
-                        <span className="rounded-full bg-ink/5 px-3 py-1 font-semibold text-ink">{row.votes}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            ) : null}
-          </>
-        )}
+        <button
+          type="button"
+          onClick={onClose}
+          className="min-h-10 shrink-0 rounded-full bg-on-primary/15 px-4 text-sm font-semibold transition hover:bg-on-primary/25 active:scale-95"
+        >
+          {showFullResults || scoreboard.length === 0 ? "Luk" : "Spring over"}
+        </button>
       </div>
+
+      {scoreboard.length === 0 ? (
+        <div className="flex flex-1 flex-col items-center justify-center text-center">
+          <p className="font-display text-5xl font-extrabold uppercase">Ingen stemmer</p>
+          <p className="mt-2 text-on-primary/80">Afstemningen blev lukket uden nogen stemmer.</p>
+        </div>
+      ) : showFullResults ? (
+        <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center py-8">
+          {winner ? (
+            <div className="mb-6 text-center">
+              <p className="text-sm font-bold uppercase tracking-[0.2em] text-on-primary/70">Vinderen</p>
+              <p className="font-display text-6xl font-extrabold uppercase leading-none">{winner.name}</p>
+              <p className="mt-1 text-on-primary/80">{winner.votes} {winner.votes === 1 ? "stemme" : "stemmer"} 🏆</p>
+            </div>
+          ) : null}
+          <ol className="space-y-1.5">
+            {scoreboard.map((row) => (
+              <li
+                key={row.userId}
+                className={`flex items-center gap-3 rounded-2xl px-4 py-3 ${row.rank === 1 ? "bg-on-primary text-[color:var(--primary)]" : "bg-on-primary/10"}`}
+              >
+                <span className="tabular w-7 text-center font-display text-2xl font-bold">{row.rank}</span>
+                <span className="min-w-0 flex-1 truncate font-semibold">{row.name}</span>
+                <span className="tabular font-display text-xl font-bold">{row.votes}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      ) : (
+        <div key={stage} className="flex flex-1 animate-pop-in flex-col items-center justify-center text-center">
+          {activeCountdownRow ? (
+            <>
+              <p className="font-display text-[5.5rem] font-extrabold leading-none text-on-primary/35">
+                {activeCountdownRow.rank}.
+              </p>
+              <p className="mt-2 font-display text-5xl font-extrabold uppercase leading-none">{activeCountdownRow.name}</p>
+              <p className="mt-3 text-lg text-on-primary/80">{activeCountdownRow.votes} {activeCountdownRow.votes === 1 ? "stemme" : "stemmer"}</p>
+            </>
+          ) : winnerVisible && winner ? (
+            <>
+              <span className="mb-4 text-7xl" aria-hidden>
+                🏆
+              </span>
+              <p className="text-sm font-bold uppercase tracking-[0.25em] text-on-primary/75">Vinderen er</p>
+              <p className="mt-2 font-display text-6xl font-extrabold uppercase leading-none">{winner.name}</p>
+              <p className="mt-3 text-lg text-on-primary/80">{winner.votes} {winner.votes === 1 ? "stemme" : "stemmer"}</p>
+            </>
+          ) : (
+            <>
+              <span className="mb-4 h-14 w-14 animate-spin rounded-full border-4 border-on-primary/25 border-t-on-primary" />
+              <p className="font-display text-4xl font-extrabold uppercase">Gør jer klar…</p>
+              <p className="mt-2 text-on-primary/75">Afsløringen starter om et øjeblik</p>
+            </>
+          )}
+        </div>
+      )}
     </div>
+    </div>,
+    document.body
   );
 }

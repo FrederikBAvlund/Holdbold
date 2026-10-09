@@ -126,7 +126,7 @@ export default function KalenderPage() {
         action={
           canManage ? (
             <Link
-              href="/dashboard/kalender/klassisk?opret=1"
+              href="/dashboard/kalender/ny"
               className="hidden min-h-11 items-center gap-2 rounded-2xl bg-primary px-4 font-semibold text-on-primary transition active:scale-95 sm:inline-flex"
             >
               <Icon name="plus" strokeWidth={2.4} />
@@ -210,7 +210,7 @@ export default function KalenderPage() {
 
       {canManage ? (
         <Link
-          href="/dashboard/kalender/klassisk?opret=1"
+          href="/dashboard/kalender/ny"
           aria-label="Ny begivenhed"
           className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] right-4 z-40 inline-flex h-14 items-center gap-2 rounded-full bg-primary px-5 font-semibold text-on-primary shadow-[var(--shadow-lg)] transition active:scale-95 sm:hidden"
         >

@@ -46,6 +46,13 @@ export type EventDetail = {
   matchHomeGoals: number | null;
   matchAwayGoals: number | null;
   matchMotmUser: { id: string; name: string | null; image: string | null } | null;
+  matchPlayerStats?: Array<{
+    userId: string;
+    goals: number;
+    assists: number;
+    yellowCards: number;
+    redCards: number;
+  }>;
 };
 
 export const isSeriesOccurrence = (id: string) => id.startsWith("series:");

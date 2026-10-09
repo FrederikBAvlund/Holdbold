@@ -5,7 +5,18 @@ import { getStoredTeamId, getStoredTheme, setStoredTeamId, setStoredTheme } from
 import { fetchMeCached } from "@/lib/meClientCache";
 
 const DEFAULT_THEME = "atlantic";
-const SUPPORTED_THEMES = ["atlantic", "forest", "crimson", "mono", "custom"];
+const SUPPORTED_THEMES = [
+  "atlantic",
+  "forest",
+  "crimson",
+  "sunset",
+  "lavender",
+  "ocean",
+  "midnight",
+  "neon",
+  "mono",
+  "custom"
+];
 
 // Ældre presets (sandstone, neon osv.) er udgået og falder tilbage til standardtemaet.
 function normalizeTheme(theme: string | null | undefined) {

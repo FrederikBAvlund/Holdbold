@@ -13,6 +13,11 @@ import Sheet from "@/components/ui/Sheet";
 import { Card, Chip, KindTag, ListGroup, ListRow, Section, SegmentedControl, Skeleton } from "@/components/ui/primitives";
 import RsvpControl from "@/components/events/RsvpControl";
 import { DutyWheelModal, type DutyWheelAppliedPayload, type DutyWheelNextEvent } from "@/components/DutyWheelModal";
+import MatchSection from "@/components/events/MatchSection";
+import MotmSection from "@/components/events/MotmSection";
+import LateFinesSection from "@/components/events/LateFinesSection";
+import { EventAdminSheet, HistorySheet } from "@/components/events/EventAdminSheet";
+import type { EventLog, SignupLog } from "@/lib/events/eventUtils";
 import {
   eventHref,
   fetchEventDetail,
@@ -38,13 +43,14 @@ export default function EventPage() {
   const params = useParams<{ eventId: string }>();
   const router = useRouter();
   const { pushToast } = useToast();
-  const { teamId, userId, members, actingMember } = useDashboardTeam();
+  const { teamId, userId, members, memberships, actingMember } = useDashboardTeam();
   const rawId = decodeURIComponent(params.eventId);
 
   const [event, setEvent] = useState<EventDetail | null>(null);
   const [signups, setSignups] = useState<EventSignup[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("IN");
+  const [showAll, setShowAll] = useState(false);
   const [editing, setEditing] = useState<DashboardTeamMember | null>(null);
   const [dutyPicker, setDutyPicker] = useState<DutyField | null>(null);
   const [savingDuty, setSavingDuty] = useState(false);
@@ -54,6 +60,10 @@ export default function EventPage() {
     nextEvent: DutyWheelNextEvent | null;
   } | null>(null);
   const [wheelLoading, setWheelLoading] = useState(false);
+  const [adminOpen, setAdminOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [logs, setLogs] = useState<SignupLog[] | null>(null);
+  const [eventLogs, setEventLogs] = useState<EventLog[] | null>(null);
 
   const role = actingMember?.role ?? "";
   const canManageEvents = EVENT_MANAGER_ROLES.includes(role);
@@ -69,6 +79,8 @@ export default function EventPage() {
       .catch((err) => setError(err instanceof Error ? err.message : "Kunne ikke åbne begivenheden"));
   }, [rawId, teamId, router]);
 
+  const needsLogs = canManageEvents || canEditOthers;
+
   const reload = useCallback(async () => {
     if (isSeriesOccurrence(rawId)) return;
     try {
@@ -77,8 +89,21 @@ export default function EventPage() {
       setSignups(list);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Kunne ikke hente begivenheden");
+      return;
     }
-  }, [rawId]);
+    if (needsLogs) {
+      fetch(`/api/events/${rawId}/signup/logs`, { cache: "no-store" })
+        .then((response) => (response.ok ? response.json() : { logs: [], eventLogs: [] }))
+        .then((data) => {
+          setLogs(data.logs ?? []);
+          setEventLogs(data.eventLogs ?? []);
+        })
+        .catch(() => {
+          setLogs([]);
+          setEventLogs([]);
+        });
+    }
+  }, [rawId, needsLogs]);
 
   useEffect(() => {
     setEvent(null);
@@ -122,15 +147,10 @@ export default function EventPage() {
   const mapsHref = event.location
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.location)}`
     : null;
-  const classicHref = `/dashboard/kalender/klassisk?${new URLSearchParams({
-    focusEvent: event.id,
-    focusDate: event.date,
-    focusTitle: event.title,
-    focusLocation: event.location ?? "",
-    focusSource: event.source ?? "MANUAL"
-  }).toString()}`;
 
-  const tabRows = tab === "IN" ? groups.coming : tab === "OUT" ? groups.notComing : groups.missing;
+  const allTabRows = tab === "IN" ? groups.coming : tab === "OUT" ? groups.notComing : groups.missing;
+  const COLLAPSED = 8;
+  const tabRows = showAll ? allTabRows : allTabRows.slice(0, COLLAPSED);
 
   async function copyLocation() {
     try {
@@ -178,6 +198,12 @@ export default function EventPage() {
     }
   }
 
+  function patchLocal(patch: Partial<EventDetail>) {
+    setEvent((prev) => (prev ? { ...prev, ...patch } : prev));
+  }
+
+  const teamName = memberships.find((membership) => membership.team?.id === teamId)?.team?.name ?? "";
+
   function onWheelApplied(payload: DutyWheelAppliedPayload) {
     if (payload.targetEventId === event!.id) {
       setEvent((prev) => (prev ? { ...prev, [payload.field]: payload.userId } : prev));
@@ -195,10 +221,25 @@ export default function EventPage() {
           canceled ? "border border-line bg-surface text-ink shadow-none" : "hero-surface"
         )}
       >
-        <div className="flex flex-wrap items-center gap-2">
-          <KindTag kind={event.kind} onHero={!canceled} />
-          {canceled ? <Chip tone="out">Aflyst</Chip> : null}
-          {past && !canceled ? <Chip tone={canceled ? "neutral" : "onHero"}>Afviklet</Chip> : null}
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <KindTag kind={event.kind} onHero={!canceled} />
+            {canceled ? <Chip tone="out">Aflyst</Chip> : null}
+            {past && !canceled ? <Chip tone="onHero">Afviklet</Chip> : null}
+          </div>
+          {canManageEvents ? (
+            <button
+              type="button"
+              onClick={() => setAdminOpen(true)}
+              aria-label="Administrér begivenhed"
+              className={cn(
+                "-mr-1 -mt-1 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition active:scale-95",
+                canceled ? "bg-ink/[0.06] text-ink" : "bg-on-primary/15 hover:bg-on-primary/25"
+              )}
+            >
+              <Icon name="more" strokeWidth={2.6} />
+            </button>
+          ) : null}
         </div>
         <h1
           className={cn(
@@ -271,13 +312,7 @@ export default function EventPage() {
                   : "Kommer du? Holdet tæller på dig."}
             </p>
           ) : null}
-          <RsvpControl
-            teamId={teamId}
-            userId={userId}
-            event={event}
-            status={myStatus}
-            onSaved={() => reload()}
-          />
+          <RsvpControl teamId={teamId} userId={userId} event={event} status={myStatus} onSaved={() => reload()} />
         </Card>
       </Section>
 
@@ -285,7 +320,10 @@ export default function EventPage() {
       <Section title="Holdet">
         <SegmentedControl<Tab>
           value={tab}
-          onChange={setTab}
+          onChange={(next) => {
+            setTab(next);
+            setShowAll(false);
+          }}
           size="sm"
           options={[
             { value: "IN", label: "Kommer", count: groups.coming.length },
@@ -324,6 +362,16 @@ export default function EventPage() {
                 onClick={canEditOthers && !canceled ? () => setEditing(member) : undefined}
               />
             ))}
+            {allTabRows.length > COLLAPSED ? (
+              <button
+                type="button"
+                onClick={() => setShowAll((prev) => !prev)}
+                className="flex min-h-12 w-full items-center justify-center gap-1 text-sm font-semibold text-moss"
+              >
+                {showAll ? "Vis færre" : `Vis alle ${allTabRows.length}`}
+                <Icon name="chevron-down" className={cn("h-4 w-4 transition", showAll && "rotate-180")} />
+              </button>
+            ) : null}
           </ListGroup>
         )}
       </Section>
@@ -354,50 +402,54 @@ export default function EventPage() {
         </ListGroup>
       </Section>
 
-      {/* Mere – flyttes ind på siden i næste fase */}
-      <Section title="Mere">
-        <ListGroup>
-          {isMatch ? (
-            <>
-              <ListRow
-                href={classicHref}
-                leading={<RowIcon name="ball" />}
-                title="Resultat og statistik"
-                subtitle="Mål, assists og kort"
-                chevron
-              />
-              <ListRow
-                href={classicHref}
-                leading={<RowIcon name="trophy" />}
-                title="Kampens spiller"
-                subtitle="Stem på dagens bedste"
-                chevron
-              />
-            </>
-          ) : null}
-          {canEditOthers ? (
-            <ListRow
-              href={classicHref}
-              leading={<RowIcon name="receipt" />}
-              title="Bøder for sene svar"
-              subtitle="Giv bøder til dem, der svarede for sent"
-              chevron
-            />
-          ) : null}
-          {canManageEvents ? (
-            <ListRow
-              href={classicHref}
-              leading={<RowIcon name="settings" />}
-              title="Administrér begivenhed"
-              subtitle="Type, mødetid, aflysning og historik"
-              chevron
-            />
-          ) : null}
-          {!isMatch && !canEditOthers && !canManageEvents ? (
-            <ListRow leading={<RowIcon name="whistle" />} title="Træning" subtitle="Ikke mere at se her." />
-          ) : null}
-        </ListGroup>
-      </Section>
+      {isMatch && !canceled ? (
+        <MatchSection
+          event={event}
+          members={members}
+          canEdit={canManageEvents}
+          teamName={teamName}
+          onUpdated={patchLocal}
+        />
+      ) : null}
+
+      {isMatch && !canceled ? (
+        <MotmSection
+          eventId={event.id}
+          eventTitle={event.title}
+          members={members}
+          canManage={canEditOthers}
+          userId={userId}
+          comingUserIds={groups.coming.map(({ member }) => member.user.id)}
+        />
+      ) : null}
+
+      {canEditOthers && !canceled && logs && signups ? (
+        <LateFinesSection
+          teamId={teamId}
+          eventId={event.id}
+          deadlineAt={event.signupDeadline}
+          members={members}
+          signups={signups}
+          logs={logs}
+        />
+      ) : null}
+
+      {canManageEvents ? (
+        <>
+          <EventAdminSheet
+            open={adminOpen}
+            onClose={() => setAdminOpen(false)}
+            event={event}
+            canEditMeta={canEditOthers}
+            onUpdated={patchLocal}
+            onOpenHistory={() => {
+              setAdminOpen(false);
+              setHistoryOpen(true);
+            }}
+          />
+          <HistorySheet open={historyOpen} onClose={() => setHistoryOpen(false)} logs={logs} eventLogs={eventLogs} />
+        </>
+      ) : null}
 
       <EditSignupSheet
         member={editing}
@@ -492,14 +544,6 @@ function HeroStat({ label, value, muted }: { label: string; value: string; muted
       </p>
       <p className="tabular mt-0.5 font-display text-[2rem] font-bold leading-none">{value}</p>
     </div>
-  );
-}
-
-function RowIcon({ name }: { name: Parameters<typeof Icon>[0]["name"] }) {
-  return (
-    <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-primary/12 text-moss">
-      <Icon name={name} />
-    </span>
   );
 }
 

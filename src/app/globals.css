@@ -540,6 +540,61 @@ button {
   --color-button-text: #ffffff;
 }
 
+/* Orange og varm – klassisk "bortetrøje"-energi */
+:root[data-theme="sunset"] {
+  --color-ink: #2a1408;
+  --color-clay: #fdba74;
+  --color-moss: #ea580c;
+  --color-ember: #f59e0b;
+  --color-fog: #fff7ed;
+  --color-button: #ea580c;
+  --color-button-text: #ffffff;
+}
+
+/* Lilla med kant */
+:root[data-theme="lavender"] {
+  --color-ink: #1e1035;
+  --color-clay: #c4b5fd;
+  --color-moss: #7c3aed;
+  --color-ember: #db2777;
+  --color-fog: #faf5ff;
+  --color-button: #7c3aed;
+  --color-button-text: #ffffff;
+}
+
+/* Turkis havblå */
+:root[data-theme="ocean"] {
+  --color-ink: #062a30;
+  --color-clay: #67e8f9;
+  --color-moss: #0891b2;
+  --color-ember: #0d9488;
+  --color-fog: #ecfeff;
+  --color-button: #0e7490;
+  --color-button-text: #ffffff;
+}
+
+/* Natkamp: dyb navy med guld */
+:root[data-theme="midnight"] {
+  --color-ink: #0b1430;
+  --color-clay: #a5b4fc;
+  --color-moss: #3046b8;
+  --color-ember: #d4a017;
+  --color-fog: #eef2ff;
+  --color-button: #1e2a78;
+  --color-button-text: #ffffff;
+}
+
+/* Neon: limegrøn som et træningsvest */
+:root[data-theme="neon"] {
+  --color-ink: #111a05;
+  --color-clay: #bef264;
+  --color-moss: #4d7c0f;
+  --color-ember: #65a30d;
+  --color-fog: #f7fee7;
+  --color-button: #3f6212;
+  --color-button-text: #f7fee7;
+}
+
 :root[data-theme="mono"] {
   --color-ink: #0f172a;
   --color-clay: #9ca3af;
@@ -548,233 +603,6 @@ button {
   --color-fog: #f8fafc;
   --color-button: #1f2937;
   --color-button-text: #ffffff;
-}
-
-/* FullCalendar tweaks — matcher øvrig app (ink / fog, samme udtryk som Kalender/Liste-toggle) */
-.fc {
-  font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
-  color: var(--ink);
-  --fc-page-bg-color: transparent;
-  --fc-today-bg-color: color-mix(in srgb, var(--moss) 14%, transparent);
-  --fc-neutral-bg-color: color-mix(in srgb, var(--surface) 90%, var(--fog));
-}
-
-.fc .fc-toolbar {
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  align-items: center;
-}
-
-.fc .fc-toolbar-chunk {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.65rem;
-}
-
-.fc .fc-toolbar-title {
-  font-weight: 700;
-  font-size: clamp(0.98rem, 2.55vw, 1.28rem);
-  text-transform: capitalize;
-  letter-spacing: -0.025em;
-  line-height: 1.2;
-}
-
-.fc .fc-button {
-  border-radius: var(--radius-control);
-  text-transform: none;
-  font-weight: 600;
-  font-size: 0.84rem;
-  line-height: 1.2;
-  transition:
-    background 0.15s ease,
-    border-color 0.15s ease,
-    color 0.15s ease,
-    transform 0.15s ease;
-}
-
-.fc .fc-button.fc-button-primary {
-  background: color-mix(in srgb, var(--surface) 96%, var(--fog));
-  border: 1px solid color-mix(in srgb, var(--ink) 9%, transparent);
-  color: var(--ink);
-  padding: 0.56rem 1.1rem;
-  box-shadow: 0 8px 18px -12px color-mix(in srgb, var(--ink) 28%, transparent);
-}
-
-.fc .fc-button.fc-button-primary:not(:disabled):hover {
-  background: color-mix(in srgb, var(--fog) 55%, white);
-  border-color: color-mix(in srgb, var(--ink) 20%, transparent);
-  color: var(--ink);
-  transform: translateY(-1px);
-}
-
-.fc .fc-button.fc-button-primary:not(:disabled).fc-button-active,
-.fc .fc-button.fc-button-primary:not(:disabled):active {
-  background: var(--ink);
-  color: var(--fog);
-  border-color: var(--ink);
-  box-shadow: var(--shadow-sm);
-}
-
-.fc .fc-button.fc-button-primary:not(:disabled).fc-button-active:hover {
-  background: color-mix(in srgb, var(--ink) 92%, white);
-  color: var(--fog);
-  border-color: var(--ink);
-}
-
-.fc .fc-prev-button,
-.fc .fc-next-button {
-  min-width: 3rem;
-  min-height: 3rem;
-  padding: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.2rem;
-  line-height: 1;
-}
-
-.fc .fc-button-group {
-  border-radius: 0.95rem;
-  overflow: hidden;
-  box-shadow: 0 10px 22px -16px color-mix(in srgb, var(--ink) 45%, transparent);
-}
-
-.fc .fc-button-group .fc-button {
-  border-radius: 0;
-}
-
-.fc .fc-today-button {
-  background: linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--primary) 92%, black),
-    color-mix(in srgb, var(--primary) 74%, var(--moss))
-  ) !important;
-  border-color: color-mix(in srgb, var(--primary) 78%, black) !important;
-  color: var(--on-primary) !important;
-  box-shadow: 0 10px 20px -14px color-mix(in srgb, var(--primary) 70%, transparent);
-}
-
-.fc .fc-scrollgrid,
-.fc-theme-standard td,
-.fc-theme-standard th {
-  border-color: color-mix(in srgb, var(--ink) 8%, transparent);
-}
-
-.fc .fc-scrollgrid {
-  border-radius: var(--radius-card-soft);
-  overflow: hidden;
-}
-
-.fc .fc-daygrid-day-frame,
-.fc .fc-timegrid-col-frame {
-  border-radius: 10px;
-}
-
-.fc .fc-daygrid-day-number,
-.fc .fc-col-header-cell-cushion {
-  font-weight: 600;
-  color: color-mix(in srgb, var(--ink) 90%, transparent);
-}
-
-.fc .fc-daygrid-event {
-  border-radius: var(--radius-control);
-  padding: 3px 6px;
-  margin-top: 2px;
-  font-weight: 600;
-  font-size: 0.75rem;
-  line-height: 1.25;
-  border: none;
-}
-
-.fc-dayGridMonth-view .fc-daygrid-day {
-  min-height: 4.25rem;
-}
-
-.fc-dayGridWeek-view .fc-daygrid-day {
-  min-height: 6.25rem;
-}
-
-.fc .fc-daygrid-day-events {
-  margin-bottom: 0.2rem;
-}
-
-@media (max-width: 1024px) {
-  .toast-root {
-    right: 0.75rem;
-    left: 0.75rem;
-    bottom: calc(6.75rem + env(safe-area-inset-bottom, 0px));
-    align-items: stretch;
-  }
-
-  .toast {
-    width: 100%;
-    max-width: none;
-  }
-}
-
-@media (max-width: 768px) {
-  .fc .fc-toolbar {
-    gap: 0.75rem;
-  }
-
-  .fc .fc-toolbar-title {
-    font-size: 0.92rem;
-    letter-spacing: -0.015em;
-  }
-
-  /* Række 1: forrige/næste + i dag, række 2: titel centreret */
-  .fc .fc-toolbar .fc-toolbar-chunk:nth-child(1) {
-    order: 1;
-  }
-
-  .fc .fc-toolbar .fc-toolbar-chunk:nth-child(3) {
-    order: 1;
-    margin-left: auto;
-  }
-
-  .fc .fc-toolbar .fc-toolbar-chunk:nth-child(2) {
-    order: 2;
-    flex: 1 1 100%;
-    display: flex;
-    justify-content: center;
-    margin-top: 0.35rem;
-  }
-
-  .fc .fc-button.fc-button-primary {
-    padding: 0.5rem 0.95rem;
-    font-size: 0.9rem;
-  }
-
-  .fc .fc-prev-button,
-  .fc .fc-next-button {
-    min-width: 3.3rem;
-    min-height: 3.3rem;
-    font-size: 1.35rem;
-  }
-
-  .fc-dayGridMonth-view .fc-daygrid-day {
-    min-height: 4rem;
-  }
-
-  .fc-dayGridWeek-view .fc-daygrid-day {
-    min-height: 5.75rem;
-  }
-
-  .fc .fc-daygrid-event {
-    font-size: 0.7rem;
-    padding: 3px 5px;
-  }
-
-  .card {
-    border-radius: 1.05rem;
-    padding: 1.15rem;
-  }
-
-  .card-soft {
-    border-radius: 0.95rem;
-    padding: 0.95rem;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {

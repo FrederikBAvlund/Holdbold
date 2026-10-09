@@ -342,3 +342,61 @@ export function Field({
 
 export const inputClass =
   "w-full min-h-12 rounded-2xl border border-line bg-surface-2 px-4 text-base text-ink placeholder:text-ink/40 transition focus:border-moss focus:bg-surface focus:outline-none focus:ring-4 focus:ring-moss/15";
+
+/* ---------- Stepper ---------- */
+
+export function Stepper({
+  value,
+  onChange,
+  min = 0,
+  max = 99,
+  label,
+  size = "md",
+  disabled,
+  canIncrement = true
+}: {
+  value: number;
+  onChange: (value: number) => void;
+  min?: number;
+  max?: number;
+  label?: string;
+  size?: "sm" | "md";
+  disabled?: boolean;
+  canIncrement?: boolean;
+}) {
+  const btn = cn(
+    "inline-flex items-center justify-center rounded-full bg-ink/[0.07] font-bold text-ink transition active:scale-90 disabled:opacity-30",
+    size === "sm" ? "h-9 w-9" : "h-11 w-11"
+  );
+  return (
+    <div className="inline-flex items-center gap-1.5" role="group" aria-label={label}>
+      <button
+        type="button"
+        className={btn}
+        aria-label={label ? `${label}: én mindre` : "Én mindre"}
+        disabled={disabled || value <= min}
+        onClick={() => onChange(Math.max(min, value - 1))}
+      >
+        <span aria-hidden className="text-lg leading-none">−</span>
+      </button>
+      <span
+        className={cn(
+          "tabular text-center font-display font-bold text-ink",
+          size === "sm" ? "w-6 text-xl" : "w-9 text-3xl"
+        )}
+        aria-live="polite"
+      >
+        {value}
+      </span>
+      <button
+        type="button"
+        className={btn}
+        aria-label={label ? `${label}: én mere` : "Én mere"}
+        disabled={disabled || value >= max || !canIncrement}
+        onClick={() => onChange(Math.min(max, value + 1))}
+      >
+        <Icon name="plus" className="h-4 w-4" strokeWidth={2.6} />
+      </button>
+    </div>
+  );
+}
