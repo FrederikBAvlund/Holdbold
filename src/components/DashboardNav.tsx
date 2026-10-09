@@ -206,7 +206,7 @@ export default function DashboardNav({
       aria-label="Hovednavigation"
     >
       <div className="pointer-events-auto w-full max-w-md">
-        <div className="grid grid-cols-5 gap-0.5 rounded-[1.75rem] border border-ink/10 bg-[color:var(--surface)] p-1.5 shadow-[var(--shadow-lg)] backdrop-blur-xl">
+        <div className="grid grid-cols-5 gap-0.5 rounded-[1.75rem] border border-line bg-[color:var(--surface)] p-1.5 shadow-[var(--shadow-lg)] backdrop-blur-xl">
           {visibleNavItems.map((item) => {
             const isNotifications = item.href === "/dashboard/notifikationer";
             const isActive = isItemActive(item.href);
@@ -257,7 +257,7 @@ export default function DashboardNav({
       </header>
 
       <aside className="hidden lg:block lg:w-[280px] lg:shrink-0">
-        <div className="sticky top-6 flex h-[calc(100vh-3rem)] flex-col overflow-hidden rounded-app border border-ink/10 bg-surface shadow-[var(--shadow-sm)]">
+        <div className="sticky top-6 flex h-[calc(100vh-3rem)] flex-col overflow-hidden rounded-app border border-line bg-surface shadow-[var(--shadow-sm)]">
           <div className="flex shrink-0 items-center gap-3 px-5 pb-4 pt-6">
             <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-primary font-display text-lg font-bold text-on-primary">
               H
@@ -291,7 +291,7 @@ export default function DashboardNav({
             })}
           </nav>
 
-          <div className="shrink-0 border-t border-ink/10 px-4 py-4">
+          <div className="shrink-0 border-t border-line px-4 py-4">
             <div className="flex items-center gap-3">
               <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold uppercase tracking-wide text-on-primary">
                 {initials}
