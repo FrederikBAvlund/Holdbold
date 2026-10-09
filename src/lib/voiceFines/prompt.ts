@@ -1,6 +1,6 @@
 import type { VoiceMember, VoiceTemplate } from "./matching";
 
-export const VOICE_FINES_MODEL = "gpt-4o-mini";
+export const VOICE_FINES_MODEL = "gpt-6-luna";
 
 export function buildSystemPrompt(members: VoiceMember[], templates: VoiceTemplate[]): string {
   const players = members.map((m) => `${m.id} | ${m.name}`).join("\n");

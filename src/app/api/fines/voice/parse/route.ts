@@ -57,8 +57,8 @@ export async function POST(request: Request) {
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({
       model: VOICE_FINES_MODEL,
-      temperature: 0,
-      max_tokens: 2000,
+      reasoning_effort: "none",
+      max_completion_tokens: 2000,
       response_format: {
         type: "json_schema",
         json_schema: { name: "fines", strict: true, schema: VOICE_FINES_SCHEMA }
