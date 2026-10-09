@@ -1,9 +1,11 @@
 import type { NextAuthOptions } from "next-auth";
-import Facebook from "next-auth/providers/facebook";
 import Credentials from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
+import { verifyLoginCode } from "@/lib/loginCode";
+import { checkRateLimit, getClientIp } from "@/lib/rateLimit";
+import { createUserFromSignup } from "@/lib/signupUser";
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
@@ -11,16 +13,44 @@ export const authOptions: NextAuthOptions = {
     signIn: "/login"
   },
   providers: [
-    ...(process.env.FACEBOOK_CLIENT_ID && process.env.FACEBOOK_CLIENT_SECRET
-      ? [
-          Facebook({
-            clientId: process.env.FACEBOOK_CLIENT_ID,
-            clientSecret: process.env.FACEBOOK_CLIENT_SECRET,
-            // Facebook "overtager" en eksisterende email-konto med samme e-mail (se events.linkAccount).
-            allowDangerousEmailAccountLinking: true
-          })
-        ]
-      : []),
+    Credentials({
+      id: "otp",
+      name: "Engangskode",
+      credentials: {
+        email: { label: "Email", type: "email" },
+        code: { label: "Kode", type: "text" }
+      },
+      async authorize(credentials, req) {
+        const email = credentials?.email?.trim().toLowerCase();
+        const code = credentials?.code?.trim() ?? "";
+        if (!email || !code) return null;
+
+        const ip = getClientIp((req?.headers ?? {}) as Record<string, string | string[] | undefined>);
+        const ipLimit = await checkRateLimit(`otp-verify:ip:${ip}`, 20, 10 * 60);
+        if (!ipLimit.allowed) return null;
+
+        const verified = await verifyLoginCode(email, code);
+        if (!verified.ok) return null;
+
+        let user = await prisma.user.findFirst({
+          where: { email: { equals: email, mode: "insensitive" } }
+        });
+        if (!user) {
+          // Ny bruger: koden beviser, at e-mailen tilhører personen, så oprettelsen kan gennemføres.
+          if (!verified.signup) return null;
+          user = await createUserFromSignup({ email, ...verified.signup });
+          if (!user) return null;
+        }
+
+        const hasMembership = await prisma.membership.findFirst({
+          where: { userId: user.id, status: { in: ["ACTIVE", "PENDING"] } },
+          select: { id: true }
+        });
+        if (!hasMembership) return null;
+
+        return { id: user.id, name: user.name, email: user.email, image: user.image };
+      }
+    }),
     ...(process.env.AUTH_CREDENTIALS_ENABLED === "true"
       ? [
           Credentials({
@@ -70,17 +100,6 @@ export const authOptions: NextAuthOptions = {
   },
   jwt: {
     maxAge: 60 * 60 * 24 * 90
-  },
-  events: {
-    // Når Facebook kobles til en eksisterende bruger, fjernes kodeordet: Facebook overtager login.
-    // Det forhindrer også, at en tidligere forhåndsregistrering med samme e-mail beholder adgang via kodeord.
-    async linkAccount({ user, account }) {
-      if (account.provider !== "facebook") return;
-      await prisma.user.updateMany({
-        where: { id: user.id, passwordHash: { not: null } },
-        data: { passwordHash: null }
-      });
-    }
   },
   callbacks: {
     async jwt({ token, user }) {
