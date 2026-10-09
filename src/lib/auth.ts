@@ -15,7 +15,9 @@ export const authOptions: NextAuthOptions = {
       ? [
           Facebook({
             clientId: process.env.FACEBOOK_CLIENT_ID,
-            clientSecret: process.env.FACEBOOK_CLIENT_SECRET
+            clientSecret: process.env.FACEBOOK_CLIENT_SECRET,
+            // Facebook "overtager" en eksisterende email-konto med samme e-mail (se events.linkAccount).
+            allowDangerousEmailAccountLinking: true
           })
         ]
       : []),
@@ -68,6 +70,17 @@ export const authOptions: NextAuthOptions = {
   },
   jwt: {
     maxAge: 60 * 60 * 24 * 90
+  },
+  events: {
+    // Når Facebook kobles til en eksisterende bruger, fjernes kodeordet: Facebook overtager login.
+    // Det forhindrer også, at en tidligere forhåndsregistrering med samme e-mail beholder adgang via kodeord.
+    async linkAccount({ user, account }) {
+      if (account.provider !== "facebook") return;
+      await prisma.user.updateMany({
+        where: { id: user.id, passwordHash: { not: null } },
+        data: { passwordHash: null }
+      });
+    }
   },
   callbacks: {
     async jwt({ token, user }) {
