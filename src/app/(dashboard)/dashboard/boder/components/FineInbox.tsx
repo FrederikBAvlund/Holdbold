@@ -72,6 +72,11 @@ export default function FineInbox({
 
   useEffect(() => setMounted(true), []);
 
+  // Hold badget i navigationen opdateret med det, indbakken viser.
+  useEffect(() => {
+    if (!readOnly && !data.loading) window.dispatchEvent(new CustomEvent("fines:inbox", { detail: items.length }));
+  }, [items.length, readOnly, data.loading]);
+
   // Fjern valg for rækker, der er væk efter en opdatering.
   useEffect(() => {
     setSelected((prev) => {
