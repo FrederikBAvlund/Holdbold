@@ -5,6 +5,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { createNotifications } from "@/lib/notifications";
 import { ensureEventSeasonOpen } from "@/lib/seasons";
+import { canViewSignupOf, requireActiveTeamMember, requireSession } from "@/lib/apiAuth";
 import {
   isPostDeadlineWithdrawal,
   isSameCalendarDayAsEvent,
@@ -23,6 +24,24 @@ export async function GET(request: Request, { params }: { params: { id: string }
   const userId = searchParams.get("userId") ?? "";
   if (!userId) {
     return NextResponse.json({ error: "userId mangler" }, { status: 400 });
+  }
+
+  const session = await requireSession();
+  if (!session.ok) return session.response;
+
+  const eventTeam = await prisma.event.findUnique({
+    where: { id: params.id },
+    select: { teamId: true }
+  });
+  if (!eventTeam) {
+    return NextResponse.json({ error: "Begivenhed ikke fundet" }, { status: 404 });
+  }
+
+  const member = await requireActiveTeamMember(session.userId, eventTeam.teamId);
+  if (!member.ok) return member.response;
+
+  if (!canViewSignupOf(session.userId, member.role, userId)) {
+    return NextResponse.json({ error: "Ikke adgang til andre spilleres tilmeldingsstatus" }, { status: 403 });
   }
 
   const signup = await prisma.signup.findUnique({

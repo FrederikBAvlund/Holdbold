@@ -3,18 +3,25 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "postinstall": "prisma generate",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
-    "prisma:seed": "prisma db seed"
+    "prisma:seed": "prisma db seed",
+    "db:up": "docker compose up -d --wait db",
+    "db:reset": "prisma migrate reset --force",
+    "dev:setup": "npm run db:up && prisma migrate deploy && prisma db seed"
   },
   "prisma": {
     "seed": "node prisma/seed.mjs"

@@ -4,6 +4,7 @@ import { z } from "zod";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { resolveSeason } from "@/lib/seasons";
+import { canViewSignupOf } from "@/lib/apiAuth";
 
 const querySchema = z.object({
   teamId: z.string().min(1),
@@ -72,11 +73,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Ikke adgang" }, { status: 403 });
   }
 
-  if (
-    parsed.userId &&
-    parsed.userId !== session.user.id &&
-    !["ADMIN", "BOEDEKASSEFORMAND", "TRAENER"].includes(actingMembership.role)
-  ) {
+  if (parsed.userId && !canViewSignupOf(session.user.id, actingMembership.role, parsed.userId)) {
     return NextResponse.json({ error: "Ikke adgang til andre spilleres tilmeldingsstatus" }, { status: 403 });
   }
 
