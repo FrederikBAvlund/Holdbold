@@ -26,7 +26,7 @@ export async function POST(request: Request) {
   try { apiKey = await getTeamOpenAiKey(teamId); } catch {
     return NextResponse.json({ error: "Holdets API-nøgle kunne ikke indlæses" }, { status: 503 });
   }
-  if (!apiKey) return NextResponse.json({ error: "Tilføj holdets OpenAI API-nøgle under Indstillinger" }, { status: 503 });
+  if (!apiKey) return NextResponse.json({ error: "Tilføj holdets OpenAI API-nøgle under Holdindstillinger" }, { status: 503 });
   const memberships = await prisma.membership.findMany({
     where: { teamId, status: "ACTIVE" }, select: { user: { select: { name: true } } }
   });

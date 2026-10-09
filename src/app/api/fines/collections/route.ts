@@ -69,7 +69,7 @@ export async function POST(request: Request) {
 
   const manager = await requireManager(body.teamId, session.user.id);
   if (!manager) {
-    return NextResponse.json({ error: "Kun admin/bødekasseformand kan oprette indsamlingsflow" }, { status: 403 });
+    return NextResponse.json({ error: "Kun admin/bødekasseformand kan oprette indsamlinger" }, { status: 403 });
   }
 
   const fineCollection = fineCollectionDelegate();

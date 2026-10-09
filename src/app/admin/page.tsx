@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import Button from "@/components/ui/Button";
+import { inputClass } from "@/components/ui/primitives";
 
 export default function AdminPage() {
   const [teamId, setTeamId] = useState("");
@@ -35,50 +37,46 @@ export default function AdminPage() {
   }
 
   return (
-    <main className="min-h-screen px-6 py-12">
-      <div className="card max-w-xl">
-        <h1 className="text-2xl font-semibold text-ink">Admin: iCal import</h1>
+    <main className="min-h-screen px-3 py-6 sm:px-6 sm:py-12">
+      <div className="rounded-[1.375rem] border border-line bg-surface shadow-[var(--shadow-sm)] mx-auto max-w-xl p-5 sm:p-7">
+        <h1 className="font-display text-3xl font-extrabold uppercase leading-none text-ink">Admin: iCal import</h1>
         <p className="mt-2 text-ink/70">
           Indsæt DBU iCal URL for at hente kampe. Importen kan køres manuelt efter behov.
         </p>
 
         <form onSubmit={handleImport} className="mt-6 space-y-4">
           <div>
-            <label className="label">Team ID</label>
+            <label className="mb-1.5 block text-sm font-semibold text-ink/80">Team ID</label>
             <input
               value={teamId}
               onChange={(event) => setTeamId(event.target.value)}
-              className="input mt-2"
+              className={inputClass}
               placeholder="team_..."
               required
             />
           </div>
           <div>
-            <label className="label">iCal URL</label>
+            <label className="mb-1.5 block text-sm font-semibold text-ink/80">iCal URL</label>
             <input
               value={url}
               onChange={(event) => setUrl(event.target.value)}
-              className="input mt-2"
+              className={inputClass}
               placeholder="https://..."
               required
             />
           </div>
           <div>
-            <label className="label">Navn</label>
+            <label className="mb-1.5 block text-sm font-semibold text-ink/80">Navn</label>
             <input
               value={name}
               onChange={(event) => setName(event.target.value)}
-              className="input mt-2"
+              className={inputClass}
               placeholder="DBU iCal"
             />
           </div>
-          <button
-            type="submit"
-            disabled={loading}
-            className="btn-primary w-full"
-          >
-            {loading ? "Importerer..." : "Kør import"}
-          </button>
+          <Button type="submit" size="lg" block loading={loading}>
+            Kør import
+          </Button>
         </form>
 
         {message ? <p className="mt-4 text-sm text-ink/80">{message}</p> : null}

@@ -5,101 +5,159 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
+import { cn } from "@/lib/utils";
+import Icon, { type IconName } from "@/components/ui/Icon";
+import Avatar from "@/components/ui/Avatar";
+import Sheet from "@/components/ui/Sheet";
+import { CountBadge } from "@/components/ui/Button";
+import { useDashboardTeam } from "@/components/DashboardTeamProvider";
+import { FINE_MANAGER_ROLES, roleLabel } from "@/lib/roleLabels";
 
-const navItems = [
-  { href: "/dashboard", label: "Overblik", shortLabel: "Overblik", icon: "home" },
-  { href: "/dashboard/kalender", label: "Kalender", shortLabel: "Kalender", icon: "calendar" },
-  { href: "/dashboard/boder", label: "Bøder", shortLabel: "Bøder", icon: "receipt" },
-  { href: "/dashboard/fravaer", label: "Fravær", shortLabel: "Fravær", icon: "absence", desktopOnly: true },
-  { href: "/dashboard/notifikationer", label: "Notifikationer", shortLabel: "Notif.", icon: "bell" },
-  { href: "/dashboard/indstillinger", label: "Indstillinger", shortLabel: "Indstill.", icon: "settings" }
+type NavItem = { href: string; label: string; icon: IconName };
+
+const NAV_ITEMS: NavItem[] = [
+  { href: "/dashboard", label: "Hjem", icon: "home" },
+  { href: "/dashboard/kalender", label: "Kalender", icon: "calendar" },
+  { href: "/dashboard/boder", label: "Bøder", icon: "receipt" },
+  { href: "/dashboard/hold", label: "Hold", icon: "users" }
 ];
 
-const icons = {
-  absence: (
-    <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5">
-      <path
-        d="M12 21s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 5.6-7 10-7 10Z"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.7"
-        strokeLinejoin="round"
-      />
-    </svg>
-  ),
-  home: (
-    <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5">
-      <path
-        d="M3 10.5 12 3l9 7.5V21a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1v-10.5Z"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.7"
-        strokeLinejoin="round"
-      />
-    </svg>
-  ),
-  calendar: (
-    <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5">
-      <path
-        d="M7 3v3M17 3v3M4 9h16M5 6h14a1 1 0 0 1 1 1v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a1 1 0 0 1 1-1Z"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.7"
-        strokeLinejoin="round"
-      />
-    </svg>
-  ),
-  receipt: (
-    <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5">
-      <path
-        d="M6 3h12v18l-2-1-2 1-2-1-2 1-2-1-2 1V3Z"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.7"
-        strokeLinejoin="round"
-      />
-      <path d="M8 8h8M8 12h8M8 16h5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
-    </svg>
-  ),
-  bell: (
-    <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5">
-      <path
-        d="M6 17h12l-1.5-2V11a4.5 4.5 0 1 0-9 0v4L6 17Z"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.7"
-        strokeLinejoin="round"
-      />
-      <path d="M10 19a2 2 0 0 0 4 0" stroke="currentColor" strokeWidth="1.7" />
-    </svg>
-  ),
-  settings: (
-    <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5">
-      <path
-        d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 0 0-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 0 0-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 0 0-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 0 0-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 0 0 1.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065Z"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.7"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M12 9a3 3 0 1 1 0 6 3 3 0 0 1 0-6Z"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.7"
-      />
-    </svg>
-  )
-};
+const SECONDARY_ITEMS: NavItem[] = [{ href: "/dashboard/fravaer", label: "Skade & fravær", icon: "heart" }];
 
-function initialsFromDisplayName(name: string) {
-  const source = name.trim();
-  if (!source) return "HB";
-  return source
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((chunk) => chunk[0]?.toUpperCase() ?? "")
-    .join("");
+const PROFILE_HREF = "/dashboard/profil";
+const NOTIFICATIONS_HREF = "/dashboard/notifikationer";
+
+function useUnreadCount(sessionUserId: string | undefined, pathname: string) {
+  const [unreadCount, setUnreadCount] = useState(0);
+  const lastLoadRef = useRef<{ key: string; at: number } | null>(null);
+  const inFlightRef = useRef<Promise<void> | null>(null);
+
+  const loadCount = useCallback(
+    async (reason = "default") => {
+      if (!sessionUserId) return;
+      const key = `${sessionUserId}:${reason}`;
+      const now = Date.now();
+      const last = lastLoadRef.current;
+      if (last?.key === key && now - last.at < 1200) return;
+      if (inFlightRef.current) return inFlightRef.current;
+      lastLoadRef.current = { key, at: now };
+      inFlightRef.current = (async () => {
+        try {
+          const response = await fetch("/api/notifications/unread-count", { cache: "no-store" });
+          if (!response.ok) return;
+          const data = await response.json();
+          setUnreadCount(data.count ?? 0);
+        } finally {
+          inFlightRef.current = null;
+        }
+      })();
+      return inFlightRef.current;
+    },
+    [sessionUserId]
+  );
+
+  useEffect(() => {
+    if (sessionUserId) loadCount(`route:${pathname}`);
+  }, [sessionUserId, pathname, loadCount]);
+
+  useEffect(() => {
+    if (!sessionUserId) return;
+    const onFocus = () => loadCount("focus");
+    const onVisibility = () => {
+      if (!document.hidden) loadCount("visibility");
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [sessionUserId, loadCount]);
+
+  useEffect(() => {
+    const onUpdate = (event: Event) => setUnreadCount((event as CustomEvent<number>).detail ?? 0);
+    window.addEventListener("notifications:unread", onUpdate);
+    return () => window.removeEventListener("notifications:unread", onUpdate);
+  }, []);
+
+  return unreadCount;
+}
+
+/** Antal forslag/betalinger, der venter på bødekassen (kun for admin og bødekasseformand). */
+function useFineInboxCount(teamId: string, seasonQuery: string, enabled: boolean, pathname: string) {
+  const [count, setCount] = useState(0);
+
+  const load = useCallback(async () => {
+    if (!enabled || !teamId) {
+      setCount(0);
+      return;
+    }
+    try {
+      const response = await fetch(`/api/fines/inbox-count?teamId=${teamId}${seasonQuery}`, { cache: "no-store" });
+      if (!response.ok) return;
+      const data = await response.json();
+      setCount(typeof data.count === "number" ? data.count : 0);
+    } catch {
+      // badge er kun en hjælp – ignorér netværksfejl
+    }
+  }, [enabled, teamId, seasonQuery]);
+
+  useEffect(() => {
+    void load();
+  }, [load, pathname]);
+
+  useEffect(() => {
+    if (!enabled) return;
+    const onVisible = () => {
+      if (!document.hidden) void load();
+    };
+    const onUpdate = (event: Event) => setCount((event as CustomEvent<number>).detail ?? 0);
+    window.addEventListener("focus", onVisible);
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("fines:inbox", onUpdate);
+    return () => {
+      window.removeEventListener("focus", onVisible);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("fines:inbox", onUpdate);
+    };
+  }, [enabled, load]);
+
+  return enabled ? count : 0;
+}
+
+function TeamSwitcherSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { memberships, teamId, setTeamId } = useDashboardTeam();
+  return (
+    <Sheet open={open} onClose={onClose} title="Skift hold" description="Vælg det hold, du vil se.">
+      <div className="space-y-2">
+        {memberships.map((membership) => {
+          const id = membership.team?.id ?? "";
+          const active = id === teamId;
+          return (
+            <button
+              key={id}
+              type="button"
+              onClick={() => {
+                setTeamId(id);
+                onClose();
+              }}
+              className={cn(
+                "flex min-h-[3.75rem] w-full items-center gap-3 rounded-2xl border px-4 text-left transition active:scale-[0.99]",
+                active ? "border-moss bg-moss/10" : "border-line hover:bg-ink/[0.03]"
+              )}
+            >
+              <Avatar name={membership.team?.name ?? "Hold"} size="md" className="rounded-xl" />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-semibold text-ink">{membership.team?.name ?? "Hold"}</span>
+                <span className="block text-sm text-ink/55">{roleLabel(membership.role)}</span>
+              </span>
+              {active ? <Icon name="check" className="h-5 w-5 text-moss" strokeWidth={2.6} /> : null}
+            </button>
+          );
+        })}
+      </div>
+    </Sheet>
+  );
 }
 
 export default function DashboardNav({
@@ -110,209 +168,196 @@ export default function DashboardNav({
   serverUserEmail?: string | null;
 }) {
   const { data: session } = useSession();
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [mobileNavMounted, setMobileNavMounted] = useState(false);
   const pathname = usePathname();
-  const sessionUserId = session?.user?.id;
+  const { memberships, teamId, members, userId, actingMember, seasonQuery } = useDashboardTeam();
+  const [mounted, setMounted] = useState(false);
+  const [teamSheetOpen, setTeamSheetOpen] = useState(false);
+  const unreadCount = useUnreadCount(session?.user?.id, pathname);
+  const canManageFines = FINE_MANAGER_ROLES.includes(actingMember?.role ?? "");
+  const fineInboxCount = useFineInboxCount(teamId, seasonQuery, canManageFines, pathname);
+  const badgeFor = (href: string) => (href === "/dashboard/boder" ? fineInboxCount : 0);
+
   const hasActiveMembership = session?.user?.hasActiveMembership === true;
   const hasPendingMembership = session?.user?.hasPendingMembership === true;
   const pendingOnly = !hasActiveMembership && hasPendingMembership;
-  const lastUnreadLoadRef = useRef<{ key: string; at: number } | null>(null);
-  const unreadInFlightRef = useRef<Promise<void> | null>(null);
 
-  // useSession() mangler ofte name/email på første client-render (SessionProvider refetch),
-  // mens SSR har fuld session → hydration mismatch. Server props er identiske på SSR og hydrering.
+  // useSession() mangler ofte name/email på første client-render, mens SSR har fuld session.
   const displayName = session?.user?.name?.trim() || serverUserName?.trim() || "";
   const displayEmail = session?.user?.email?.trim() || serverUserEmail?.trim() || "";
+  const myImage = members.find((member) => member.user.id === userId)?.user.image ?? null;
 
-  const initials = useMemo(() => initialsFromDisplayName(displayName), [displayName]);
+  const activeTeam = useMemo(
+    () => memberships.find((membership) => membership.team?.id === teamId) ?? memberships[0],
+    [memberships, teamId]
+  );
+  const teamName = activeTeam?.team?.name ?? "Holdbold";
+  const canSwitchTeam = memberships.length > 1;
 
-  const visibleNavItems = useMemo(
-    () =>
-      pendingOnly
-        ? navItems.filter((item) => item.href === "/dashboard/indstillinger")
-        : navItems,
-    [pendingOnly]
+  const items = pendingOnly ? [] : NAV_ITEMS;
+  const isActive = (href: string) =>
+    href === "/dashboard" ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
+
+  useEffect(() => setMounted(true), []);
+
+  const teamButton = (
+    <button
+      type="button"
+      onClick={() => canSwitchTeam && setTeamSheetOpen(true)}
+      className={cn(
+        "flex min-w-0 items-center gap-2.5 rounded-2xl py-1 pr-2 text-left",
+        canSwitchTeam && "transition active:scale-[0.98]"
+      )}
+      aria-label={canSwitchTeam ? `Aktivt hold: ${teamName}. Tryk for at skifte` : teamName}
+    >
+      <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary text-on-primary">
+        <Icon name="ball" className="h-5 w-5" strokeWidth={2} />
+      </span>
+      <span className="min-w-0 leading-none">
+        <span className="block text-[0.625rem] font-bold uppercase tracking-[0.16em] text-ink/45">Holdbold</span>
+        <span className="mt-0.5 flex items-center gap-1 font-display text-lg font-bold uppercase leading-none text-ink">
+          <span className="truncate">{teamName}</span>
+          {canSwitchTeam ? <Icon name="chevron-down" className="h-4 w-4 text-ink/45" strokeWidth={2.4} /> : null}
+        </span>
+      </span>
+    </button>
   );
 
-  const loadCount = useCallback(async (reason = "default") => {
-    if (!sessionUserId) return;
-    const key = `${sessionUserId}:${reason}`;
-    const now = Date.now();
-    const last = lastUnreadLoadRef.current;
-    if (last?.key === key && now - last.at < 1200) return;
-    if (unreadInFlightRef.current) return unreadInFlightRef.current;
-    lastUnreadLoadRef.current = { key, at: now };
+  const actions = (
+    <div className="flex shrink-0 items-center gap-1.5">
+      <Link
+        href={NOTIFICATIONS_HREF}
+        aria-label={unreadCount > 0 ? `Notifikationer, ${unreadCount} ulæste` : "Notifikationer"}
+        className={cn(
+          "relative inline-flex h-10 w-10 items-center justify-center rounded-full transition active:scale-95",
+          pathname.startsWith(NOTIFICATIONS_HREF) ? "bg-ink text-bg" : "bg-ink/[0.06] text-ink hover:bg-ink/10"
+        )}
+      >
+        <Icon name="bell" />
+        {unreadCount > 0 ? <CountBadge count={unreadCount} className="absolute -right-1 -top-1" /> : null}
+      </Link>
+      <Link href={PROFILE_HREF} aria-label="Profil og indstillinger" className="rounded-full transition active:scale-95">
+        <Avatar
+          name={displayName || "?"}
+          image={myImage}
+          size="md"
+          className={cn(pathname.startsWith(PROFILE_HREF) && "ring-2 ring-moss ring-offset-2 ring-offset-bg")}
+        />
+      </Link>
+    </div>
+  );
 
-    unreadInFlightRef.current = (async () => {
-      try {
-        const response = await fetch("/api/notifications/unread-count", { cache: "no-store" });
-        if (!response.ok) return;
-        const data = await response.json();
-        setUnreadCount(data.count ?? 0);
-      } finally {
-        unreadInFlightRef.current = null;
-      }
-    })();
-
-    return unreadInFlightRef.current;
-  }, [sessionUserId]);
-
-  useEffect(() => {
-    if (!sessionUserId) return;
-    loadCount(`route:${pathname}`);
-  }, [sessionUserId, pathname, loadCount]);
-
-  useEffect(() => {
-    if (!sessionUserId) return;
-
-    function onFocus() {
-      loadCount("focus");
-    }
-
-    function onVisibilityChange() {
-      if (!document.hidden) {
-        loadCount("visibility");
-      }
-    }
-
-    window.addEventListener("focus", onFocus);
-    document.addEventListener("visibilitychange", onVisibilityChange);
-
-    return () => {
-      window.removeEventListener("focus", onFocus);
-      document.removeEventListener("visibilitychange", onVisibilityChange);
-    };
-  }, [sessionUserId, loadCount]);
-
-  useEffect(() => {
-    function onUnreadUpdate(event: Event) {
-      const custom = event as CustomEvent<number>;
-      setUnreadCount(custom.detail ?? 0);
-    }
-
-    window.addEventListener("notifications:unread", onUnreadUpdate);
-    return () => window.removeEventListener("notifications:unread", onUnreadUpdate);
-  }, []);
-
-  useEffect(() => {
-    setMobileNavMounted(true);
-  }, []);
-
-  const mobileNavBar = (
+  // Svævende dock: aktiv fane udvider sig til ikon + tekst, de øvrige er kun ikoner.
+  const bottomNav = (
     <nav
-      className="pointer-events-none fixed inset-x-0 bottom-0 z-50 flex justify-center px-3 pb-[max(0.78rem,calc(env(safe-area-inset-bottom,0px)+2px))] lg:hidden"
       aria-label="Hovednavigation"
+      className="pointer-events-none fixed inset-x-0 bottom-0 z-50 flex justify-center px-4 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))] lg:hidden"
     >
-      <div className="pointer-events-auto w-full max-w-md">
-        <div className="grid grid-cols-5 gap-1 rounded-[1.35rem] border border-ink/10 bg-fog/95 p-2 shadow-[0_12px_40px_-12px_rgba(15,23,42,0.35)] ring-1 ring-black/[0.04] backdrop-blur-xl">
-          {visibleNavItems.filter((item) => !("desktopOnly" in item)).map((item) => {
-            const isNotifications = item.href === "/dashboard/notifikationer";
-            const isActive = pathname === item.href;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                aria-label={item.label}
-                className={`relative flex min-h-[3.4rem] min-w-0 flex-col items-center justify-center gap-1 rounded-control px-0.5 py-1 transition-colors duration-150 ${
-                  isActive ? "bg-moss/14 text-moss" : "text-ink/65 hover:bg-ink/[0.04]"
-                }`}
-              >
-                <span
-                  className={`relative flex h-9 w-9 shrink-0 items-center justify-center rounded-control border transition ${
-                    isActive
-                      ? "border-moss/40 bg-moss text-fog shadow-md"
-                      : "border-transparent bg-ink/[0.05] text-ink/70"
-                  }`}
-                >
-                  {icons[item.icon as keyof typeof icons]}
-                </span>
-                <span className="text-nav-label max-w-[4.25rem] truncate text-center">{item.shortLabel}</span>
-                {isNotifications && unreadCount > 0 ? (
-                  <span className="absolute right-0.5 top-1 inline-flex min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold text-white shadow-sm">
-                    {unreadCount > 99 ? "99+" : unreadCount}
-                  </span>
+      <div className="pointer-events-auto flex w-full max-w-sm items-center justify-between gap-1 rounded-full border border-line bg-surface/85 p-1.5 shadow-[0_18px_40px_-16px_rgba(0,0,0,0.35)] backdrop-blur-2xl backdrop-saturate-150">
+        {items.map((item) => {
+          const active = isActive(item.href);
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              aria-current={active ? "page" : undefined}
+              aria-label={badgeFor(item.href) > 0 ? `${item.label}, ${badgeFor(item.href)} venter` : item.label}
+              className={cn(
+                "flex h-12 items-center justify-center gap-2 rounded-full transition-all duration-300 ease-out active:scale-95",
+                active
+                  ? "flex-[2.2] bg-primary px-4 text-on-primary shadow-[0_8px_20px_-10px_var(--primary)]"
+                  : "flex-1 text-ink/55 hover:text-ink"
+              )}
+            >
+              <span className="relative inline-flex">
+                <Icon name={item.icon} className="h-[22px] w-[22px]" strokeWidth={active ? 2.3 : 1.9} />
+                {badgeFor(item.href) > 0 ? (
+                  <CountBadge count={badgeFor(item.href)} className="absolute -right-2.5 -top-2" />
                 ) : null}
-              </Link>
-            );
-          })}
-        </div>
+              </span>
+              {active ? (
+                <span className="animate-fade-in font-display text-base font-bold uppercase tracking-wide">
+                  {item.label}
+                </span>
+              ) : null}
+            </Link>
+          );
+        })}
       </div>
     </nav>
   );
 
   return (
     <>
-      <aside className="hidden lg:block lg:w-[308px] lg:shrink-0">
-        <div className="sticky top-6 flex h-[calc(100vh-3rem)] flex-col overflow-hidden rounded-app border border-ink/10 bg-fog/95 shadow-[0_20px_50px_-28px_rgba(15,23,42,0.35)] backdrop-blur-xl">
-          <div className="relative shrink-0 overflow-hidden px-5 pb-6 pt-7">
-            <div
-              className="pointer-events-none absolute inset-0 opacity-[0.97]"
-              style={{
-                background: `linear-gradient(135deg, color-mix(in srgb, var(--color-moss) 92%, black) 0%, var(--color-button) 55%, color-mix(in srgb, var(--color-moss) 75%, var(--color-button)) 100%)`
-              }}
-            />
-            <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-white/15 blur-2xl" />
-            <div className="relative space-y-2 text-fog">
-              <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-white/75">Holdbold</p>
-              <h1 className="font-display text-[1.85rem] font-bold leading-[1.1] tracking-tight">Dashboard</h1>
-              <p className="max-w-[16rem] text-sm leading-snug text-white/88">
-                Kalender, bøder og hold samlet i ét overblik.
-              </p>
-            </div>
-          </div>
+      {/* Mobil topbar */}
+      <header className="sticky top-0 z-40 -mx-3 flex items-center justify-between gap-3 bg-bg/90 px-3 pb-2 pt-[max(0.5rem,env(safe-area-inset-top,0px))] backdrop-blur-xl sm:-mx-5 sm:px-5 lg:hidden">
+        {teamButton}
+        {actions}
+      </header>
 
-          <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-3 py-4">
-            {visibleNavItems.map((item) => {
-              const active = pathname === item.href;
-              const isNotifications = item.href === "/dashboard/notifikationer";
+      {/* Desktop sidebar */}
+      <aside className="hidden lg:block lg:w-[260px] lg:shrink-0">
+        <div className="sticky top-6 flex h-[calc(100vh-3rem)] flex-col rounded-[1.75rem] border border-line bg-surface p-3 shadow-[var(--shadow-sm)]">
+          <div className="px-2 pb-4 pt-2">{teamButton}</div>
+          <nav className="flex flex-1 flex-col gap-1" aria-label="Hovednavigation">
+            {items.map((item) => {
+              const active = isActive(item.href);
               return (
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`group flex items-center justify-between rounded-control border px-3 py-2.5 text-sm font-semibold transition ${
-                    active
-                      ? "border-moss/20 bg-white text-ink shadow-[0_8px_24px_-16px_rgba(15,23,42,0.35)] ring-1 ring-moss/15"
-                      : "border-transparent text-ink/78 hover:bg-white/70 hover:text-ink"
-                  }`}
+                  aria-current={active ? "page" : undefined}
+                  className={cn(
+                    "flex min-h-12 items-center gap-3 rounded-2xl px-3.5 font-display text-lg font-bold uppercase tracking-wide transition",
+                    active ? "bg-primary text-on-primary" : "text-ink/65 hover:bg-ink/[0.05] hover:text-ink"
+                  )}
                 >
-                  <span className="flex min-w-0 items-center gap-3">
-                    <span
-                      className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-control border transition ${
-                        active
-                          ? "border-moss/30 bg-moss text-fog shadow-sm"
-                          : "border-ink/10 bg-white text-ink/65 group-hover:border-moss/25 group-hover:text-ink"
-                      }`}
-                    >
-                      {icons[item.icon as keyof typeof icons]}
-                    </span>
-                    <span className="truncate">{item.label}</span>
-                  </span>
-                  {isNotifications && unreadCount > 0 ? (
-                    <span className="inline-flex min-w-[22px] shrink-0 items-center justify-center rounded-full bg-red-500 px-2 py-0.5 text-xs font-semibold text-white">
-                      {unreadCount}
-                    </span>
-                  ) : null}
+                  <Icon name={item.icon} />
+                  <span className="flex-1">{item.label}</span>
+                  {badgeFor(item.href) > 0 ? <CountBadge count={badgeFor(item.href)} className="ring-0" /> : null}
                 </Link>
               );
             })}
+            {(pendingOnly ? [] : SECONDARY_ITEMS).map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                aria-current={isActive(item.href) ? "page" : undefined}
+                className={cn(
+                  "flex min-h-12 items-center gap-3 rounded-2xl px-3.5 font-display text-lg font-bold uppercase tracking-wide transition",
+                  isActive(item.href) ? "bg-primary text-on-primary" : "text-ink/65 hover:bg-ink/[0.05] hover:text-ink"
+                )}
+              >
+                <Icon name={item.icon} />
+                {item.label}
+              </Link>
+            ))}
+            <Link
+              href={NOTIFICATIONS_HREF}
+              className={cn(
+                "flex min-h-12 items-center gap-3 rounded-2xl px-3.5 font-display text-lg font-bold uppercase tracking-wide transition",
+                pathname.startsWith(NOTIFICATIONS_HREF)
+                  ? "bg-primary text-on-primary"
+                  : "text-ink/65 hover:bg-ink/[0.05] hover:text-ink"
+              )}
+            >
+              <Icon name="bell" />
+              <span className="flex-1">Notifikationer</span>
+              {unreadCount > 0 ? <CountBadge count={unreadCount} className="ring-0" /> : null}
+            </Link>
           </nav>
-
-          <div className="shrink-0 border-t border-ink/10 bg-white/55 px-4 py-4">
-            <div className="flex items-center gap-3">
-              <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-moss to-[color:var(--color-button)] text-xs font-bold uppercase tracking-wide text-fog shadow-md ring-2 ring-white/90">
-                {initials}
-              </span>
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-ink">{displayName || "Holdbold bruger"}</p>
-                <p className="truncate text-xs text-ink/55">{displayEmail || "Logget ind"}</p>
-              </div>
-            </div>
-          </div>
+          <Link href={PROFILE_HREF} className="flex items-center gap-3 rounded-2xl p-2 transition hover:bg-ink/[0.04]">
+            <Avatar name={displayName || "?"} image={myImage} size="md" />
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-semibold text-ink">{displayName || "Din profil"}</span>
+              <span className="block truncate text-xs text-ink/55">{displayEmail || ""}</span>
+            </span>
+            <Icon name="settings" className="h-4 w-4 text-ink/40" />
+          </Link>
         </div>
       </aside>
 
-      {mobileNavMounted ? createPortal(mobileNavBar, document.body) : null}
+      {mounted && items.length > 0 ? createPortal(bottomNav, document.body) : null}
+      <TeamSwitcherSheet open={teamSheetOpen} onClose={() => setTeamSheetOpen(false)} />
     </>
   );
 }
