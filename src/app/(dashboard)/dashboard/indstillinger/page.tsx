@@ -9,126 +9,19 @@ import PushSettings from "@/components/PushSettings";
 import { CollapsibleCard } from "@/components/CollapsibleCard";
 import Link from "next/link";
 import Avatar from "@/components/ui/Avatar";
-import TeamOpenAiSettings from "@/components/TeamOpenAiSettings";
 import SeasonSettingsCard from "@/components/SeasonSettingsCard";
 import LoadingButton from "@/components/LoadingButton";
 import { invalidateDashboardTeam } from "@/components/DashboardTeamProvider";
 import { clearMeClientCache } from "@/lib/meClientCache";
-import {
-  fetchFineAutomationCached,
-  primeFineAutomationCache
-} from "@/lib/fineAutomationClientCache";
+import { THEME_PRESETS } from "@/lib/themePresets";
 
 type Membership = {
   role: string;
   team: { id: string; name: string; slug: string };
 };
 
-type TeamMember = {
-  id: string;
-  role: string;
-  status: "PENDING" | "ACTIVE";
-  user: {
-    id: string;
-    name: string;
-    email?: string | null;
-    image?: string | null;
-  };
-};
-
-type IcalFeed = {
-  id: string;
-  name: string;
-  url: string;
-  lastImportedAt?: string | null;
-};
-
-const roleLabels: Record<string, string> = {
-  ADMIN: "Admin",
-  TRAENER: "Træner",
-  SPILLER: "Spiller",
-  SOME: "SoMe",
-  BOEDEKASSEFORMAND: "Bødekasseformand"
-};
-
-const statusLabels: Record<string, string> = {
-  ACTIVE: "Aktiv",
-  PENDING: "Afventer"
-};
-
-const FINE_AUTOMATION_ACTIONS = [
-  {
-    action: "MISSED_SIGNUP_AT_DEADLINE" as const,
-    label: "Manglende svar ved/efter deadline",
-    hint: "Gælder spillere uden svar efter tilmeldingsfrist.",
-    supportsTraining: true,
-    supportsMatch: true,
-    supportsExcludedRoles: true
-  },
-  {
-    action: "STATUS_CHANGE_AFTER_DEADLINE" as const,
-    label: "Afbud efter deadline",
-    hint: "Når nogen går fra tilmeldt til frameldt efter fristen, men før begivenhedsdagen.",
-    supportsTraining: true,
-    supportsMatch: true,
-    supportsExcludedRoles: true
-  },
-  {
-    action: "SAME_DAY_WITHDRAWAL" as const,
-    label: "Afbud på begivenhedsdag",
-    hint: "Når nogen melder fra på begivenhedens dag.",
-    supportsTraining: true,
-    supportsMatch: true,
-    supportsExcludedRoles: true
-  },
-  {
-    action: "MATCH_MOTM_WINNER" as const,
-    label: "Kampens spiller",
-    hint: "Foreslå automatisk en bøde til vinderen, når MOTM-afstemningen lukkes.",
-    supportsTraining: false,
-    supportsMatch: true,
-    supportsExcludedRoles: false
-  },
-  {
-    action: "MATCH_MOTM_SELF_VOTE" as const,
-    label: "Stem på sig selv (MOTM)",
-    hint: "Foreslå en bøde til den, der stemmer, for hver stemme de lægger på sig selv, når de gemmer deres MOTM-stemme.",
-    supportsTraining: false,
-    supportsMatch: true,
-    supportsExcludedRoles: true
-  }
-] as const;
-
-const FINE_AUTOMATION_ROLE_KEYS = ["ADMIN", "TRAENER", "SPILLER", "SOME", "BOEDEKASSEFORMAND"] as const;
-
-type FineAutomationRuleDraft = {
-  appliesTraining: boolean;
-  appliesMatch: boolean;
-  templateTrainingId: string;
-  templateMatchId: string;
-  excludedRoles: string[];
-};
-
-function emptyFineAutomationRuleDraft(): FineAutomationRuleDraft {
-  return {
-    appliesTraining: false,
-    appliesMatch: false,
-    templateTrainingId: "",
-    templateMatchId: "",
-    excludedRoles: ["SOME"]
-  };
-}
-
 const presets = [
-  { id: "atlantic", label: "Atlantic", swatch: "#0b84d8" },
-  { id: "forest", label: "Forest", swatch: "#15803d" },
-  { id: "crimson", label: "Crimson", swatch: "#e11d48" },
-  { id: "sunset", label: "Sunset", swatch: "#ea580c" },
-  { id: "lavender", label: "Lavender", swatch: "#7c3aed" },
-  { id: "ocean", label: "Ocean", swatch: "#0e7490" },
-  { id: "midnight", label: "Midnight", swatch: "linear-gradient(135deg, #1e2a78 55%, #d4a017 55%)" },
-  { id: "neon", label: "Neon", swatch: "#65a30d" },
-  { id: "mono", label: "Mono", swatch: "#334155" },
+  ...THEME_PRESETS,
   {
     id: "custom",
     label: "Tilpasset",
@@ -143,12 +36,6 @@ export default function IndstillingerPage() {
   const [hasUserTheme, setHasUserTheme] = useState(false);
   const [teamId, setTeamId] = useState("");
   const [memberships, setMemberships] = useState<Membership[]>([]);
-  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
-  const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null);
-  const [memberRole, setMemberRole] = useState("SPILLER");
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [mobilePayBox, setMobilePayBox] = useState("");
-  const [savingMobilePayBox, setSavingMobilePayBox] = useState(false);
   const [savingTeamTheme, setSavingTeamTheme] = useState(false);
   const [customTheme, setCustomThemeState] = useState({
     ink: "#0f172a",
@@ -169,27 +56,12 @@ export default function IndstillingerPage() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [uploading, setUploading] = useState(false);
-  const [icalUrl, setIcalUrl] = useState("");
-  const [icalImporting, setIcalImporting] = useState(false);
-  const [xlsxImporting, setXlsxImporting] = useState(false);
-  const [xlsxFile, setXlsxFile] = useState<File | null>(null);
-  const [icalFeeds, setIcalFeeds] = useState<IcalFeed[]>([]);
   const [profileSaving, setProfileSaving] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
-  const [copyingInviteLink, setCopyingInviteLink] = useState(false);
   const [savingCustomTheme, setSavingCustomTheme] = useState(false);
   const [usingTeamTheme, setUsingTeamTheme] = useState(false);
   const [themeApplyingId, setThemeApplyingId] = useState<string | null>(null);
-  const [memberActionSubmitting, setMemberActionSubmitting] = useState<"approve" | "updateRole" | "delete" | null>(null);
   const [pendingApprovalNotice, setPendingApprovalNotice] = useState(false);
-  const [fineAutomationTemplates, setFineAutomationTemplates] = useState<
-    Array<{ id: string; title: string; amount: number; category: string }>
-  >([]);
-  const [fineAutomationRules, setFineAutomationRules] = useState<
-    Record<string, FineAutomationRuleDraft>
-  >({});
-  const [fineAutomationLoading, setFineAutomationLoading] = useState(false);
-  const [fineAutomationSaving, setFineAutomationSaving] = useState(false);
 
   useEffect(() => {
     setTeamId(getStoredTeamId());
@@ -246,7 +118,6 @@ export default function IndstillingerPage() {
       const teamResponse = await fetch(`/api/team/${resolvedTeamId}`);
       if (!teamResponse.ok) return;
       const teamData = await teamResponse.json();
-      setMobilePayBox(teamData.team?.mobilePayBox ?? "");
       if (!userHasTheme) {
         const teamTheme = teamData.team?.themePreset ?? "atlantic";
         setActive(teamTheme);
@@ -287,82 +158,6 @@ export default function IndstillingerPage() {
 
     return () => window.clearInterval(interval);
   }, [pushToast, session?.user?.hasActiveMembership, session?.user?.hasPendingMembership, session?.user?.id]);
-
-  useEffect(() => {
-    async function loadTeamMembers() {
-      if (!teamId) return;
-      const response = await fetch(`/api/team-members?teamId=${teamId}&includePending=true`);
-      if (!response.ok) return;
-      const data = await response.json();
-      setTeamMembers(data.members ?? []);
-    }
-
-    loadTeamMembers();
-  }, [teamId]);
-
-  useEffect(() => {
-    async function loadIcalFeeds() {
-      if (!teamId) return;
-      const response = await fetch(`/api/ical/import?teamId=${teamId}`, { cache: "no-store" });
-      if (!response.ok) {
-        setIcalFeeds([]);
-        return;
-      }
-      const data = await response.json();
-      setIcalFeeds(data.feeds ?? []);
-    }
-
-    loadIcalFeeds();
-  }, [teamId]);
-
-  useEffect(() => {
-    const membership = memberships.find((item) => item.team.id === teamId);
-    const canFine =
-      membership?.role === "ADMIN" || membership?.role === "BOEDEKASSEFORMAND";
-    if (!teamId || !canFine) return;
-
-    let cancelled = false;
-    (async () => {
-      setFineAutomationLoading(true);
-      try {
-        const result = await fetchFineAutomationCached(teamId);
-        const data = result.data ?? {};
-        if (!result.ok) {
-          if (!cancelled) {
-            pushToast(data.error ?? "Kunne ikke hente automatiske bøder", "error");
-          }
-          return;
-        }
-        const rules: Record<string, FineAutomationRuleDraft> = {};
-        for (const def of FINE_AUTOMATION_ACTIONS) {
-          const saved = (data.rules ?? []).find(
-            (item: { action: string }) => item.action === def.action
-          );
-          rules[def.action] = saved
-            ? {
-                appliesTraining: Boolean(saved.appliesTraining),
-                appliesMatch: Boolean(saved.appliesMatch),
-                templateTrainingId: saved.templateTrainingId ?? "",
-                templateMatchId: saved.templateMatchId ?? "",
-                excludedRoles: Array.isArray(saved.excludedRoles) ? saved.excludedRoles : ["SOME"]
-              }
-            : emptyFineAutomationRuleDraft();
-        }
-        if (!cancelled) {
-          setFineAutomationTemplates(data.templates ?? []);
-          setFineAutomationRules(rules);
-        }
-      } finally {
-        if (!cancelled) {
-          setFineAutomationLoading(false);
-        }
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [teamId, memberships, pushToast]);
 
   async function handleTheme(theme: string) {
     if (themeApplyingId) return;
@@ -427,7 +222,6 @@ export default function IndstillingerPage() {
       const teamResponse = await fetch(`/api/team/${teamId}`);
       if (!teamResponse.ok) return;
       const data = await teamResponse.json();
-      setMobilePayBox(data.team?.mobilePayBox ?? "");
       const theme = data.team?.themePreset ?? "atlantic";
       setActive(theme);
       if (theme === "custom") {
@@ -464,31 +258,7 @@ export default function IndstillingerPage() {
     return () => clearTimeout(timeout);
   }, [active, customTheme, hasUserTheme]);
 
-  function handleTeamChange(value: string) {
-    setTeamId(value);
-    setStoredTeamId(value);
-  }
-
-  async function handleSaveMobilePayBox() {
-    if (!teamId) return;
-    setSavingMobilePayBox(true);
-    try {
-      const response = await fetch(`/api/team/${teamId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mobilePayBox: mobilePayBox.trim() || null })
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        pushToast(data.error ?? "Kunne ikke gemme MobilePay box", "error");
-        return;
-      }
-      pushToast("MobilePay box gemt", "success");
-    } finally {
-      setSavingMobilePayBox(false);
-    }
-  }
-
+  // Holdets standardtema kan også sættes herfra, så egne (tilpassede) farver kan gemmes som holdets standard.
   async function handleSaveTeamTheme() {
     if (!teamId || !isAdmin) return;
     setSavingTeamTheme(true);
@@ -512,68 +282,9 @@ export default function IndstillingerPage() {
     }
   }
 
-  async function handleSaveFineAutomation() {
-    if (!teamId) return;
-    const membership = memberships.find((item) => item.team.id === teamId);
-    if (membership?.role !== "ADMIN" && membership?.role !== "BOEDEKASSEFORMAND") return;
-
-    for (const def of FINE_AUTOMATION_ACTIONS) {
-      const draft = fineAutomationRules[def.action] ?? emptyFineAutomationRuleDraft();
-      if (def.supportsTraining && draft.appliesTraining && !draft.templateTrainingId) {
-        pushToast(`Vælg skabelon for træning: ${def.label}`, "error");
-        return;
-      }
-      if (def.supportsMatch && draft.appliesMatch && !draft.templateMatchId) {
-        pushToast(`Vælg skabelon for kamp: ${def.label}`, "error");
-        return;
-      }
-    }
-
-    const rules = FINE_AUTOMATION_ACTIONS.map((def) => {
-      const draft = fineAutomationRules[def.action] ?? emptyFineAutomationRuleDraft();
-      return {
-        action: def.action,
-        appliesTraining: def.supportsTraining ? draft.appliesTraining : false,
-        appliesMatch: def.supportsMatch ? draft.appliesMatch : false,
-        templateTrainingId: def.supportsTraining && draft.appliesTraining ? draft.templateTrainingId : null,
-        templateMatchId: def.supportsMatch && draft.appliesMatch ? draft.templateMatchId : null,
-        excludedRoles: def.supportsExcludedRoles ? draft.excludedRoles : []
-      };
-    });
-
-    setFineAutomationSaving(true);
-    try {
-      const response = await fetch(`/api/team/${teamId}/fine-automation`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rules })
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        pushToast(data.error ?? "Kunne ikke gemme automatisering", "error");
-        return;
-      }
-      primeFineAutomationCache(teamId, data);
-      pushToast("Automatiske bødeforslag gemt", "success");
-      const next: Record<string, FineAutomationRuleDraft> = {};
-      for (const def of FINE_AUTOMATION_ACTIONS) {
-        const saved = (data.rules ?? []).find(
-          (item: { action: string }) => item.action === def.action
-        );
-        next[def.action] = saved
-          ? {
-              appliesTraining: Boolean(saved.appliesTraining),
-              appliesMatch: Boolean(saved.appliesMatch),
-              templateTrainingId: saved.templateTrainingId ?? "",
-              templateMatchId: saved.templateMatchId ?? "",
-              excludedRoles: Array.isArray(saved.excludedRoles) ? saved.excludedRoles : ["SOME"]
-            }
-          : emptyFineAutomationRuleDraft();
-      }
-      setFineAutomationRules(next);
-    } finally {
-      setFineAutomationSaving(false);
-    }
+  function handleTeamChange(value: string) {
+    setTeamId(value);
+    setStoredTeamId(value);
   }
 
   const currentMembership = memberships.find((item) => item.team.id === teamId);
@@ -587,120 +298,6 @@ export default function IndstillingerPage() {
       : newPassword && newPassword !== confirmPassword
       ? "Adgangskoderne matcher ikke."
       : null;
-
-  async function handleCopySignupLink() {
-    if (!inviteSlug) return;
-    if (copyingInviteLink) return;
-    setCopyingInviteLink(true);
-    const origin = window.location.origin;
-    const inviteUrl = `${origin}/signup?slug=${encodeURIComponent(inviteSlug)}`;
-    try {
-      if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(inviteUrl);
-      } else {
-        const temp = document.createElement("textarea");
-        temp.value = inviteUrl;
-        temp.style.position = "fixed";
-        temp.style.opacity = "0";
-        document.body.appendChild(temp);
-        temp.select();
-        document.execCommand("copy");
-        document.body.removeChild(temp);
-      }
-      pushToast("Invitationslink kopieret", "success");
-    } catch {
-      pushToast("Kunne ikke kopiere linket", "error");
-    } finally {
-      setCopyingInviteLink(false);
-    }
-  }
-
-  async function handleUpdateRole() {
-    if (!selectedMember) return;
-    if (memberActionSubmitting) return;
-    setMemberActionSubmitting("updateRole");
-    try {
-      const response = await fetch(`/api/team-members/${selectedMember.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role: memberRole })
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        pushToast(data.error ?? "Kunne ikke opdatere rolle", "error");
-        return;
-      }
-      setTeamMembers((prev) => prev.map((m) => (m.id === selectedMember.id ? { ...m, role: data.membership.role } : m)));
-      setSelectedMember((prev) => (prev ? { ...prev, role: data.membership.role } : prev));
-      invalidateDashboardTeam();
-      pushToast("Rolle opdateret", "success");
-    } finally {
-      setMemberActionSubmitting(null);
-    }
-  }
-
-  async function handleApproveMember() {
-    if (!selectedMember) return;
-    if (memberActionSubmitting) return;
-    setMemberActionSubmitting("approve");
-    try {
-      const response = await fetch(`/api/team-members/${selectedMember.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role: memberRole, status: "ACTIVE" })
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        pushToast(data.error ?? "Kunne ikke godkende medlem", "error");
-        return;
-      }
-      setTeamMembers((prev) =>
-        prev.map((m) =>
-          m.id === selectedMember.id
-            ? { ...m, role: data.membership.role, status: data.membership.status }
-            : m
-        )
-      );
-      setSelectedMember((prev) =>
-        prev
-          ? {
-              ...prev,
-              role: data.membership.role,
-              status: data.membership.status
-            }
-          : prev
-      );
-      invalidateDashboardTeam();
-      pushToast("Medlem godkendt", "success");
-    } finally {
-      setMemberActionSubmitting(null);
-    }
-  }
-
-  async function handleDeleteMember() {
-    if (!selectedMember) return;
-    if (memberActionSubmitting) return;
-    setMemberActionSubmitting("delete");
-    try {
-      const response = await fetch(`/api/team-members/${selectedMember.id}`, { method: "DELETE" });
-      const data = await response.json();
-      if (!response.ok) {
-        pushToast(data.error ?? "Kunne ikke fjerne bruger", "error");
-        return;
-      }
-      setTeamMembers((prev) => prev.filter((m) => m.id !== selectedMember.id));
-      setSelectedMember(null);
-      invalidateDashboardTeam();
-      pushToast(data.warning ?? "Bruger fjernet", "success");
-    } finally {
-      setMemberActionSubmitting(null);
-    }
-  }
-
-  function confirmDeleteMember() {
-    if (!selectedMember) return;
-    setShowDeleteConfirm(true);
-  }
 
   async function handleSignOut() {
     if (signingOut) return;
@@ -769,104 +366,6 @@ export default function IndstillingerPage() {
       pushToast("Profilbillede opdateret.", "success");
     } finally {
       setUploading(false);
-    }
-  }
-
-  async function handleIcalImport(event: React.FormEvent) {
-    event.preventDefault();
-    if (!teamId) {
-      pushToast("Vælg et hold først", "error");
-      return;
-    }
-    if (!icalUrl.trim()) {
-      pushToast("Indsæt iCal URL", "error");
-      return;
-    }
-
-    setIcalImporting(true);
-    try {
-      const response = await fetch("/api/ical/import", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          teamId,
-          url: icalUrl
-        })
-      });
-      const raw = await response.text();
-      let data: { error?: string; details?: string; created?: number; updated?: number } = {};
-      try {
-        data = JSON.parse(raw);
-      } catch {
-        data = {};
-      }
-      if (!response.ok) {
-        pushToast(data.error ?? `Import fejlede (${response.status})`, "error");
-        if (!data.error) {
-          console.error("iCal import non-JSON response", raw.slice(0, 500));
-        } else if (data.details) {
-          console.error("iCal import details", data.details);
-        }
-        return;
-      }
-      pushToast(`Importeret: ${data.created} oprettet, ${data.updated} opdateret`, "success");
-
-      const feedsResponse = await fetch(`/api/ical/import?teamId=${teamId}`, { cache: "no-store" });
-      if (feedsResponse.ok) {
-        const feedsData = await feedsResponse.json();
-        setIcalFeeds(feedsData.feeds ?? []);
-      }
-    } finally {
-      setIcalImporting(false);
-    }
-  }
-
-  async function handleXlsxImport(event: React.FormEvent) {
-    event.preventDefault();
-    if (!teamId) {
-      pushToast("Vælg et hold først", "error");
-      return;
-    }
-    if (!xlsxFile) {
-      pushToast("Vælg en Excel-fil (.xlsx)", "error");
-      return;
-    }
-
-    setXlsxImporting(true);
-    try {
-      const formData = new FormData();
-      formData.append("teamId", teamId);
-      formData.append("file", xlsxFile);
-
-      const response = await fetch("/api/ical/import-xlsx", {
-        method: "POST",
-        body: formData
-      });
-      const raw = await response.text();
-      let data: { error?: string; created?: number; updated?: number } = {};
-      try {
-        data = JSON.parse(raw);
-      } catch {
-        data = {};
-      }
-      if (!response.ok) {
-        pushToast(data.error ?? `Excel-import fejlede (${response.status})`, "error");
-        if (!data.error) {
-          console.error("Excel import non-JSON response", raw.slice(0, 500));
-        }
-        return;
-      }
-
-      pushToast(`Excel importeret: ${data.created} oprettet, ${data.updated} opdateret`, "success");
-      setXlsxFile(null);
-
-      const feedsResponse = await fetch(`/api/ical/import?teamId=${teamId}`, { cache: "no-store" });
-      if (feedsResponse.ok) {
-        const feedsData = await feedsResponse.json();
-        setIcalFeeds(feedsData.feeds ?? []);
-      }
-    } finally {
-      setXlsxImporting(false);
     }
   }
 
@@ -1044,114 +543,6 @@ export default function IndstillingerPage() {
 
       <div className="grid w-full min-w-0 gap-6 lg:grid-cols-2">
         <CollapsibleCard
-          title="Hold"
-          description="Vælg hvilket hold du arbejder i."
-          storageKey={`holdbold:settings:${session.user.id}:hold:${teamId || "none"}`}
-        >
-          <div className="grid gap-3">
-            <select value={teamId} onChange={(event) => handleTeamChange(event.target.value)} className="input">
-              <option value="">Vælg hold</option>
-              {memberships.map((membership) => (
-                <option key={membership.team.id} value={membership.team.id}>
-                  {membership.team.name} ({membership.role})
-                </option>
-              ))}
-            </select>
-            {isAdmin ? (
-              <div className="space-y-2">
-                <label className="label">Invitationslink til spillere</label>
-                <div className="flex flex-wrap gap-2">
-                  <input
-                    className="input flex-1"
-                    value={inviteSlug ? `/signup?slug=${inviteSlug}` : ""}
-                    readOnly
-                    placeholder="Vælg et hold"
-                  />
-                  <LoadingButton
-                    type="button"
-                    className="btn-ghost"
-                    onClick={handleCopySignupLink}
-                    disabled={!inviteSlug}
-                    isLoading={copyingInviteLink}
-                    idleContent="Kopiér link"
-                    loadingContent="Kopierer..."
-                  />
-                </div>
-                <p className="text-xs text-ink/60">
-                  Spillere får holdslug udfyldt automatisk og kan ikke ændre den.
-                </p>
-              </div>
-            ) : null}
-            {isAdmin ? (
-              <div className="space-y-2">
-                <label className="label" htmlFor="mobilepay-box">MobilePay box nummer</label>
-                <div className="flex flex-wrap gap-2">
-                  <input
-                    id="mobilepay-box"
-                    className="input flex-1"
-                    placeholder="Fx 1234AB"
-                    value={mobilePayBox}
-                    onChange={(event) => setMobilePayBox(event.target.value)}
-                  />
-                  <button
-                    type="button"
-                    className="btn-ghost"
-                    onClick={handleSaveMobilePayBox}
-                    disabled={savingMobilePayBox || !teamId}
-                  >
-                    {savingMobilePayBox ? "Gemmer..." : "Gem box"}
-                  </button>
-                </div>
-              </div>
-            ) : null}
-          </div>
-          <div className="mt-6 space-y-3">
-            <p className="label">Spillere</p>
-            <div className="space-y-2">
-              {teamMembers.length === 0 ? (
-                <p className="text-sm text-ink/60">Ingen medlemmer fundet.</p>
-              ) : (
-                teamMembers.map((member) => (
-                  <button
-                    key={member.id}
-                    onClick={() => {
-                      setSelectedMember(member);
-                      setMemberRole(member.role);
-                    }}
-                    className="flex w-full min-w-0 items-center justify-between gap-3 overflow-hidden rounded-2xl border border-ink/10 bg-surface/80 px-4 py-3 text-left hover:border-ink/30"
-                  >
-                    <div className="flex min-w-0 flex-1 items-center gap-3 overflow-hidden">
-                      <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full border border-ink/10 bg-surface">
-                        {member.user.image ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={member.user.image} alt={member.user.name} className="h-full w-full object-cover" />
-                        ) : null}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="max-w-[140px] truncate text-sm font-semibold text-ink">{member.user.name}</div>
-                        <div className="max-w-[140px] block truncate text-xs text-ink/60">{member.user.email ?? "Ingen email"}</div>
-                      </div>
-                    </div>
-                    <span
-                      className="block max-w-[40%] shrink-0 truncate rounded-full bg-ink/10 px-3 py-1 text-right text-xs font-semibold text-ink/70 sm:max-w-none"
-                      title={
-                        member.status === "PENDING"
-                          ? "Afventer godkendelse"
-                          : roleLabels[member.role] ?? member.role
-                      }
-                    >
-                      {member.status === "PENDING"
-                        ? "Afventer godkendelse"
-                        : roleLabels[member.role] ?? member.role}
-                    </span>
-                  </button>
-                ))
-              )}
-            </div>
-          </div>
-        </CollapsibleCard>
-
-        <CollapsibleCard
           title="Tema"
           description="Vælg en farveprofil for dashboardet."
           storageKey={`holdbold:settings:${session.user.id}:tema:${teamId || "none"}`}
@@ -1258,7 +649,6 @@ export default function IndstillingerPage() {
         </section>
       ) : null}
 
-      {isAdmin && teamId ? <TeamOpenAiSettings key={teamId} teamId={teamId} /> : null}
 
       {teamId ? (
         <SeasonSettingsCard
@@ -1268,170 +658,19 @@ export default function IndstillingerPage() {
         />
       ) : null}
 
-      {isAdmin ? (
-        <CollapsibleCard
-          title="Integrationer"
-          description="Indsæt iCal-link eller upload et Excel-kampprogram."
-          storageKey={`holdbold:settings:${session.user.id}:integrationer:${teamId || "none"}`}
+      {isAdmin && teamId ? (
+        <Link
+          href="/dashboard/hold/indstillinger"
+          className="card flex items-center justify-between gap-3 transition hover:border-ink/20"
         >
-          <form className="grid gap-3" onSubmit={handleIcalImport}>
-          <div className="space-y-2">
-            <label className="label" htmlFor="ical-url">iCal URL</label>
-            <input
-              id="ical-url"
-              className="input"
-              value={icalUrl}
-              onChange={(event) => setIcalUrl(event.target.value)}
-              placeholder="webcal://ical.dbu.dk/Match.ashx?..."
-              disabled={!isAdmin || !teamId}
-              required
-            />
-          </div>
-          <div className="flex items-end gap-3">
-            <button type="submit" className="btn-primary" disabled={!isAdmin || !teamId || icalImporting}>
-              {icalImporting ? "Importerer..." : "Importer kampe"}
-            </button>
-            {!isAdmin ? <span className="text-sm text-ink/60">Kun admin kan importere.</span> : null}
-          </div>
-        </form>
-        <form className="mt-4 grid gap-3" onSubmit={handleXlsxImport}>
-          <div className="space-y-2">
-            <label className="label" htmlFor="xlsx-file">Excel (.xlsx)</label>
-            <input
-              id="xlsx-file"
-              type="file"
-              accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-              className="input file:mr-4 file:rounded-full file:border-0 file:bg-primary file:px-4 file:py-2 file:text-xs file:font-semibold file:text-on-primary file:tracking-[0.2em] file:text-fog"
-              disabled={!isAdmin || !teamId || xlsxImporting}
-              onChange={(event) => setXlsxFile(event.target.files?.[0] ?? null)}
-            />
-          </div>
-          <div className="flex items-end gap-3">
-            <button
-              type="submit"
-              className="btn-ghost"
-              disabled={!isAdmin || !teamId || xlsxImporting || !xlsxFile}
-            >
-              {xlsxImporting ? "Uploader..." : "Upload kampprogram"}
-            </button>
-          </div>
-        </form>
-        <div className="mt-6 space-y-2">
-          <p className="label">Importerede feeds</p>
-          {icalFeeds.length === 0 ? (
-            <p className="text-sm text-ink/60">Ingen iCal feeds endnu.</p>
-          ) : (
-            icalFeeds.map((feed) => (
-              <div key={feed.id} className="rounded-2xl border border-ink/10 bg-surface/80 px-4 py-3">
-                <div className="text-sm font-semibold text-ink">{feed.name}</div>
-                <div className="truncate text-xs text-ink/60">{feed.url}</div>
-                <div className="mt-1 text-xs text-ink/50">
-                  Sidst importeret:{" "}
-                  {feed.lastImportedAt ? new Date(feed.lastImportedAt).toLocaleString("da-DK") : "Aldrig"}
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-        </CollapsibleCard>
+          <span>
+            <span className="block text-lg font-bold text-ink">Holdindstillinger</span>
+            <span className="block text-sm text-ink/60">Holdets farver, kampprogram og OpenAI-nøgle.</span>
+          </span>
+          <span aria-hidden className="text-ink/40">›</span>
+        </Link>
       ) : null}
 
-      {selectedMember ? (
-        <div className="modal-backdrop" onClick={() => setSelectedMember(null)}>
-          <div className="modal-panel max-w-lg" onClick={(event) => event.stopPropagation()}>
-            <div className="flex items-start justify-between">
-              <div>
-                <h3 className="text-lg font-semibold text-ink">{selectedMember.user.name}</h3>
-                <p className="mt-2 text-sm text-ink/70">Medlemsoplysninger</p>
-              </div>
-              <button className="btn-ghost" onClick={() => setSelectedMember(null)} disabled={memberActionSubmitting !== null}>
-                Luk
-              </button>
-            </div>
-            <div className="mt-4 space-y-3 text-sm text-ink/70">
-              <div>Email: {selectedMember.user.email ?? "—"}</div>
-              <div>Rolle: {roleLabels[selectedMember.role] ?? selectedMember.role}</div>
-              <div>Status: {statusLabels[selectedMember.status] ?? selectedMember.status}</div>
-            </div>
-            {isAdmin ? (
-              <div className="mt-4 space-y-3">
-                <div className="space-y-2">
-                  <label className="label">Rolle</label>
-                  <select value={memberRole} onChange={(event) => setMemberRole(event.target.value)} className="input">
-                    <option value="ADMIN">Admin</option>
-                    <option value="TRAENER">Træner</option>
-                    <option value="SPILLER">Spiller</option>
-                    <option value="SOME">SoMe</option>
-                    <option value="BOEDEKASSEFORMAND">Bødekasseformand</option>
-                  </select>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {selectedMember.status === "PENDING" ? (
-                    <LoadingButton
-                      className="btn-primary"
-                      onClick={handleApproveMember}
-                      isLoading={memberActionSubmitting === "approve"}
-                      disabled={memberActionSubmitting !== null && memberActionSubmitting !== "approve"}
-                      idleContent="Godkend medlem"
-                      loadingContent="Godkender..."
-                    />
-                  ) : (
-                    <LoadingButton
-                      className="btn-primary"
-                      onClick={handleUpdateRole}
-                      isLoading={memberActionSubmitting === "updateRole"}
-                      disabled={memberActionSubmitting !== null && memberActionSubmitting !== "updateRole"}
-                      idleContent="Opdater rolle"
-                      loadingContent="Opdaterer..."
-                    />
-                  )}
-                  <button className="btn-ghost" onClick={confirmDeleteMember} disabled={memberActionSubmitting !== null}>
-                    Slet bruger
-                  </button>
-                </div>
-              </div>
-            ) : null}
-          </div>
-        </div>
-      ) : null}
-
-      {showDeleteConfirm && selectedMember ? (
-        <div className="modal-backdrop" onClick={() => setShowDeleteConfirm(false)}>
-          <div className="modal-panel max-w-md" onClick={(event) => event.stopPropagation()}>
-            <div className="flex items-start justify-between">
-              <div>
-                <h3 className="text-lg font-semibold text-ink">Slet bruger</h3>
-                <p className="mt-2 text-sm text-ink/70">
-                  Er du sikker på, at du vil slette {selectedMember.user.name ?? "brugeren"}?
-                </p>
-              </div>
-              <button className="btn-ghost" onClick={() => setShowDeleteConfirm(false)} disabled={memberActionSubmitting !== null}>
-                Luk
-              </button>
-            </div>
-            <div className="mt-6 flex flex-wrap gap-2">
-              <button
-                className="btn-ghost"
-                onClick={() => setShowDeleteConfirm(false)}
-                disabled={memberActionSubmitting !== null}
-              >
-                Fortryd
-              </button>
-              <LoadingButton
-                className="btn-primary"
-                onClick={async () => {
-                  await handleDeleteMember();
-                  setShowDeleteConfirm(false);
-                }}
-                isLoading={memberActionSubmitting === "delete"}
-                disabled={memberActionSubmitting !== null && memberActionSubmitting !== "delete"}
-                idleContent="Slet bruger"
-                loadingContent="Sletter..."
-              />
-            </div>
-          </div>
-        </div>
-      ) : null}
     </section>
   );
 }

@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
-import { useDashboardTeam } from "@/components/DashboardTeamProvider";
+import { invalidateDashboardTeam, useDashboardTeam, type DashboardTeamMember } from "@/components/DashboardTeamProvider";
+import MemberSheet from "@/components/team/MemberSheet";
 import { useToast } from "@/components/ToastProvider";
 import Icon from "@/components/ui/Icon";
 import Avatar from "@/components/ui/Avatar";
@@ -33,7 +34,50 @@ export default function HoldPage() {
   const team = memberships.find((membership) => membership.team?.id === teamId)?.team;
   const isAdmin = actingMember?.role === "ADMIN";
   const active = members.filter((member) => member.status === "ACTIVE");
-  const pending = members.filter((member) => member.status !== "ACTIVE");
+  const [pending, setPending] = useState<DashboardTeamMember[]>([]);
+  const [decidingId, setDecidingId] = useState<string | null>(null);
+  const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
+  const selectedMember = selectedMemberId ? members.find((member) => member.id === selectedMemberId) ?? null : null;
+
+  async function loadPending() {
+    if (!teamId || !isAdmin) {
+      setPending([]);
+      return;
+    }
+    try {
+      const response = await fetch(`/api/team-members?teamId=${teamId}&includePending=true`, { cache: "no-store" });
+      if (!response.ok) return;
+      const data = await response.json();
+      setPending(((data.members ?? []) as DashboardTeamMember[]).filter((member) => member.status !== "ACTIVE"));
+    } catch {
+      /* ignore */
+    }
+  }
+
+  useEffect(() => {
+    void loadPending();
+  }, [teamId, isAdmin]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function decide(member: DashboardTeamMember, approve: boolean) {
+    setDecidingId(member.id);
+    try {
+      const response = await fetch(`/api/team-members/${member.id}`, {
+        method: approve ? "PATCH" : "DELETE",
+        headers: approve ? { "Content-Type": "application/json" } : undefined,
+        body: approve ? JSON.stringify({ status: "ACTIVE", role: member.role }) : undefined
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        pushToast(typeof data.error === "string" ? data.error : "Kunne ikke gemme", "error");
+        return;
+      }
+      pushToast(approve ? `${member.user.name ?? "Medlemmet"} er velkommen på holdet 🎉` : "Anmodningen er afvist", "success");
+      invalidateDashboardTeam();
+      await loadPending();
+    } finally {
+      setDecidingId(null);
+    }
+  }
 
   useEffect(() => {
     if (!teamId) return;
@@ -123,7 +167,7 @@ export default function HoldPage() {
         </Link>
         {isAdmin ? (
           <Link
-            href="/dashboard/indstillinger"
+            href="/dashboard/hold/indstillinger"
             className="flex min-h-[4.5rem] items-center gap-3 rounded-[1.375rem] border border-line bg-surface px-4 transition hover:border-ink/20"
           >
             <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-ink/[0.06] text-ink">
@@ -131,7 +175,7 @@ export default function HoldPage() {
             </span>
             <span className="flex-1">
               <span className="block font-semibold text-ink">Holdindstillinger</span>
-              <span className="block text-sm text-ink/55">Roller, MobilePay, tema og kampprogram</span>
+              <span className="block text-sm text-ink/55">Tema, kampprogram og OpenAI-nøgle</span>
             </span>
             <Icon name="chevron-right" className="h-4 w-4 text-ink/35" />
           </Link>
@@ -139,18 +183,33 @@ export default function HoldPage() {
       </div>
 
       {isAdmin && pending.length > 0 ? (
-        <Section title={`Venter på godkendelse · ${pending.length}`}>
+        <Section title={`Vil med på holdet · ${pending.length}`}>
           <ListGroup className="border-pending/40">
             {pending.map((member) => (
-              <ListRow
-                key={member.id}
-                leading={<Avatar name={member.user.name} image={member.user.image} />}
-                title={member.user.name ?? member.user.email ?? "Ny bruger"}
-                subtitle={member.user.email ?? "Afventer"}
-                href="/dashboard/indstillinger"
-                trailing={<Chip tone="pending">Ny</Chip>}
-                chevron
-              />
+              <div key={member.id} className="space-y-3 px-4 py-3.5">
+                <div className="flex items-center gap-3">
+                  <Avatar name={member.user.name} image={member.user.image} />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-semibold text-ink">{member.user.name ?? "Ny bruger"}</p>
+                    <p className="truncate text-sm text-ink/55">{member.user.email ?? "Afventer godkendelse"}</p>
+                  </div>
+                  <Chip tone="pending">Ny</Chip>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="success"
+                    icon="check"
+                    loading={decidingId === member.id}
+                    onClick={() => decide(member, true)}
+                  >
+                    Godkend
+                  </Button>
+                  <Button size="sm" variant="secondary" disabled={decidingId === member.id} onClick={() => decide(member, false)}>
+                    Afvis
+                  </Button>
+                </div>
+              </div>
             ))}
           </ListGroup>
         </Section>
@@ -190,6 +249,8 @@ export default function HoldPage() {
                         </>
                       }
                       subtitle={member.user.email ?? undefined}
+                      onClick={() => setSelectedMemberId(member.id)}
+                      chevron
                     />
                   ))}
                 </ListGroup>
@@ -242,6 +303,14 @@ export default function HoldPage() {
           ))}
         </div>
       </Section>
+
+      <MemberSheet
+        member={selectedMember}
+        isSelf={selectedMember?.user.id === userId}
+        canEdit={isAdmin}
+        onClose={() => setSelectedMemberId(null)}
+        onChanged={loadPending}
+      />
 
       <Sheet
         open={openCategory !== null}
