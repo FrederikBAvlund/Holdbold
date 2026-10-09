@@ -27,6 +27,13 @@ enum SignupStatus {
   UNKNOWN
 }
 
+enum AbsenceStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELED
+}
+
 enum EventLogType {
   SIGNUP
   CANCEL
@@ -128,6 +135,8 @@ model User {
   eventMotmBallots EventMotmBallot[] @relation("EventMotmBallotVoter")
   receivedEventMotmVotes EventMotmVote[] @relation("EventMotmVoteTarget")
   wonMatchMotmEvents Event[] @relation("EventMatchMotmWinner")
+  absences Absence[] @relation("AbsenceUser")
+  decidedAbsences Absence[] @relation("AbsenceDecider")
 }
 
 model Team {
@@ -148,6 +157,7 @@ model Team {
   icalFeeds   IcalFeed[]
   notifications Notification[]
   seasons     Season[]
+  absences    Absence[]
 }
 
 model Season {
@@ -337,14 +347,41 @@ model Signup {
   userId    String
   status    SignupStatus @default(UNKNOWN)
   reason    String?
+  /// Sat når svaret er afgivet automatisk af et godkendt fravær (ikke af spilleren selv)
+  absenceId String?
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
 
   event Event @relation(fields: [eventId], references: [id])
   user User @relation(fields: [userId], references: [id])
+  absence Absence? @relation(fields: [absenceId], references: [id], onDelete: SetNull)
   logs SignupLog[]
 
   @@unique([eventId, userId])
+  @@index([absenceId])
+}
+
+model Absence {
+  id          String        @id @default(cuid())
+  teamId      String
+  userId      String
+  startDate   DateTime
+  endDate     DateTime
+  reason      String
+  status      AbsenceStatus @default(PENDING)
+  decidedById String?
+  decidedAt   DateTime?
+  /// Sat hvis spilleren stopper et godkendt fravær før tid
+  endedAt     DateTime?
+  createdAt   DateTime      @default(now())
+
+  team      Team     @relation(fields: [teamId], references: [id])
+  user      User     @relation("AbsenceUser", fields: [userId], references: [id])
+  decidedBy User?    @relation("AbsenceDecider", fields: [decidedById], references: [id])
+  signups   Signup[]
+
+  @@index([teamId, status])
+  @@index([userId, status])
 }
 
 model SignupLog {

@@ -10,11 +10,23 @@ const navItems = [
   { href: "/dashboard", label: "Overblik", shortLabel: "Overblik", icon: "home" },
   { href: "/dashboard/kalender", label: "Kalender", shortLabel: "Kalender", icon: "calendar" },
   { href: "/dashboard/boder", label: "Bøder", shortLabel: "Bøder", icon: "receipt" },
+  { href: "/dashboard/fravaer", label: "Fravær", shortLabel: "Fravær", icon: "absence", desktopOnly: true },
   { href: "/dashboard/notifikationer", label: "Notifikationer", shortLabel: "Notif.", icon: "bell" },
   { href: "/dashboard/indstillinger", label: "Indstillinger", shortLabel: "Indstill.", icon: "settings" }
 ];
 
 const icons = {
+  absence: (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5">
+      <path
+        d="M12 21s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 5.6-7 10-7 10Z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinejoin="round"
+      />
+    </svg>
+  ),
   home: (
     <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5">
       <path
@@ -194,7 +206,7 @@ export default function DashboardNav({
     >
       <div className="pointer-events-auto w-full max-w-md">
         <div className="grid grid-cols-5 gap-1 rounded-[1.35rem] border border-ink/10 bg-fog/95 p-2 shadow-[0_12px_40px_-12px_rgba(15,23,42,0.35)] ring-1 ring-black/[0.04] backdrop-blur-xl">
-          {visibleNavItems.map((item) => {
+          {visibleNavItems.filter((item) => !("desktopOnly" in item)).map((item) => {
             const isNotifications = item.href === "/dashboard/notifikationer";
             const isActive = pathname === item.href;
             return (

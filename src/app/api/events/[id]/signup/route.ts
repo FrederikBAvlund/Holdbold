@@ -184,7 +184,9 @@ export async function POST(request: Request, { params }: { params: { id: string 
     },
     update: {
       status: body.status,
-      reason: body.reason ?? null
+      reason: body.reason ?? null,
+      // Et aktivt svar fra spiller/leder overtager fra fraværets automatiske afbud
+      absenceId: null
     },
     create: {
       eventId: params.id,

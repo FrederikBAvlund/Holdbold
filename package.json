@@ -21,7 +21,7 @@
     "prisma:seed": "prisma db seed",
     "db:up": "docker compose up -d --wait db",
     "db:reset": "prisma migrate reset --force",
-    "dev:setup": "npm run db:up && prisma migrate deploy && prisma db seed"
+    "dev:setup": "npm run db:up && prisma generate && prisma migrate deploy && prisma db seed"
   },
   "prisma": {
     "seed": "node prisma/seed.mjs"
