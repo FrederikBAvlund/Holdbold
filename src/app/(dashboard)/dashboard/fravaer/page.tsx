@@ -2,8 +2,12 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useDashboardTeam } from "@/components/DashboardTeamProvider";
-import LoadingButton from "@/components/LoadingButton";
+import Link from "next/link";
 import { useToast } from "@/components/ToastProvider";
+import Avatar from "@/components/ui/Avatar";
+import Button from "@/components/ui/Button";
+import Icon from "@/components/ui/Icon";
+import { Card, Chip, EmptyState, Field, ListGroup, PageHeader, Section, Skeleton, inputClass } from "@/components/ui/primitives";
 
 type AbsenceItem = {
   id: string;
@@ -33,14 +37,16 @@ function todayInput() {
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 }
 
-function statusLabel(absence: AbsenceItem) {
-  if (absence.status === "PENDING") return "Afventer godkendelse";
-  if (absence.status === "REJECTED") return "Afvist";
-  if (absence.status === "CANCELED") return "Trukket tilbage";
-  if (absence.endedAt) return "Stoppet";
-  if (new Date(absence.endDate) < new Date()) return "Afsluttet";
-  if (new Date(absence.startDate) > new Date()) return "Godkendt – starter senere";
-  return "Aktivt fravær";
+type Tone = "neutral" | "in" | "out" | "pending";
+
+function statusMeta(absence: AbsenceItem): { label: string; tone: Tone } {
+  if (absence.status === "PENDING") return { label: "Afventer", tone: "pending" };
+  if (absence.status === "REJECTED") return { label: "Afvist", tone: "out" };
+  if (absence.status === "CANCELED") return { label: "Trukket tilbage", tone: "neutral" };
+  if (absence.endedAt) return { label: "Stoppet", tone: "neutral" };
+  if (new Date(absence.endDate) < new Date()) return { label: "Afsluttet", tone: "neutral" };
+  if (new Date(absence.startDate) > new Date()) return { label: "Starter senere", tone: "in" };
+  return { label: "Aktivt", tone: "in" };
 }
 
 export default function FravaerPage() {
@@ -135,104 +141,133 @@ export default function FravaerPage() {
 
   if (!teamId) {
     return (
-      <section className="card">
-        <h2 className="text-2xl font-semibold text-ink">Fravær</h2>
-        <p className="mt-2 text-ink/70">Vælg aktivt hold i Indstillinger for at fortsætte.</p>
-      </section>
+      <EmptyState icon="users" title="Vælg et hold" description="Du skal være på et hold for at melde fravær." />
     );
   }
 
   return (
-    <section className="space-y-6">
-      <div className="shrink-0 lg:hidden" aria-hidden style={{ height: "3.65rem" }} />
-      <header className="card">
-        <h2 className="text-2xl font-semibold text-ink">Skade og fravær</h2>
-        <p className="mt-2 text-ink/70">
-          Anmod om fravær over længere tid. Når bødekassen har godkendt det, meldes du automatisk fra alle
-          begivenheder i perioden. Du kan til enhver tid stoppe fraværet – så nulstilles dine kommende
-          begivenheder, og du kan melde dig til igen.
-        </p>
-      </header>
+    <div className="space-y-7 pb-8 pt-1">
+      <Link
+        href="/dashboard/profil"
+        className="inline-flex min-h-10 items-center gap-1 rounded-full pr-3 text-sm font-semibold text-ink/65 hover:text-ink"
+      >
+        <Icon name="chevron-left" className="h-5 w-5" />
+        Profil
+      </Link>
+      <PageHeader
+        title="Skade og fravær"
+        subtitle="Meld dig fra over længere tid. Når fraværet er godkendt, bliver du automatisk meldt fra alle begivenheder i perioden."
+      />
 
-      <form className="card grid gap-3" onSubmit={submit}>
-        <h3 className="text-lg font-semibold text-ink">Anmod om fravær</h3>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div>
-            <label className="label" htmlFor="absence-start">Fra</label>
-            <input id="absence-start" type="date" className="input" value={startDate} required
-              onChange={(e) => setStartDate(e.target.value)} />
-          </div>
-          <div>
-            <label className="label" htmlFor="absence-end">Til (forventet)</label>
-            <input id="absence-end" type="date" className="input" value={endDate} required min={startDate}
-              onChange={(e) => setEndDate(e.target.value)} />
-          </div>
-        </div>
-        <div>
-          <label className="label" htmlFor="absence-reason">Årsag</label>
-          <input id="absence-reason" className="input" value={reason} required minLength={2} maxLength={200}
-            placeholder="Fx skadet knæ, udlandsophold" onChange={(e) => setReason(e.target.value)} />
-        </div>
-        <LoadingButton type="submit" className="btn-primary" isLoading={submitting}
-          idleContent="Send anmodning" loadingContent="Sender..." />
-      </form>
+      <Section title="Meld fravær">
+        <Card>
+          <form className="space-y-4" onSubmit={submit}>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Fra" htmlFor="absence-start">
+                <input id="absence-start" type="date" className={inputClass} value={startDate} required
+                  onChange={(e) => setStartDate(e.target.value)} />
+              </Field>
+              <Field label="Til (forventet)" htmlFor="absence-end">
+                <input id="absence-end" type="date" className={inputClass} value={endDate} required min={startDate}
+                  onChange={(e) => setEndDate(e.target.value)} />
+              </Field>
+            </div>
+            <Field label="Årsag" htmlFor="absence-reason" hint="Du kan til enhver tid stoppe fraværet og melde dig til igen.">
+              <input id="absence-reason" className={inputClass} value={reason} required minLength={2} maxLength={200}
+                placeholder="Fx skadet knæ eller udlandsophold" onChange={(e) => setReason(e.target.value)} />
+            </Field>
+            <Button type="submit" block icon="check" loading={submitting}>
+              Send anmodning
+            </Button>
+          </form>
+        </Card>
+      </Section>
 
       {canManage && pending.length > 0 ? (
-        <div className="card space-y-3">
-          <h3 className="text-lg font-semibold text-ink">Afventer godkendelse</h3>
-          {pending.map((a) => (
-            <div key={a.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-ink/10 bg-white/80 p-4">
-              <div>
-                <p className="font-semibold text-ink">{a.user.name ?? "Ukendt"}</p>
-                <p className="text-sm text-ink/70">{formatDate(a.startDate)} – {formatDate(a.endDate)} · {a.reason}</p>
+        <Section title={`Afventer godkendelse (${pending.length})`}>
+          <ListGroup>
+            {pending.map((a) => (
+              <div key={a.id} className="space-y-3 px-4 py-3.5">
+                <div className="flex items-center gap-3">
+                  <Avatar name={a.user.name} image={null} size="md" />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-semibold text-ink">{a.user.name ?? "Ukendt"}</p>
+                    <p className="text-sm text-ink/60">
+                      {formatDate(a.startDate)} – {formatDate(a.endDate)}
+                    </p>
+                    <p className="text-sm text-ink/60">{a.reason}</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button variant="success" icon="check" loading={busyId === a.id}
+                    onClick={() => act(a.id, `/api/absences/${a.id}/decision`, { decision: "APPROVE" }, "Fravær godkendt")}>
+                    Godkend
+                  </Button>
+                  <Button variant="danger" icon="x" loading={busyId === a.id}
+                    onClick={() => act(a.id, `/api/absences/${a.id}/decision`, { decision: "REJECT" }, "Fravær afvist")}>
+                    Afvis
+                  </Button>
+                </div>
               </div>
-              <div className="flex gap-2">
-                <LoadingButton type="button" className="btn-primary" isLoading={busyId === a.id}
-                  idleContent="Godkend" loadingContent="..."
-                  onClick={() => act(a.id, `/api/absences/${a.id}/decision`, { decision: "APPROVE" }, "Fravær godkendt")} />
-                <LoadingButton type="button" className="btn-ghost" isLoading={busyId === a.id}
-                  idleContent="Afvis" loadingContent="..."
-                  onClick={() => act(a.id, `/api/absences/${a.id}/decision`, { decision: "REJECT" }, "Fravær afvist")} />
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </ListGroup>
+        </Section>
       ) : null}
 
-      <div className="card space-y-3">
-        <h3 className="text-lg font-semibold text-ink">Dit fravær</h3>
-        {loading ? <p className="text-ink/70">Indlæser...</p> : null}
-        {!loading && mine.length === 0 ? <p className="text-ink/70">Du har ikke noget fravær registreret.</p> : null}
-        {mine.map((a) => (
-          <div key={a.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-ink/10 bg-white/80 p-4">
-            <div>
-              <p className="font-semibold text-ink">{formatDate(a.startDate)} – {formatDate(a.endDate)}</p>
-              <p className="text-sm text-ink/70">{a.reason} · {statusLabel(a)}</p>
-            </div>
-            {isCurrent(a) ? (
-              <LoadingButton type="button" className="btn-ghost" isLoading={busyId === a.id}
-                idleContent={a.status === "PENDING" ? "Træk anmodning tilbage" : "Stop fravær – jeg er tilbage"}
-                loadingContent="..."
-                onClick={() =>
-                  act(a.id, `/api/absences/${a.id}/stop`, {},
-                    a.status === "PENDING" ? "Anmodning trukket tilbage" : "Fravær stoppet – du kan igen tilmelde dig")}
-              />
-            ) : null}
-          </div>
-        ))}
-      </div>
+      <Section title="Dit fravær">
+        {loading ? (
+          <Skeleton className="h-24 rounded-[1.375rem]" />
+        ) : mine.length === 0 ? (
+          <Card>
+            <p className="text-sm text-ink/60">Du har ikke noget fravær registreret.</p>
+          </Card>
+        ) : (
+          <ListGroup>
+            {mine.map((a) => {
+              const meta = statusMeta(a);
+              return (
+                <div key={a.id} className="space-y-3 px-4 py-3.5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-ink">
+                        {formatDate(a.startDate)} – {formatDate(a.endDate)}
+                      </p>
+                      <p className="text-sm text-ink/60">{a.reason}</p>
+                    </div>
+                    <Chip tone={meta.tone}>{meta.label}</Chip>
+                  </div>
+                  {isCurrent(a) ? (
+                    <Button variant="secondary" size="sm" loading={busyId === a.id}
+                      onClick={() =>
+                        act(a.id, `/api/absences/${a.id}/stop`, {},
+                          a.status === "PENDING" ? "Anmodning trukket tilbage" : "Fravær stoppet – du kan igen tilmelde dig")}>
+                      {a.status === "PENDING" ? "Træk anmodning tilbage" : "Stop fravær – jeg er tilbage"}
+                    </Button>
+                  ) : null}
+                </div>
+              );
+            })}
+          </ListGroup>
+        )}
+      </Section>
 
       {canManage && othersCurrent.length > 0 ? (
-        <div className="card space-y-3">
-          <h3 className="text-lg font-semibold text-ink">Aktive fravær på holdet</h3>
-          {othersCurrent.map((a) => (
-            <div key={a.id} className="rounded-2xl border border-ink/10 bg-white/80 p-4">
-              <p className="font-semibold text-ink">{a.user.name ?? "Ukendt"}</p>
-              <p className="text-sm text-ink/70">{formatDate(a.startDate)} – {formatDate(a.endDate)} · {a.reason}</p>
-            </div>
-          ))}
-        </div>
+        <Section title="Fraværende på holdet">
+          <ListGroup>
+            {othersCurrent.map((a) => (
+              <div key={a.id} className="flex items-center gap-3 px-4 py-3">
+                <Avatar name={a.user.name} image={null} size="md" />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-semibold text-ink">{a.user.name ?? "Ukendt"}</p>
+                  <p className="truncate text-sm text-ink/60">
+                    {formatDate(a.startDate)} – {formatDate(a.endDate)} · {a.reason}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </ListGroup>
+        </Section>
       ) : null}
-    </section>
+    </div>
   );
 }

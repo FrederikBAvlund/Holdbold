@@ -1,9 +1,9 @@
 export default function PrivatlivPage() {
   return (
-    <main className="px-4 py-10 sm:px-8">
-      <section className="card mx-auto max-w-4xl space-y-6 p-7 sm:p-10">
+    <main className="px-3 pb-10 pt-[max(1rem,env(safe-area-inset-top,0px))] sm:px-8 sm:py-10">
+      <section className="rounded-[1.375rem] border border-line bg-surface shadow-[var(--shadow-sm)] mx-auto max-w-4xl space-y-6 p-5 sm:p-10">
         <header className="space-y-2">
-          <h1 className="text-3xl font-semibold text-ink" style={{ fontFamily: "var(--font-display)" }}>
+          <h1 className="font-display text-3xl font-bold text-ink">
             Privatlivspolitik
           </h1>
           <p className="text-sm text-ink/65">Sidst opdateret: 6. april 2026</p>
