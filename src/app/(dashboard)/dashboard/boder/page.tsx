@@ -9,6 +9,7 @@ import LoadingButton from "@/components/LoadingButton";
 import { TrashIcon } from "@/components/TrashIcon";
 import { CollapsibleCard } from "@/components/CollapsibleCard";
 import { FineEventLink } from "./FineEventLink";
+import { VoiceFinesModal } from "./VoiceFinesModal";
 import { categoryLabel, categoryOptions, fineRoles, roleLabel } from "./boderConstants";
 import type { FineCollection, FineItem, FineTemplate, Member, PendingPayment } from "./boderTypes";
 import {
@@ -22,7 +23,7 @@ import {
 export default function BoderPage() {
   const { pushToast } = useToast();
   const { data: session, status: sessionStatus } = useSession();
-  const { teamId, userId, members: teamMembers, actingMember, seasonQuery } = useDashboardTeam();
+  const { teamId, userId, members: teamMembers, actingMember, seasonQuery, isReadOnlySeason } = useDashboardTeam();
   const members = teamMembers as Member[];
   const loadedTemplatesKeyRef = useRef<string | null>(null);
   const loadedMyFinesKeyRef = useRef<string | null>(null);
@@ -54,6 +55,7 @@ export default function BoderPage() {
   const [fineDescription, setFineDescription] = useState("");
 
   const [showAssignModal, setShowAssignModal] = useState(false);
+  const [showVoiceModal, setShowVoiceModal] = useState(false);
   const [memberSearch, setMemberSearch] = useState("");
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -871,6 +873,15 @@ export default function BoderPage() {
 
   return (
     <>
+      {showVoiceModal ? (
+        <VoiceFinesModal
+          teamId={teamId}
+          members={members}
+          templates={templates}
+          onClose={() => setShowVoiceModal(false)}
+          onCreated={refreshFinesAndApprovals}
+        />
+      ) : null}
       <div className="fixed inset-x-0 top-0 z-40 border-b border-ink/10 bg-fog/95 px-3 py-1.5 pt-[max(0.35rem,env(safe-area-inset-top,0px))] pb-1.5 shadow-md backdrop-blur-lg lg:hidden">
         <div className="mx-auto w-full max-w-lg">
           <button type="button" className="btn-primary w-full shadow-[0_10px_28px_-14px_rgba(0,0,0,0.35)]" onClick={() => setShowAssignModal(true)}>
@@ -892,6 +903,11 @@ export default function BoderPage() {
         <button type="button" className="btn-primary hidden lg:inline-flex" onClick={() => setShowAssignModal(true)}>
           {assignLabel}
         </button>
+        {canManageFines && !isReadOnlySeason ? (
+          <button type="button" className="btn-ghost min-h-[2.75rem] lg:min-h-0" onClick={() => setShowVoiceModal(true)}>
+            🎤 Indtal bøder
+          </button>
+        ) : null}
         {unpaidTotal > 0 || canManageFines ? (
           <div className="flex w-full gap-2 lg:w-auto lg:gap-4">
             {unpaidTotal > 0 ? (
