@@ -4,6 +4,7 @@ import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { verifyLoginCode } from "@/lib/loginCode";
+import { checkRateLimit, getClientIp } from "@/lib/rateLimit";
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
@@ -18,10 +19,14 @@ export const authOptions: NextAuthOptions = {
         email: { label: "Email", type: "email" },
         code: { label: "Kode", type: "text" }
       },
-      async authorize(credentials) {
+      async authorize(credentials, req) {
         const email = credentials?.email?.trim().toLowerCase();
         const code = credentials?.code?.trim() ?? "";
         if (!email || !code) return null;
+
+        const ip = getClientIp((req?.headers ?? {}) as Record<string, string | string[] | undefined>);
+        const ipLimit = await checkRateLimit(`otp-verify:ip:${ip}`, 20, 10 * 60);
+        if (!ipLimit.allowed) return null;
 
         const valid = await verifyLoginCode(email, code);
         if (!valid) return null;

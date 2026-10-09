@@ -612,3 +612,10 @@ model LoginCode {
 
   @@index([email, createdAt])
 }
+
+/// Tællere til rate limiting af login-endpoints (fast vindue pr. nøgle).
+model AuthRateLimit {
+  key         String   @id
+  count       Int
+  windowStart DateTime
+}

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { prisma } from "./prisma";
 import { sendMail } from "./mail";
+import { checkRateLimit } from "./rateLimit";
 import {
   LOGIN_CODE_MAX_ATTEMPTS,
   codesMatch,
@@ -18,6 +19,7 @@ vi.mock("@/lib/prisma", () => ({
   }
 }));
 vi.mock("@/lib/mail", () => ({ sendMail: vi.fn() }));
+vi.mock("@/lib/rateLimit", () => ({ checkRateLimit: vi.fn() }));
 
 const db = prisma as unknown as {
   user: { findFirst: ReturnType<typeof vi.fn> };
@@ -25,7 +27,10 @@ const db = prisma as unknown as {
   loginCode: Record<"findMany" | "findFirst" | "create" | "update" | "updateMany", ReturnType<typeof vi.fn>>;
 };
 
-beforeEach(() => vi.stubEnv("NEXTAUTH_SECRET", "test-secret"));
+beforeEach(() => {
+  vi.stubEnv("NEXTAUTH_SECRET", "test-secret");
+  vi.mocked(checkRateLimit).mockResolvedValue({ allowed: true, count: 1 });
+});
 afterEach(() => {
   vi.unstubAllEnvs();
   vi.clearAllMocks();
@@ -84,6 +89,18 @@ describe("requestLoginCode", () => {
     db.loginCode.findMany.mockResolvedValue(Array.from({ length: 5 }, () => ({ createdAt: new Date(Date.now() - 600_000) })));
     await requestLoginCode("a@b.dk");
     expect(sendMail).not.toHaveBeenCalled();
+  });
+});
+
+describe("requestLoginCode global cap", () => {
+  it("sends nothing once the global hourly cap is reached", async () => {
+    db.user.findFirst.mockResolvedValue({ id: "u1" });
+    db.membership.findFirst.mockResolvedValue({ id: "m1" });
+    db.loginCode.findMany.mockResolvedValue([]);
+    vi.mocked(checkRateLimit).mockResolvedValue({ allowed: false, count: 201 });
+    await requestLoginCode("a@b.dk");
+    expect(sendMail).not.toHaveBeenCalled();
+    expect(db.loginCode.create).not.toHaveBeenCalled();
   });
 });
 

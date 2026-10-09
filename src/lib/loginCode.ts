@@ -1,11 +1,14 @@
 import { createHmac, randomInt, timingSafeEqual } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { sendMail } from "@/lib/mail";
+import { checkRateLimit } from "@/lib/rateLimit";
 
 export const LOGIN_CODE_TTL_MS = 10 * 60 * 1000;
 export const LOGIN_CODE_MAX_ATTEMPTS = 5;
 export const LOGIN_CODE_RESEND_COOLDOWN_MS = 60 * 1000;
 export const LOGIN_CODE_MAX_PER_HOUR = 5;
+/** Samlet loft for udsendte koder pr. time, som værn mod misbrug fra mange IP-adresser (fx via proxyer). */
+export const LOGIN_CODE_GLOBAL_MAX_PER_HOUR = 200;
 
 export function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
@@ -58,6 +61,9 @@ export async function requestLoginCode(rawEmail: string): Promise<void> {
   });
   if (recent.length >= LOGIN_CODE_MAX_PER_HOUR) return;
   if (recent[0] && now - recent[0].createdAt.getTime() < LOGIN_CODE_RESEND_COOLDOWN_MS) return;
+
+  const global = await checkRateLimit("otp-request:global", LOGIN_CODE_GLOBAL_MAX_PER_HOUR, 60 * 60);
+  if (!global.allowed) return;
 
   const code = generateLoginCode();
   await prisma.loginCode.create({
