@@ -4,7 +4,8 @@ import { authOptions } from "@/lib/auth";
 import { createNotifications } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 
-export async function POST(_request: Request, { params }: { params: { id: string } }) {
+export async function POST(_request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Ikke logget ind" }, { status: 401 });

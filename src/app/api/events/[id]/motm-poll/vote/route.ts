@@ -39,7 +39,8 @@ const pollInclude = {
   }
 } as const;
 
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const session = await requireSession();
   if (!session.ok) return session.response;
 

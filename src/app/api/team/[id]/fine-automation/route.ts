@@ -43,7 +43,8 @@ const patchSchema = z.object({
   rules: z.array(ruleInputSchema).min(1).max(5)
 });
 
-export async function GET(_request: Request, { params }: { params: { id: string } }) {
+export async function GET(_request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const session = await requireSession();
   if (!session.ok) return session.response;
 
@@ -66,7 +67,8 @@ export async function GET(_request: Request, { params }: { params: { id: string 
   return NextResponse.json({ rules, templates });
 }
 
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const session = await requireSession();
   if (!session.ok) return session.response;
 

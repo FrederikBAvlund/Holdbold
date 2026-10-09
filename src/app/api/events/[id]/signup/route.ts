@@ -17,7 +17,8 @@ const bodySchema = z.object({
   reason: z.string().optional()
 });
 
-export async function GET(request: Request, { params }: { params: { id: string } }) {
+export async function GET(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const { searchParams } = new URL(request.url);
   const userId = searchParams.get("userId") ?? "";
   if (!userId) {
@@ -66,7 +67,8 @@ export async function GET(request: Request, { params }: { params: { id: string }
   return NextResponse.json({ signup, event });
 }
 
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Ikke logget ind" }, { status: 401 });

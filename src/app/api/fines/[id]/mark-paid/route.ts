@@ -8,7 +8,8 @@ const bodySchema = z.object({
   markedById: z.string().min(1)
 });
 
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Ikke logget ind" }, { status: 401 });

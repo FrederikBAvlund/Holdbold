@@ -26,7 +26,8 @@ const updateSchema = z.object({
   mobilePayBox: z.string().trim().min(1).max(32).optional().nullable()
 });
 
-export async function GET(_request: Request, { params }: { params: { id: string } }) {
+export async function GET(_request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Ikke logget ind" }, { status: 401 });
@@ -51,7 +52,8 @@ export async function GET(_request: Request, { params }: { params: { id: string 
   return NextResponse.json({ team });
 }
 
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Ikke logget ind" }, { status: 401 });

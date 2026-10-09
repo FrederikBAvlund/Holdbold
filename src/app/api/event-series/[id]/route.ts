@@ -8,7 +8,8 @@ const updateSchema = z.object({
   kind: z.enum(["TRAINING", "MATCH"]).optional()
 });
 
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const session = await requireSession();
   if (!session.ok) return session.response;
 

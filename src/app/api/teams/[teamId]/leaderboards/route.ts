@@ -3,10 +3,8 @@ import { getLeaderboardRows, getLeaderboardSummary } from "@/lib/leaderboards";
 import { isLeaderboardCategory } from "@/lib/leaderboardsShared";
 import { requireActiveTeamMember, requireSession } from "@/lib/apiAuth";
 
-export async function GET(
-  request: Request,
-  { params }: { params: { teamId: string } }
-) {
+export async function GET(request: Request, props: { params: Promise<{ teamId: string }> }) {
+  const params = await props.params;
   const session = await requireSession();
   if (!session.ok) return session.response;
 

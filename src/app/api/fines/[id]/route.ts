@@ -5,7 +5,8 @@ import { prisma } from "@/lib/prisma";
 
 const deletableStatuses = new Set(["UNPAID", "PAID_PENDING", "AFVIST"]);
 
-export async function DELETE(_request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(_request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Ikke logget ind" }, { status: 401 });

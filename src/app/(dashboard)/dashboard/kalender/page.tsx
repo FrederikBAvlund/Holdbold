@@ -9,8 +9,6 @@ import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import interactionPlugin from "@fullcalendar/interaction";
 import daLocale from "@fullcalendar/core/locales/da";
-import "@fullcalendar/common/main.css";
-import "@fullcalendar/daygrid/main.css";
 import { useDashboardTeam, type DashboardTeamMember } from "@/components/DashboardTeamProvider";
 import { CollapsibleCard } from "@/components/CollapsibleCard";
 import {
