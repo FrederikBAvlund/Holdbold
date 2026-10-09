@@ -248,6 +248,7 @@ export default function KalenderPage() {
   }, [viewMode]);
 
   const canManageEvents = actingMember ? adminRoles.includes(actingMember.role) : false;
+  const isAdmin = actingMember?.role === "ADMIN";
   const canAssignLateFine = actingMember
     ? actingMember.role === "ADMIN" || actingMember.role === "BOEDEKASSEFORMAND"
     : false;
@@ -1509,6 +1510,24 @@ export default function KalenderPage() {
     }
   }
 
+  async function closeSeries(seriesId: string, title: string) {
+    if (!window.confirm(`Luk ned for "${title}"? Alle fremtidige begivenheder i serien fjernes.`)) return;
+    setUpdatingSeriesId(seriesId);
+    try {
+      const response = await fetch(`/api/event-series/${seriesId}`, { method: "DELETE" });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        pushToast(data.error ?? "Kunne ikke lukke serien", "error");
+        return;
+      }
+      pushToast("Serien er lukket, og fremtidige begivenheder er fjernet", "success");
+      loadedSeriesKeyRef.current = null;
+      window.location.reload();
+    } finally {
+      setUpdatingSeriesId((prev) => (prev === seriesId ? null : prev));
+    }
+  }
+
   async function updateSeriesEndDate(seriesId: string, newEndDate: string) {
     setUpdatingSeriesId(seriesId);
     try {
@@ -1987,6 +2006,16 @@ export default function KalenderPage() {
                         onBlur={(event) => updateSeriesEndDate(item.id, event.target.value)}
                         disabled={updatingSeriesId === item.id}
                       />
+                      {isAdmin ? (
+                        <button
+                          type="button"
+                          className="btn-ghost"
+                          onClick={() => closeSeries(item.id, item.title)}
+                          disabled={updatingSeriesId === item.id}
+                        >
+                          Luk ned
+                        </button>
+                      ) : null}
                     </div>
                   </div>
                 </div>
