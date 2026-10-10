@@ -25,12 +25,18 @@ export type GuidePromotion = {
   stepIds: string[];
 };
 
+/**
+ * intro: nyt medlem – vis velkomsten.
+ * announce: medlem fra før guiden fandtes – vis det diskrete "Nyt"-kort.
+ * checklist: brugeren har sagt ja til guiden – vis "Kom i gang".
+ * hidden: guiden er sprunget over.
+ */
+export type GuideMode = "intro" | "announce" | "checklist" | "hidden";
+
 export type GuideState = {
   role: Role;
   capabilities: Capability[];
-  /** Brugeren har aldrig fået guide på holdet og har ikke sprunget den over */
-  intro: boolean;
-  dismissed: boolean;
+  mode: GuideMode;
   promotion: GuidePromotion | null;
   steps: GuideStepState[];
   summary: { total: number; done: number; skipped: number; todo: number };
@@ -40,6 +46,7 @@ export type GuideStateInput = {
   role: Role;
   guideRole: Role | null;
   dismissed: boolean;
+  started: boolean;
   facts: GuideFacts;
   progress: Record<string, GuideProgressStatus>;
 };
@@ -97,12 +104,28 @@ export function computeGuideState(input: GuideStateInput): GuideState {
   return {
     role: input.role,
     capabilities: caps,
-    intro: input.guideRole === null && !input.dismissed,
-    dismissed: input.dismissed,
+    mode: guideMode(input),
     promotion,
     steps,
     summary: { total: steps.length, done: count("done"), skipped: count("skipped"), todo: count("todo") }
   };
+}
+
+/** Det, rollen er til for, kommer først: en ny bødeformand skal i gang med bødekassen før profilbilledet. */
+const NEXT_PRIORITY: readonly Capability[] = ["admin", "fines", "events", "absences", "motm", "basis"];
+
+/** De næste trin, brugeren bør tage – rollens egne dele først, ellers i guidens rækkefølge. */
+export function nextGuideSteps(steps: GuideStepState[], count: number) {
+  return steps
+    .filter((step) => step.status === "todo")
+    .sort((a, b) => NEXT_PRIORITY.indexOf(a.capability) - NEXT_PRIORITY.indexOf(b.capability))
+    .slice(0, count);
+}
+
+function guideMode(input: GuideStateInput): GuideMode {
+  if (input.dismissed) return "hidden";
+  if (input.started) return "checklist";
+  return input.guideRole === null ? "intro" : "announce";
 }
 
 /**

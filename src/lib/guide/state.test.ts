@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeGuideState, guideRoleAfterRoleChange, type GuideStateInput } from "@/lib/guide/state";
+import { computeGuideState, guideRoleAfterRoleChange, nextGuideSteps, type GuideStateInput } from "@/lib/guide/state";
 import { GUIDE_STEPS, type GuideFacts } from "@/lib/guide/steps";
 
 function facts(overrides: { team?: Partial<GuideFacts["team"]>; user?: Partial<GuideFacts["user"]> } = {}): GuideFacts {
@@ -34,7 +34,15 @@ function facts(overrides: { team?: Partial<GuideFacts["team"]>; user?: Partial<G
 }
 
 function state(input: Partial<GuideStateInput> = {}) {
-  return computeGuideState({ role: "SPILLER", guideRole: null, dismissed: false, facts: facts(), progress: {}, ...input });
+  return computeGuideState({
+    role: "SPILLER",
+    guideRole: null,
+    dismissed: false,
+    started: false,
+    facts: facts(),
+    progress: {},
+    ...input
+  });
 }
 
 const ids = (s: ReturnType<typeof state>) => s.steps.map((step) => step.id);
@@ -53,7 +61,7 @@ describe("computeGuideState", () => {
     const s = state();
     expect(s.steps.every((x) => x.capability === "basis")).toBe(true);
     expect(ids(s)).toContain("basis.rsvp");
-    expect(s.intro).toBe(true);
+    expect(s.mode).toBe("intro");
   });
 
   it("viser træneren begivenheder, men ikke bødekassen", () => {
@@ -99,7 +107,7 @@ describe("computeGuideState", () => {
       guideRole: "TRAENER",
       facts: facts({ team: { mobilePayBox: true, fineTemplates: true } })
     });
-    expect(s.intro).toBe(false);
+    expect(s.mode).toBe("announce");
     expect(s.promotion).toMatchObject({ from: "TRAENER", to: "BOEDEKASSEFORMAND" });
     expect(s.promotion?.stepIds).toContain("fines.assign");
     expect(s.promotion?.stepIds).not.toContain("fines.mobilepay");
@@ -113,7 +121,28 @@ describe("computeGuideState", () => {
   });
 
   it("viser ingen velkomst, når guiden er sprunget over", () => {
-    expect(state({ dismissed: true }).intro).toBe(false);
+    expect(state({ dismissed: true }).mode).toBe("hidden");
+    expect(state({ dismissed: true, started: true }).mode).toBe("hidden");
+  });
+
+  it("viser 'Nyt'-kortet til medlemmer fra før guiden og tjeklisten, når guiden er startet", () => {
+    expect(state({ guideRole: "SPILLER" }).mode).toBe("announce");
+    expect(state({ guideRole: "SPILLER", started: true }).mode).toBe("checklist");
+  });
+});
+
+describe("nextGuideSteps", () => {
+  it("starter bødeformanden i bødekassen og springer det klarede over", () => {
+    const s = state({ role: "BOEDEKASSEFORMAND", facts: facts({ team: { mobilePayBox: true } }) });
+    expect(nextGuideSteps(s.steps, 3).map((x) => x.id)).toEqual(["fines.templates", "fines.automation", "fines.assign"]);
+  });
+
+  it("starter admin med at få holdet sat op", () => {
+    expect(nextGuideSteps(state({ role: "ADMIN" }).steps, 2).map((x) => x.id)).toEqual(["admin.invite", "admin.calendar-import"]);
+  });
+
+  it("holder guidens rækkefølge for spillere", () => {
+    expect(nextGuideSteps(state().steps, 2).map((x) => x.id)).toEqual(["basis.push", "basis.rsvp"]);
   });
 });
 

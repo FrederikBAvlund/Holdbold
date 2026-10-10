@@ -50,7 +50,8 @@ beforeEach(() => {
     id: "m1",
     role: "TRAENER",
     guideRole: "SPILLER",
-    guideDismissedAt: null
+    guideDismissedAt: null,
+    guideStartedAt: null
   } as never);
   vi.mocked(prisma.guideProgress.findMany).mockResolvedValue([]);
   vi.mocked(loadGuideFacts).mockResolvedValue(noFacts);
@@ -100,6 +101,14 @@ describe("POST /api/guide", () => {
   it("følger den nuværende rolle, når velkomst eller forfremmelse er vist", async () => {
     await POST(post({ teamId: "t1", action: "acknowledge-role" }));
     expect(prisma.membership.update).toHaveBeenCalledWith({ where: { id: "m1" }, data: { guideRole: "TRAENER" } });
+  });
+
+  it("starter guiden", async () => {
+    await POST(post({ teamId: "t1", action: "start" }));
+    expect(prisma.membership.update).toHaveBeenCalledWith({
+      where: { id: "m1" },
+      data: { guideRole: "TRAENER", guideStartedAt: expect.any(Date), guideDismissedAt: null }
+    });
   });
 
   it("springer hele guiden over", async () => {
