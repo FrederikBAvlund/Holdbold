@@ -106,17 +106,17 @@ export default function SignupPage() {
             {fieldErrors.email ? <p className="mt-2 text-sm text-danger">{fieldErrors.email}</p> : null}
           </div>
           <div>
-            <label className="mb-1.5 block text-sm font-semibold text-ink/80">Hold slug*</label>
+            <label className="mb-1.5 block text-sm font-semibold text-ink/80">Holdkode*</label>
             <input
               value={teamSlug}
               onChange={(event) => setTeamSlug(event.target.value)}
               className={inputClass}
-              placeholder="bk_skjold"
+              placeholder="bk-skjold"
               readOnly={slugLocked}
               required
             />
             {slugLocked ? (
-              <p className="mt-2 text-xs text-ink/60">Holdslug er udfyldt fra invitationslink og kan ikke ændres.</p>
+              <p className="mt-2 text-xs text-ink/60">Holdkoden er udfyldt fra invitationslink og kan ikke ændres.</p>
             ) : null}
             {fieldErrors.teamSlug ? <p className="mt-2 text-sm text-danger">{fieldErrors.teamSlug}</p> : null}
           </div>

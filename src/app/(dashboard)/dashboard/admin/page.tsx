@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { invalidateDashboardTeam, useDashboardTeam } from "@/components/DashboardTeamProvider";
+import { useDashboardTeam } from "@/components/DashboardTeamProvider";
 import { useToast } from "@/components/ToastProvider";
 import Button from "@/components/ui/Button";
 import { Chip, ListGroup, ListRow, PageHeader, Section, Skeleton, inputClass } from "@/components/ui/primitives";
@@ -21,7 +21,7 @@ export default function AdminPage() {
   const router = useRouter();
   const { status, data: session } = useSession();
   const { pushToast } = useToast();
-  const { setTeamId, teamId } = useDashboardTeam();
+  const { setTeamId, teamId, memberships, refreshDashboardTeam } = useDashboardTeam();
   const [teams, setTeams] = useState<AdminTeam[] | null>(null);
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
@@ -49,7 +49,11 @@ export default function AdminPage() {
     void load();
   }, [status, allowed, router, load]);
 
-  function openTeam(id: string) {
+  async function openTeam(id: string) {
+    // Hent medlemskaber først, ellers nulstiller dashboardet valget til det første hold.
+    if (!memberships.some((m) => m.team?.id === id)) {
+      await refreshDashboardTeam();
+    }
     setTeamId(id);
     router.push("/dashboard");
   }
@@ -61,7 +65,7 @@ export default function AdminPage() {
       const response = await fetch("/api/admin/teams", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, slug: slug || undefined })
+        body: JSON.stringify({ name, slug })
       });
       const data = await response.json();
       if (!response.ok) {
@@ -71,7 +75,7 @@ export default function AdminPage() {
       pushToast(`${data.team.name} er oprettet`, "success");
       setName("");
       setSlug("");
-      invalidateDashboardTeam();
+      await refreshDashboardTeam();
       await load();
     } finally {
       setCreating(false);
@@ -86,9 +90,8 @@ export default function AdminPage() {
         pushToast("Kunne ikke give adgang", "error");
         return;
       }
-      invalidateDashboardTeam();
       await load();
-      openTeam(id);
+      await openTeam(id);
     } finally {
       setBusyId(null);
     }
@@ -115,15 +118,17 @@ export default function AdminPage() {
             />
           </div>
           <div>
-            <label className="mb-1.5 block text-sm font-semibold text-ink/80">Slug (valgfri)</label>
+            <label className="mb-1.5 block text-sm font-semibold text-ink/80">Holdkode</label>
             <input
               value={slug}
               onChange={(event) => setSlug(event.target.value)}
               className={inputClass}
-              placeholder="Genereres ud fra navnet"
+              placeholder="fx serie-4-herrer"
+              required
+              minLength={2}
               maxLength={40}
             />
-            <p className="mt-1 text-xs text-ink/55">Bruges af spillere, når de opretter sig på holdet.</p>
+            <p className="mt-1 text-xs text-ink/55">Unik kode, som spillere bruger, når de opretter sig på holdet. Små bogstaver, tal og bindestreg.</p>
           </div>
           <p className="text-xs text-ink/55">Du bliver selv admin på det nye hold.</p>
           <Button type="submit" size="lg" block loading={creating}>

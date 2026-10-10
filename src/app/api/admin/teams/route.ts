@@ -41,7 +41,7 @@ export async function GET() {
 
 const createSchema = z.object({
   name: z.string().trim().min(2, "Navn skal have mindst 2 tegn").max(60),
-  slug: z.string().trim().max(40).optional()
+  slug: z.string().trim().min(2, "Holdkode skal have mindst 2 tegn").max(40)
 });
 
 export async function POST(request: Request) {
@@ -56,9 +56,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: message ?? "Ugyldigt input" }, { status: 400 });
   }
 
-  const slug = slugify(body.slug || body.name);
-  if (!slug) {
-    return NextResponse.json({ error: "Kunne ikke lave en slug ud fra navnet" }, { status: 400 });
+  const slug = slugify(body.slug);
+  if (slug.length < 2) {
+    return NextResponse.json({ error: "Holdkoden skal indeholde mindst 2 bogstaver eller tal" }, { status: 400 });
+  }
+  if (await prisma.team.findUnique({ where: { slug }, select: { id: true } })) {
+    return NextResponse.json({ error: "Holdkoden er allerede i brug af et andet hold" }, { status: 409 });
   }
 
   try {
@@ -73,7 +76,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ team }, { status: 201 });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-      return NextResponse.json({ error: "Slug er allerede i brug" }, { status: 409 });
+      return NextResponse.json({ error: "Holdkoden er allerede i brug af et andet hold" }, { status: 409 });
     }
     throw error;
   }
