@@ -27,6 +27,8 @@ export default function AssignFineSheet({
   canManage,
   initialTemplateId,
   initialUserIds,
+  voiceEnabled = false,
+  onVoice,
   onDone
 }: {
   open: boolean;
@@ -37,6 +39,9 @@ export default function AssignFineSheet({
   canManage: boolean;
   initialTemplateId?: string;
   initialUserIds?: string[];
+  /** Vis "Indtal" som tredje valg (kræver holdets OpenAI-nøgle). */
+  voiceEnabled?: boolean;
+  onVoice?: () => void;
   onDone: () => Promise<void> | void;
 }) {
   const { pushToast } = useToast();
@@ -170,7 +175,7 @@ export default function AssignFineSheet({
 
       {step === "what" ? (
         <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-2">
+          <div className={cn("grid gap-2", voiceEnabled && onVoice ? "grid-cols-3" : "grid-cols-2")}>
             <button
               type="button"
               onClick={() => setCustom(false)}
@@ -193,6 +198,19 @@ export default function AssignFineSheet({
             >
               Egen bøde
             </button>
+            {voiceEnabled && onVoice ? (
+              <button
+                type="button"
+                onClick={onVoice}
+                className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-2xl bg-ink/[0.06] text-sm font-semibold text-ink/70 transition"
+              >
+                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+                  <rect x="9" y="2" width="6" height="12" rx="3" />
+                  <path d="M5 10a7 7 0 0 0 14 0M12 17v5M8 22h8" />
+                </svg>
+                Indtal
+              </button>
+            ) : null}
           </div>
 
           {custom ? (
