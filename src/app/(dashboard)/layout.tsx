@@ -15,16 +15,21 @@ export default async function DashboardLayout({ children }: { children: React.Re
     redirect("/login");
   }
 
-  const initialMemberships = (await prisma.membership.findMany({
-    where: { userId: session.user.id, status: "ACTIVE" },
+  const allMemberships = (await prisma.membership.findMany({
+    where: { userId: session.user.id },
     include: { team: true },
     orderBy: { createdAt: "asc" }
   })) as DashboardMembership[];
+  const initialMemberships = allMemberships.filter((membership) => membership.status === "ACTIVE");
+  const initialPendingMemberships = allMemberships.filter((membership) => membership.status === "PENDING");
 
   return (
     <div className="min-h-screen pb-nav-pad lg:pb-10 lg:pt-4">
-      <PendingAccessGuard />
-      <DashboardTeamProvider initialMemberships={initialMemberships}>
+      <DashboardTeamProvider
+        initialMemberships={initialMemberships}
+        initialPendingMemberships={initialPendingMemberships}
+      >
+        <PendingAccessGuard />
         <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-4 px-3 sm:px-5 lg:flex-row lg:gap-7 lg:px-6">
           <DashboardNav
             serverUserName={session.user?.name ?? null}

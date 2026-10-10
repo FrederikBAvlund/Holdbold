@@ -278,6 +278,15 @@ export default function EventPage() {
               Svar senest {formatDayLabel(event.signupDeadline).toLowerCase()} kl. {formatTime(event.signupDeadline)}
             </p>
           ) : null}
+          {!past && !canceled ? (
+            <a
+              href={`/api/events/${event.id}/ics`}
+              className="flex w-fit items-center gap-2 underline-offset-4 hover:underline"
+            >
+              <Icon name="calendar" className="h-4 w-4" />
+              Føj til kalender
+            </a>
+          ) : null}
           {event.location ? (
             <div className="flex items-center gap-2">
               <Icon name="map-pin" className="h-4 w-4 shrink-0" />

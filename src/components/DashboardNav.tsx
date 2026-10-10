@@ -13,6 +13,9 @@ import Sheet from "@/components/ui/Sheet";
 import { CountBadge } from "@/components/ui/Button";
 import { useDashboardTeam } from "@/components/DashboardTeamProvider";
 import { useRouter } from "next/navigation";
+import Button from "@/components/ui/Button";
+import { inputClass } from "@/components/ui/primitives";
+import { clearMeClientCache } from "@/lib/meClientCache";
 import { roleLabel } from "@/lib/roleLabels";
 
 type NavItem = { href: string; label: string; icon: IconName };
@@ -138,21 +141,94 @@ function useNavBadges(teamId: string, seasonQuery: string, pathname: string) {
 }
 
 function TeamSwitcherSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { memberships, teamId, setTeamId } = useDashboardTeam();
+  const { memberships, pendingMemberships, teamId, setTeamId, refreshDashboardTeam } = useDashboardTeam();
   const { data: session } = useSession();
   const router = useRouter();
+  const [joining, setJoining] = useState(false);
+  const [teamSlug, setTeamSlug] = useState("");
+  const [joinError, setJoinError] = useState<string | null>(null);
+  const [joinLoading, setJoinLoading] = useState(false);
+
+  function closeSheet() {
+    setJoining(false);
+    setJoinError(null);
+    setTeamSlug("");
+    onClose();
+  }
+
+  async function handleJoin(event: React.FormEvent) {
+    event.preventDefault();
+    setJoinLoading(true);
+    setJoinError(null);
+    try {
+      const response = await fetch("/api/me/teams", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ teamSlug: teamSlug.trim() })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setJoinError(data.error ?? "Kunne ikke tilmelde dig holdet");
+        return;
+      }
+      clearMeClientCache();
+      await refreshDashboardTeam();
+      if (data.team?.id) setTeamId(data.team.id);
+      router.push("/dashboard/profil?notice=pending_approval");
+      closeSheet();
+    } catch {
+      setJoinError("Kunne ikke tilmelde dig holdet. Prøv igen.");
+    } finally {
+      setJoinLoading(false);
+    }
+  }
   const pathname = usePathname();
   const isSuperAdmin = session?.user?.isSuperAdmin === true;
   const adminActive = pathname.startsWith(ADMIN_HREF);
   return (
-    <Sheet open={open} onClose={onClose} title="Skift hold" description="Vælg det hold, du vil se.">
+    <Sheet
+      open={open}
+      onClose={closeSheet}
+      title={joining ? "Tilmeld nyt hold" : "Skift hold"}
+      description={joining ? "Skriv holdkoden fra din træner eller admin." : "Vælg det hold, du vil se."}
+    >
+      {joining ? (
+        <form onSubmit={handleJoin} className="space-y-4">
+          <div>
+            <label className="mb-1.5 block text-sm font-semibold text-ink/80" htmlFor="join-team-slug">
+              Holdkode*
+            </label>
+            <input
+              id="join-team-slug"
+              value={teamSlug}
+              onChange={(event) => setTeamSlug(event.target.value)}
+              className={inputClass}
+              placeholder="bk-skjold"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              required
+            />
+            {joinError ? <p className="mt-2 text-sm text-danger">{joinError}</p> : null}
+            <p className="mt-2 text-xs text-ink/60">En admin på holdet skal godkende dig, før du får adgang.</p>
+          </div>
+          <div className="flex gap-2">
+            <Button type="button" variant="secondary" size="lg" onClick={() => setJoining(false)}>
+              Tilbage
+            </Button>
+            <Button type="submit" size="lg" block loading={joinLoading}>
+              Tilmeld hold
+            </Button>
+          </div>
+        </form>
+      ) : (
       <div className="space-y-2">
         {isSuperAdmin ? (
           <button
             type="button"
             onClick={() => {
               router.push(ADMIN_HREF);
-              onClose();
+              closeSheet();
             }}
             className={cn(
               "flex min-h-[3.75rem] w-full items-center gap-3 rounded-2xl border px-4 text-left transition active:scale-[0.99]",
@@ -179,7 +255,7 @@ function TeamSwitcherSheet({ open, onClose }: { open: boolean; onClose: () => vo
               onClick={() => {
                 setTeamId(id);
                 if (adminActive) router.push("/dashboard");
-                onClose();
+                closeSheet();
               }}
               className={cn(
                 "flex min-h-[3.75rem] w-full items-center gap-3 rounded-2xl border px-4 text-left transition active:scale-[0.99]",
@@ -195,7 +271,47 @@ function TeamSwitcherSheet({ open, onClose }: { open: boolean; onClose: () => vo
             </button>
           );
         })}
+        {pendingMemberships.map((membership) => {
+          const id = membership.team?.id ?? "";
+          const active = id === teamId && !adminActive;
+          return (
+            <button
+              key={id}
+              type="button"
+              onClick={() => {
+                setTeamId(id);
+                router.push("/dashboard/profil?notice=pending_approval");
+                closeSheet();
+              }}
+              className={cn(
+                "flex min-h-[3.75rem] w-full items-center gap-3 rounded-2xl border px-4 text-left transition active:scale-[0.99]",
+                active ? "border-pending bg-pending/10" : "border-line hover:bg-ink/[0.03]"
+              )}
+            >
+              <Avatar name={membership.team?.name ?? "Hold"} size="md" className="rounded-xl opacity-70" />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-semibold text-ink">{membership.team?.name ?? "Hold"}</span>
+                <span className="block text-sm text-pending">Afventer godkendelse</span>
+              </span>
+              <Icon name="hourglass" className="h-5 w-5 text-pending" />
+            </button>
+          );
+        })}
+        <button
+          type="button"
+          onClick={() => setJoining(true)}
+          className="flex min-h-[3.75rem] w-full items-center gap-3 rounded-2xl border border-dashed border-line px-4 text-left transition hover:bg-ink/[0.03] active:scale-[0.99]"
+        >
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/12 text-moss">
+            <Icon name="plus" className="h-5 w-5" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate font-semibold text-ink">Tilmeld nyt hold</span>
+            <span className="block text-sm text-ink/55">Brug en holdkode</span>
+          </span>
+        </button>
       </div>
+      )}
     </Sheet>
   );
 }
@@ -209,7 +325,7 @@ export default function DashboardNav({
 }) {
   const { data: session } = useSession();
   const pathname = usePathname();
-  const { memberships, teamId, members, userId, seasonQuery } = useDashboardTeam();
+  const { memberships, pendingMemberships, teamPending, teamId, members, userId, seasonQuery } = useDashboardTeam();
   const [mounted, setMounted] = useState(false);
   const [teamSheetOpen, setTeamSheetOpen] = useState(false);
   const unreadCount = useUnreadCount(session?.user?.id, pathname);
@@ -219,7 +335,7 @@ export default function DashboardNav({
 
   const hasActiveMembership = session?.user?.hasActiveMembership === true;
   const hasPendingMembership = session?.user?.hasPendingMembership === true;
-  const pendingOnly = !hasActiveMembership && hasPendingMembership;
+  const pendingOnly = (!hasActiveMembership && hasPendingMembership) || teamPending;
 
   // useSession() mangler ofte name/email på første client-render, mens SSR har fuld session.
   const displayName = session?.user?.name?.trim() || serverUserName?.trim() || "";
@@ -227,14 +343,18 @@ export default function DashboardNav({
   const myImage = members.find((member) => member.user.id === userId)?.user.image ?? null;
 
   const activeTeam = useMemo(
-    () => memberships.find((membership) => membership.team?.id === teamId) ?? memberships[0],
-    [memberships, teamId]
+    () =>
+      memberships.find((membership) => membership.team?.id === teamId) ??
+      pendingMemberships.find((membership) => membership.team?.id === teamId) ??
+      memberships[0],
+    [memberships, pendingMemberships, teamId]
   );
   const teamName = pathname.startsWith(ADMIN_HREF) && session?.user?.isSuperAdmin
     ? "Admin"
     : activeTeam?.team?.name ?? "Holdbold";
   const isSuperAdmin = session?.user?.isSuperAdmin === true;
-  const canSwitchTeam = memberships.length > 1 || isSuperAdmin;
+  // Alle kan åbne holdvælgeren, fordi den også bruges til at tilmelde sig et nyt hold.
+  const canSwitchTeam = true;
 
   const items = pendingOnly ? [] : NAV_ITEMS;
   const isActive = (href: string) =>

@@ -13,18 +13,21 @@ export async function GET() {
     return NextResponse.json({ user: null, memberships: [] }, { status: 401 });
   }
 
-  const [user, memberships] = await Promise.all([
+  const [user, allMemberships] = await Promise.all([
     prisma.user.findUnique({
       where: { id: session.user.id }
     }),
     prisma.membership.findMany({
-      where: { userId: session.user.id, status: "ACTIVE" },
+      where: { userId: session.user.id },
       include: { team: true },
       orderBy: { createdAt: "asc" }
     })
   ]);
 
   const resolvedImage = await resolveProfileImageUrl(user?.image ?? null);
+  const memberships = allMemberships.filter((membership) => membership.status === "ACTIVE");
+  // Ventende medlemskaber holdes adskilt, så resten af appen kun ser hold, brugeren har adgang til.
+  const pendingMemberships = allMemberships.filter((membership) => membership.status === "PENDING");
 
   return NextResponse.json({
     user: {
@@ -35,7 +38,8 @@ export async function GET() {
       themePreset: user?.themePreset ?? null,
       themeConfig: user?.themeConfig ?? null
     },
-    memberships
+    memberships,
+    pendingMemberships
   });
 }
 
