@@ -7,7 +7,7 @@ export const THEME_PRESETS = [
   { id: "sunset", label: "Sunset", swatch: "linear-gradient(135deg, #ffffff 55%, #ea580c 55%)" },
   { id: "lavender", label: "Lavender", swatch: "linear-gradient(135deg, #ffffff 55%, #7c3aed 55%)" },
   { id: "ocean", label: "Ocean", swatch: "linear-gradient(135deg, #ffffff 55%, #0e7490 55%)" },
-  { id: "midnight", label: "Midnight", swatch: "linear-gradient(135deg, #1e2a78 55%, #d4a017 55%)" },
+  { id: "midnight", label: "Midnight", swatch: "linear-gradient(135deg, #ffffff 55%, #1e2a78 55%)" },
   { id: "neon", label: "Neon", swatch: "linear-gradient(135deg, #ffffff 55%, #65a30d 55%)" },
   { id: "gold", label: "Gold", swatch: "linear-gradient(135deg, #ffffff 55%, #eab308 55%)" },
   // Mørke temaer: altid mørke, uanset systemets lys/mørk-indstilling.
