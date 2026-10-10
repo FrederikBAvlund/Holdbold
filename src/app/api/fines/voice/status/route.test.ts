@@ -15,7 +15,7 @@ const request = (query = "?teamId=team") => new Request(`http://localhost/api/fi
 
 beforeEach(() => {
   vi.resetAllMocks();
-  vi.mocked(requireActiveTeamMemberWithRoles).mockResolvedValue({ ok: true, role: "ADMIN" } as never);
+  vi.mocked(requireActiveTeamMemberWithRoles).mockResolvedValue({ ok: true, roles: ["ADMIN"] } as never);
 });
 
 describe("voice status", () => {
