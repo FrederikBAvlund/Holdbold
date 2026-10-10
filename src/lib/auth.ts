@@ -3,9 +3,9 @@ import Credentials from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
-import { verifyLoginCode } from "@/lib/loginCode";
+import { userCanLogIn, verifyLoginCode } from "@/lib/loginCode";
 import { checkRateLimit, getClientIp } from "@/lib/rateLimit";
-import { createUserFromSignup } from "@/lib/signupUser";
+import { createUserForTeamRequest, createUserFromSignup } from "@/lib/signupUser";
 import { isSuperAdminEmail } from "@/lib/superAdmin";
 
 export const authOptions: NextAuthOptions = {
@@ -38,16 +38,19 @@ export const authOptions: NextAuthOptions = {
         });
         if (!user) {
           // Ny bruger: koden beviser, at e-mailen tilhører personen, så oprettelsen kan gennemføres.
-          if (!verified.signup) return null;
-          user = await createUserFromSignup({ email, ...verified.signup });
+          if (verified.signup) {
+            user = await createUserFromSignup({ email, ...verified.signup });
+          } else if (verified.teamRequestSignup) {
+            user = await createUserForTeamRequest({ email, ...verified.teamRequestSignup });
+          } else {
+            return null;
+          }
           if (!user) return null;
         }
 
-        const hasMembership = await prisma.membership.findFirst({
-          where: { userId: user.id, status: { in: ["ACTIVE", "PENDING"] } },
-          select: { id: true }
-        });
-        if (!hasMembership) return null;
+        // Brugere uden hold kan logge ind, når de har anmodet om et hold (de kan ikke andet endnu).
+        // En ny bruger, der netop er oprettet til at anmode om et hold, har ingen anmodning endnu.
+        if (!(await userCanLogIn(user.id)) && !verified.teamRequestSignup) return null;
 
         return { id: user.id, name: user.name, email: user.email, image: user.image };
       }
@@ -77,11 +80,7 @@ export const authOptions: NextAuthOptions = {
               const valid = await bcrypt.compare(password, user.passwordHash);
               if (!valid) return null;
 
-              const hasMembership = await prisma.membership.findFirst({
-                where: { userId: user.id, status: { in: ["ACTIVE", "PENDING"] } },
-                select: { id: true }
-              });
-              if (!hasMembership) return null;
+              if (!(await userCanLogIn(user.id))) return null;
 
               return {
                 id: user.id,

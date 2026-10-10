@@ -38,3 +38,9 @@ export function getStoredTheme() {
   if (typeof window === "undefined") return "";
   return window.localStorage.getItem(STORAGE_THEME) ?? "";
 }
+
+/** Fjerner det gemte tema, så næste bruger ikke starter med forrige brugers farver. */
+export function clearStoredTheme() {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(STORAGE_THEME);
+}

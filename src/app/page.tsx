@@ -47,14 +47,15 @@ export default function Home() {
         </span>
         <h2 className="mt-3 font-display text-2xl font-bold uppercase leading-tight text-ink">Vil du oprette dit eget hold?</h2>
         <p className="mt-1 max-w-xl text-sm text-ink/65">
-          Skriv til os, så sætter vi jeres hold op i Holdbold. Har I allerede et hold, kan du i stedet bede din admin om et
+          Opret en bruger, og send en anmodning med holdets navn, holdkode og farver. Når vi har godkendt den, bliver du
+          administrator for holdet og kan invitere spillere. Har I allerede et hold, kan du i stedet bede din admin om et
           invitationslink.
         </p>
         <a
-          href="mailto:kontakt@holdbold.dk?subject=Opret%20nyt%20hold%20i%20Holdbold"
+          href="/opret-hold"
           className={buttonClasses({ variant: "primary", size: "md", className: "mt-4" })}
         >
-          Kontakt kontakt@holdbold.dk
+          Anmod om dit eget hold
         </a>
       </section>
 

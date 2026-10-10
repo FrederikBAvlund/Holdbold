@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
+import { isSuperAdminEmail } from "@/lib/superAdmin";
 
 const PUBLIC_PATHS = new Set([
   "/",
   "/login",
   "/signup",
+  "/opret-hold",
   "/glemt-password",
   "/nulstil-password",
   "/offline",
@@ -59,10 +61,20 @@ export async function middleware(request: NextRequest) {
     pathname === "/dashboard/profil" ||
     pathname.startsWith("/dashboard/profil/") ||
     pathname === "/dashboard/indstillinger" ||
-    pathname.startsWith("/dashboard/indstillinger/");
+    pathname.startsWith("/dashboard/indstillinger/") ||
+    pathname === "/dashboard/opret-hold";
   const hasActiveMembership = token.hasActiveMembership === true;
 
-  if (isDashboardPath && !isSettingsPath && !hasActiveMembership) {
+  // Systemadministratoren skal kunne nå sin egen side uden at være medlem af et hold.
+  const isSuperAdminPath =
+    (pathname === "/dashboard/admin" || pathname.startsWith("/dashboard/admin/")) &&
+    isSuperAdminEmail(typeof token.email === "string" ? token.email : null);
+
+  if (isDashboardPath && !isSettingsPath && !isSuperAdminPath && !hasActiveMembership) {
+    // Bruger uden hold (kun en holdanmodning) sendes til anmodningssiden i stedet for til "afventer godkendelse".
+    if (token.hasPendingMembership !== true) {
+      return NextResponse.redirect(new URL("/dashboard/opret-hold", request.url));
+    }
     const settingsUrl = new URL("/dashboard/profil", request.url);
     settingsUrl.searchParams.set("notice", "pending_approval");
     return NextResponse.redirect(settingsUrl);

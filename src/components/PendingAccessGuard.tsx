@@ -14,11 +14,19 @@ export default function PendingAccessGuard() {
   useEffect(() => {
     const hasActiveMembership = session?.user?.hasActiveMembership === true;
     const hasPendingMembership = session?.user?.hasPendingMembership === true;
+    const isSuperAdminPath = session?.user?.isSuperAdmin === true && pathname.startsWith("/dashboard/admin");
     const isSettingsPath =
+      isSuperAdminPath ||
       pathname === "/dashboard/profil" ||
       pathname.startsWith("/dashboard/profil/") ||
       pathname === "/dashboard/indstillinger" ||
-      pathname.startsWith("/dashboard/indstillinger/");
+      pathname.startsWith("/dashboard/indstillinger/") ||
+      pathname === "/dashboard/opret-hold";
+
+    if (!hasActiveMembership && !hasPendingMembership && !isSettingsPath) {
+      router.replace("/dashboard/opret-hold");
+      return;
+    }
 
     if (((!hasActiveMembership && hasPendingMembership) || teamPending) && !isSettingsPath) {
       router.replace("/dashboard/profil?notice=pending_approval");

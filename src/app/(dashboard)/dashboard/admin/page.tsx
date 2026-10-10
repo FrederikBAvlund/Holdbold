@@ -20,6 +20,17 @@ type AdminTeam = {
   otherMembers: number;
 };
 
+type AdminTeamRequest = {
+  id: string;
+  name: string;
+  slug: string;
+  themePreset: string;
+  status: "PENDING" | "APPROVED" | "REJECTED";
+  rejectionReason: string | null;
+  createdAt: string;
+  requester: { name: string; email: string | null };
+};
+
 export default function AdminPage() {
   const router = useRouter();
   const { status, data: session } = useSession();
@@ -32,6 +43,10 @@ export default function AdminPage() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [teamToDelete, setTeamToDelete] = useState<AdminTeam | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [teamRequests, setTeamRequests] = useState<AdminTeamRequest[] | null>(null);
+  const [requestBusyId, setRequestBusyId] = useState<string | null>(null);
+  const [requestToReject, setRequestToReject] = useState<AdminTeamRequest | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
 
   const load = useCallback(async () => {
     const response = await fetch("/api/admin/teams", { cache: "no-store" });
@@ -43,6 +58,11 @@ export default function AdminPage() {
     setTeams(data.teams ?? []);
   }, []);
 
+  const loadRequests = useCallback(async () => {
+    const response = await fetch("/api/admin/team-requests", { cache: "no-store" });
+    setTeamRequests(response.ok ? ((await response.json()).requests ?? []) : []);
+  }, []);
+
   const allowed = session?.user?.isSuperAdmin === true;
 
   useEffect(() => {
@@ -52,7 +72,8 @@ export default function AdminPage() {
       return;
     }
     void load();
-  }, [status, allowed, router, load]);
+    void loadRequests();
+  }, [status, allowed, router, load, loadRequests]);
 
   async function openTeam(id: string) {
     // Hent medlemskaber først, ellers nulstiller dashboardet valget til det første hold.
@@ -102,6 +123,28 @@ export default function AdminPage() {
     }
   }
 
+  async function decideRequest(id: string, action: "approve" | "reject", reason?: string) {
+    setRequestBusyId(id);
+    try {
+      const response = await fetch(`/api/admin/team-requests/${id}/${action}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(action === "reject" ? { reason } : {})
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        pushToast(typeof data.error === "string" ? data.error : "Kunne ikke behandle anmodningen", "error");
+        return;
+      }
+      pushToast(action === "approve" ? `${data.team?.name ?? "Holdet"} er oprettet, og anmoderen er informeret` : "Anmodningen er afvist", "success");
+      setRequestToReject(null);
+      setRejectReason("");
+      await Promise.all([load(), loadRequests(), refreshDashboardTeam()]);
+    } finally {
+      setRequestBusyId(null);
+    }
+  }
+
   async function deleteTeam() {
     if (!teamToDelete) return;
     setDeleting(true);
@@ -125,7 +168,38 @@ export default function AdminPage() {
 
   return (
     <div className="min-w-0 flex-1 space-y-6">
-      <PageHeader title="Admin" subtitle="Opret og administrér hold. Kun synligt for dig." />
+      <PageHeader title="Systemadmin" subtitle="Godkend holdanmodninger, og opret og administrér hold. Kun synligt for dig." />
+
+      <Section title="Holdanmodninger">
+        {teamRequests === null ? (
+          <Skeleton className="h-24 w-full" />
+        ) : (
+          <ListGroup>
+            {teamRequests.map((request) => (
+              <ListRow
+                key={request.id}
+                title={request.name}
+                subtitle={`${request.slug} · ${request.requester.name}${request.requester.email ? ` (${request.requester.email})` : ""} · ${new Date(request.createdAt).toLocaleDateString("da-DK")}`}
+                trailing={
+                  request.status === "PENDING" ? (
+                    <div className="flex items-center gap-2">
+                      <Button size="sm" variant="secondary" disabled={requestBusyId === request.id} onClick={() => setRequestToReject(request)}>
+                        Afvis
+                      </Button>
+                      <Button size="sm" loading={requestBusyId === request.id} onClick={() => decideRequest(request.id, "approve")}>
+                        Godkend
+                      </Button>
+                    </div>
+                  ) : (
+                    <Chip tone="neutral">{request.status === "APPROVED" ? "Godkendt" : "Afvist"}</Chip>
+                  )
+                }
+              />
+            ))}
+            {teamRequests.length === 0 ? <p className="p-4 text-sm text-ink/60">Ingen holdanmodninger.</p> : null}
+          </ListGroup>
+        )}
+      </Section>
 
       <Section title="Opret nyt hold">
         <form onSubmit={createTeam} className="space-y-3 rounded-[1.375rem] border border-line bg-surface p-4">
@@ -198,6 +272,23 @@ export default function AdminPage() {
       <p className="text-xs text-ink/55">
         Et hold kan kun slettes, når der ingen spillere er på det. Åbn holdet under Hold for at fjerne spillere enkeltvis.
       </p>
+      <ConfirmSheet
+        open={requestToReject !== null}
+        onClose={() => setRequestToReject(null)}
+        onConfirm={() => requestToReject && decideRequest(requestToReject.id, "reject", rejectReason)}
+        loading={requestBusyId !== null}
+        title={`Afvis ${requestToReject?.name ?? "anmodningen"}?`}
+        description="Holdkoden frigives, og anmoderen får en mail. Du kan skrive en begrundelse nedenfor."
+        confirmLabel="Afvis anmodning"
+      >
+        <input
+          value={rejectReason}
+          onChange={(event) => setRejectReason(event.target.value)}
+          className={inputClass}
+          placeholder="Begrundelse (valgfri)"
+          maxLength={500}
+        />
+      </ConfirmSheet>
       <ConfirmSheet
         open={teamToDelete !== null}
         onClose={() => setTeamToDelete(null)}

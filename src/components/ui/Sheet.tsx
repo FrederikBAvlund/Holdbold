@@ -174,7 +174,8 @@ export function ConfirmSheet({
   confirmLabel,
   cancelLabel = "Fortryd",
   tone = "danger",
-  loading
+  loading,
+  children
 }: {
   open: boolean;
   onClose: () => void;
@@ -185,9 +186,11 @@ export function ConfirmSheet({
   cancelLabel?: string;
   tone?: "danger" | "primary";
   loading?: boolean;
+  children?: ReactNode;
 }) {
   return (
     <Sheet open={open} onClose={onClose} title={title} description={description} dismissible={!loading}>
+      {children ? <div className="pb-2">{children}</div> : null}
       <div className="flex flex-col gap-2 pt-2 sm:flex-row-reverse">
         <Button
           block

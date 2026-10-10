@@ -21,3 +21,13 @@ export const THEME_PRESETS = [
 export type ThemePresetId = (typeof THEME_PRESETS)[number]["id"];
 
 export const DEFAULT_THEME_ID: ThemePresetId = "graphite";
+
+export function isThemePresetId(value: string | null | undefined): value is ThemePresetId {
+  return THEME_PRESETS.some((preset) => preset.id === value);
+}
+
+/** Det tema en bruger ser: eget valg vinder, ellers holdets, ellers standardtemaet. */
+export function effectiveThemeId(userTheme: string | null | undefined, teamTheme: string | null | undefined): string {
+  const valid = (theme: string | null | undefined) => (theme === "custom" || isThemePresetId(theme) ? theme : null);
+  return valid(userTheme) ?? valid(teamTheme) ?? DEFAULT_THEME_ID;
+}

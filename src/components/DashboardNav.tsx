@@ -239,8 +239,8 @@ function TeamSwitcherSheet({ open, onClose }: { open: boolean; onClose: () => vo
               <Icon name="settings" className="h-5 w-5" />
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block truncate font-semibold text-ink">Admin</span>
-              <span className="block text-sm text-ink/55">Opret og administrér hold</span>
+              <span className="block truncate font-semibold text-ink">Systemadmin</span>
+              <span className="block text-sm text-ink/55">Hold og holdanmodninger</span>
             </span>
             {adminActive ? <Icon name="check" className="h-5 w-5 text-moss" strokeWidth={2.6} /> : null}
           </button>
@@ -310,6 +310,22 @@ function TeamSwitcherSheet({ open, onClose }: { open: boolean; onClose: () => vo
             <span className="block text-sm text-ink/55">Brug en holdkode</span>
           </span>
         </button>
+        <button
+          type="button"
+          onClick={() => {
+            router.push("/dashboard/opret-hold");
+            closeSheet();
+          }}
+          className="flex min-h-[3.75rem] w-full items-center gap-3 rounded-2xl border border-dashed border-line px-4 text-left transition hover:bg-ink/[0.03] active:scale-[0.99]"
+        >
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/12 text-moss">
+            <Icon name="users" className="h-5 w-5" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate font-semibold text-ink">Anmod om nyt hold</span>
+            <span className="block text-sm text-ink/55">Opret dit eget hold</span>
+          </span>
+        </button>
       </div>
       )}
     </Sheet>
@@ -350,7 +366,7 @@ export default function DashboardNav({
     [memberships, pendingMemberships, teamId]
   );
   const teamName = pathname.startsWith(ADMIN_HREF) && session?.user?.isSuperAdmin
-    ? "Admin"
+    ? "Systemadmin"
     : activeTeam?.team?.name ?? "Holdbold";
   const isSuperAdmin = session?.user?.isSuperAdmin === true;
   // Alle kan åbne holdvælgeren, fordi den også bruges til at tilmelde sig et nyt hold.
