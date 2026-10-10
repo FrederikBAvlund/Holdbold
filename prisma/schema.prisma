@@ -191,7 +191,7 @@ model Membership {
   status    MembershipStatus @default(ACTIVE)
   createdAt DateTime @default(now())
 
-  user User @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   team Team @relation(fields: [teamId], references: [id])
 
   @@unique([userId, teamId])
@@ -212,12 +212,12 @@ model EventSeries {
   signupDeadlineHoursBefore Int      @default(24)
   kind                     EventKind @default(TRAINING)
   seasonId                 String
-  createdById              String
+  createdById              String?
   createdAt                DateTime @default(now())
 
   team Team @relation(fields: [teamId], references: [id])
   season Season @relation(fields: [seasonId], references: [id])
-  createdBy User @relation(fields: [createdById], references: [id])
+  createdBy User? @relation(fields: [createdById], references: [id], onDelete: SetNull)
   events Event[]
 }
 
@@ -361,7 +361,7 @@ model Signup {
   updatedAt DateTime     @updatedAt
 
   event Event @relation(fields: [eventId], references: [id])
-  user User @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   absence Absence? @relation(fields: [absenceId], references: [id], onDelete: SetNull)
   logs SignupLog[]
 
@@ -384,7 +384,7 @@ model Absence {
   createdAt   DateTime      @default(now())
 
   team      Team     @relation(fields: [teamId], references: [id])
-  user      User     @relation("AbsenceUser", fields: [userId], references: [id])
+  user      User     @relation("AbsenceUser", fields: [userId], references: [id], onDelete: Cascade)
   decidedBy User?    @relation("AbsenceDecider", fields: [decidedById], references: [id])
   signups   Signup[]
 
@@ -402,9 +402,9 @@ model SignupLog {
   createdAt DateTime     @default(now())
 
   signupId String
-  signup   Signup @relation(fields: [signupId], references: [id])
+  signup   Signup @relation(fields: [signupId], references: [id], onDelete: Cascade)
   event Event @relation(fields: [eventId], references: [id])
-  user User @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([eventId, createdAt])
   @@index([userId, createdAt])
@@ -424,7 +424,7 @@ model Notification {
   readAt    DateTime?
   createdAt DateTime         @default(now())
 
-  user User @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   team Team? @relation(fields: [teamId], references: [id])
 
   @@index([userId, readAt])
@@ -471,7 +471,7 @@ model Fine {
 
   team Team @relation(fields: [teamId], references: [id])
   season Season @relation(fields: [seasonId], references: [id])
-  user User @relation("FineRecipient", fields: [userId], references: [id])
+  user User @relation("FineRecipient", fields: [userId], references: [id], onDelete: Cascade)
   event Event? @relation(fields: [eventId], references: [id])
   template FineTemplate? @relation(fields: [templateId], references: [id])
   createdBy User? @relation("FineCreator", fields: [createdById], references: [id])
@@ -541,12 +541,12 @@ model FineCollection {
   intervalHours Int     @default(24)
   lastRunAt    DateTime?
   isActive     Boolean  @default(true)
-  createdById  String
+  createdById  String?
   createdAt    DateTime @default(now())
 
   team      Team        @relation(fields: [teamId], references: [id])
   template  FineTemplate @relation(fields: [templateId], references: [id])
-  createdBy User        @relation("FineCollectionCreator", fields: [createdById], references: [id])
+  createdBy User?       @relation("FineCollectionCreator", fields: [createdById], references: [id], onDelete: SetNull)
 
   @@index([teamId, isActive])
   @@index([deadlineAt])

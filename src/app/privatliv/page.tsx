@@ -40,8 +40,9 @@ export default function PrivatlivPage() {
         <section className="space-y-2 text-ink/80">
           <h2 className="text-xl font-semibold text-ink">Opbevaring og sikkerhed</h2>
           <p>
-            Vi opbevarer data så længe kontoen er aktiv eller der er et sagligt behov for historik. Adgangskoder
-            opbevares aldrig i klartekst.
+            Vi opbevarer data, så længe du har en bruger på et hold. Bliver du fjernet fra dit sidste hold, eller
+            beder du om sletning, slettes din bruger og alle data, der hører til den. Adgangskoder opbevares aldrig i
+            klartekst.
           </p>
         </section>
 

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { authOptions } from "@/lib/auth";
 import { createNotifications } from "@/lib/notifications";
@@ -93,31 +94,29 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
     return NextResponse.json({ removed: true, userDeleted: false });
   }
 
-  const relatedCounts = await prisma.$transaction([
-    prisma.signup.count({ where: { userId } }),
-    prisma.fine.count({ where: { userId } }),
-    prisma.event.count({ where: { createdById: userId } })
-  ]);
+  // GDPR: Når brugeren ikke længere er på noget hold, slettes brugeren helt. Bøder, tilmeldinger,
+  // notifikationer, fravær m.m. følger med (onDelete: Cascade i skemaet). Felter, der blot peger på
+  // brugeren som opretter/godkender, nulstilles, så holdets øvrige data bevares.
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
 
-  const hasRelations = relatedCounts.some((count) => count > 0);
-  if (hasRelations) {
-    return NextResponse.json({
-      removed: true,
-      userDeleted: false,
-      warning: "Brugeren har historik og kan ikke slettes helt."
-    });
-  }
+  await prisma.$transaction(async (tx) => {
+    // Hændelseslog gemmer navne som tekst, så de skal anonymiseres, før brugeren forsvinder.
+    if (user?.name.trim()) {
+      const [signups, actorLogs] = await Promise.all([
+        tx.signup.findMany({ where: { userId }, select: { eventId: true } }),
+        tx.eventLog.findMany({ where: { actorId: userId }, select: { eventId: true } })
+      ]);
+      const eventIds = Array.from(new Set([...signups, ...actorLogs].map((row) => row.eventId)));
+      if (eventIds.length > 0) {
+        await tx.$executeRaw`
+          UPDATE "EventLog"
+          SET "message" = REPLACE("message", ${user.name}, 'Slettet bruger')
+          WHERE "eventId" IN (${Prisma.join(eventIds)})
+        `;
+      }
+    }
+    await tx.user.delete({ where: { id: userId } });
+  });
 
-  // Medlemskabet er allerede fjernet. Hænger brugeren stadig sammen med andre data (notifikationer,
-  // fravær, afstemninger …), må det ikke vælte svaret – så ser klienten fejl, selvom spilleren er væk.
-  try {
-    await prisma.user.delete({ where: { id: userId } });
-  } catch {
-    return NextResponse.json({
-      removed: true,
-      userDeleted: false,
-      warning: "Brugeren har historik og kan ikke slettes helt."
-    });
-  }
   return NextResponse.json({ removed: true, userDeleted: true });
 }

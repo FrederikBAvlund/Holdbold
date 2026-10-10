@@ -162,7 +162,7 @@ export default function MemberSheet({
         onConfirm={remove}
         loading={saving === "remove"}
         title={`Fjern ${name.split(" ")[0]}?`}
-        description="Medlemmet mister adgang til holdet. Historik som bøder og svar bliver gemt."
+        description="Medlemmet mister adgang til holdet. Er medlemmet ikke på andre hold, slettes brugeren helt, inkl. bøder, svar og notifikationer."
         confirmLabel="Fjern fra holdet"
       />
     </>
