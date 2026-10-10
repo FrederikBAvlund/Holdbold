@@ -3,7 +3,8 @@ import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { requireSuperAdmin } from "@/lib/apiAuth";
 import { prisma } from "@/lib/prisma";
-import { slugify } from "@/lib/superAdmin";
+import { checkSlugAvailable, SLUG_ERROR_MESSAGES } from "@/lib/reservedSlugs";
+import { createTeamWithAdmin } from "@/lib/teams";
 
 export async function GET() {
   const auth = await requireSuperAdmin();
@@ -63,23 +64,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: message ?? "Ugyldigt input" }, { status: 400 });
   }
 
-  const slug = slugify(body.slug);
-  if (slug.length < 2) {
-    return NextResponse.json({ error: "Holdkoden skal indeholde mindst 2 bogstaver eller tal" }, { status: 400 });
+  const check = await checkSlugAvailable(body.slug);
+  if (!check.ok) {
+    return NextResponse.json({ error: SLUG_ERROR_MESSAGES[check.reason] }, { status: check.reason === "too_short" ? 400 : 409 });
   }
-  if (await prisma.team.findUnique({ where: { slug }, select: { id: true } })) {
-    return NextResponse.json({ error: "Holdkoden er allerede i brug af et andet hold" }, { status: 409 });
-  }
+  const slug = check.slug;
 
   try {
-    const team = await prisma.$transaction(async (tx) => {
-      const created = await tx.team.create({ data: { name: body.name, slug } });
-      await tx.season.create({ data: { teamId: created.id, name: "Sæson 1" } });
-      await tx.membership.create({
-        data: { teamId: created.id, userId: auth.userId, role: "ADMIN", status: "ACTIVE" }
-      });
-      return created;
-    });
+    const team = await prisma.$transaction((tx) =>
+      createTeamWithAdmin(tx, { name: body.name, slug, adminUserId: auth.userId })
+    );
     return NextResponse.json({ team }, { status: 201 });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {

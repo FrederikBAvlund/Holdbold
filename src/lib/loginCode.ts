@@ -43,7 +43,7 @@ function skip(reason: string) {
 }
 
 /** Spørger rate limits og opretter + sender koden. Gør intet synligt, hvis grænserne er nået. */
-async function issueCode(email: string, signup?: { name: string; teamId: string }): Promise<void> {
+async function issueCode(email: string, signup?: { name: string; teamId: string | null }): Promise<void> {
   const now = Date.now();
   const recent = await prisma.loginCode.findMany({
     where: { email, createdAt: { gte: new Date(now - 60 * 60 * 1000) } },
@@ -63,7 +63,8 @@ async function issueCode(email: string, signup?: { name: string; teamId: string 
       codeHash: hashLoginCode(email, code),
       expiresAt: new Date(now + LOGIN_CODE_TTL_MS),
       signupName: signup?.name ?? null,
-      signupTeamId: signup?.teamId ?? null
+      signupTeamId: signup?.teamId ?? null,
+      signupForTeamRequest: Boolean(signup && !signup.teamId)
     }
   });
 
@@ -73,6 +74,15 @@ async function issueCode(email: string, signup?: { name: string; teamId: string 
     text: `Din kode til at ${signup ? "oprette din bruger" : "logge ind"} på Holdbold er ${code}.\n\nKoden udløber om 10 minutter. Har du ikke bedt om den, kan du ignorere mailen.`,
     html: `<p>Din kode til at ${signup ? "oprette din bruger" : "logge ind"} på Holdbold er</p><p style="font-size:28px;font-weight:700;letter-spacing:6px">${code}</p><p>Koden udløber om 10 minutter. Har du ikke bedt om den, kan du ignorere mailen.</p>`
   });
+}
+
+/** En bruger kan logge ind, når vedkommende har et medlemskab (aktivt/afventende) eller har anmodet om et hold. */
+export async function userCanLogIn(userId: string): Promise<boolean> {
+  const [membership, request] = await Promise.all([
+    prisma.membership.findFirst({ where: { userId, status: { in: ["ACTIVE", "PENDING"] } }, select: { id: true } }),
+    prisma.teamRequest.findFirst({ where: { userId }, select: { id: true } })
+  ]);
+  return Boolean(membership || request);
 }
 
 /**
@@ -88,11 +98,7 @@ export async function requestLoginCode(rawEmail: string): Promise<void> {
   });
   if (!user) return skip("no_user_with_email");
 
-  const hasMembership = await prisma.membership.findFirst({
-    where: { userId: user.id, status: { in: ["ACTIVE", "PENDING"] } },
-    select: { id: true }
-  });
-  if (!hasMembership) return skip("user_has_no_membership");
+  if (!(await userCanLogIn(user.id))) return skip("user_has_no_membership");
 
   await issueCode(email);
 }
@@ -116,7 +122,25 @@ export async function requestSignupCode(input: { email: string; name: string; te
   return { status: "sent" };
 }
 
-export type VerifiedLoginCode = { ok: false } | { ok: true; signup: { name: string; teamId: string } | null };
+export type VerifiedLoginCode =
+  | { ok: false }
+  | { ok: true; signup: { name: string; teamId: string } | null; teamRequestSignup: { name: string } | null };
+
+export type TeamRequesterCodeResult = { status: "sent" } | { status: "email_taken" };
+
+/** Sender en kode til en ny bruger, der vil anmode om et hold. Brugeren oprettes uden hold, når koden er bekræftet. */
+export async function requestTeamRequesterCode(input: { email: string; name: string }): Promise<TeamRequesterCodeResult> {
+  const email = normalizeEmail(input.email);
+  const existing = await prisma.user.findFirst({
+    where: { email: { equals: email, mode: "insensitive" } },
+    select: { id: true }
+  });
+  // En bruger uden hold og uden anmodning (fx afbrudt oprettelse) kan godt prøve igen.
+  if (existing && (await userCanLogIn(existing.id))) return { status: "email_taken" };
+
+  await issueCode(email, { name: input.name.trim(), teamId: null });
+  return { status: "sent" };
+}
 
 /** Forbruger koden, hvis den er korrekt, ikke udløbet og ikke brugt. Returnerer evt. signup-data. */
 export async function verifyLoginCode(rawEmail: string, code: string): Promise<VerifiedLoginCode> {
@@ -143,6 +167,7 @@ export async function verifyLoginCode(rawEmail: string, code: string): Promise<V
 
   return {
     ok: true,
-    signup: record.signupName && record.signupTeamId ? { name: record.signupName, teamId: record.signupTeamId } : null
+    signup: record.signupName && record.signupTeamId ? { name: record.signupName, teamId: record.signupTeamId } : null,
+    teamRequestSignup: record.signupName && record.signupForTeamRequest ? { name: record.signupName } : null
   };
 }

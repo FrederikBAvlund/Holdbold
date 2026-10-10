@@ -114,6 +114,7 @@ model User {
   accounts     Account[]
   sessions     Session[]
   memberships  Membership[]
+  teamRequests TeamRequest[]
   signups      Signup[]
   createdSeries EventSeries[]
   createdEvents Event[]      @relation("EventCreatedBy")
@@ -161,6 +162,7 @@ model Team {
   seasons     Season[]
   absences    Absence[]
   openAiCredential TeamOpenAiCredential?
+  teamRequests TeamRequest[]
 }
 
 // Separate from Team so ordinary team queries never include credential material.
@@ -619,6 +621,8 @@ model LoginCode {
   /// Sat, når koden bruges til at oprette en ny bruger (navn + hold fra signup).
   signupName   String?
   signupTeamId String?
+  /// Sat, når koden bruges til at oprette en bruger uden hold, som vil anmode om et nyt hold.
+  signupForTeamRequest Boolean @default(false)
 
   @@index([email, createdAt])
 }
@@ -628,4 +632,33 @@ model AuthRateLimit {
   key         String   @id
   count       Int
   windowStart DateTime
+}
+
+
+enum TeamRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+/// Anmodning om at oprette et hold. Slug'en er reserveret, mens anmodningen er PENDING
+/// (partielt unikt indeks i migrationen); et godkendt hold holder selv koden via Team.slug.
+model TeamRequest {
+  id              String            @id @default(cuid())
+  userId          String
+  name            String
+  slug            String
+  themePreset     String            @default("graphite")
+  status          TeamRequestStatus @default(PENDING)
+  rejectionReason String?
+  teamId          String?
+  decidedById     String?
+  decidedAt       DateTime?
+  createdAt       DateTime          @default(now())
+
+  user User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  team Team? @relation(fields: [teamId], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([userId])
 }

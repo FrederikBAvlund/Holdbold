@@ -4,7 +4,7 @@ import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { slugify } from "@/lib/superAdmin";
+import { checkSlugAvailable, SLUG_ERROR_MESSAGES } from "@/lib/reservedSlugs";
 
 const themeConfigSchema = z
   .object({
@@ -35,11 +35,21 @@ export async function GET(_request: Request, { params }: { params: { id: string 
   }
 
   const membership = await prisma.membership.findFirst({
-    where: { teamId: params.id, userId: session.user.id, status: "ACTIVE" },
-    select: { id: true }
+    where: { teamId: params.id, userId: session.user.id, status: { in: ["ACTIVE", "PENDING"] } },
+    select: { id: true, status: true }
   });
   if (!membership) {
     return NextResponse.json({ error: "Ikke adgang" }, { status: 403 });
+  }
+
+  // Afventende medlemmer får kun holdets navn og tema, så appen allerede har holdets udseende.
+  if (membership.status === "PENDING") {
+    const themeOnly = await prisma.team.findUnique({
+      where: { id: params.id },
+      select: { id: true, name: true, themePreset: true, themeConfig: true }
+    });
+    if (!themeOnly) return NextResponse.json({ error: "Team ikke fundet" }, { status: 404 });
+    return NextResponse.json({ team: themeOnly });
   }
 
   const team = await prisma.team.findUnique({
@@ -79,23 +89,15 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
   let slug: string | undefined;
   if (body.slug !== undefined) {
-    slug = slugify(body.slug);
-    if (slug.length < 2) {
+    const check = await checkSlugAvailable(body.slug, { ignoreTeamId: params.id });
+    if (!check.ok) {
+      const message = SLUG_ERROR_MESSAGES[check.reason];
       return NextResponse.json(
-        { error: "Holdkode skal have mindst 2 tegn (bogstaver og tal)", fieldErrors: { slug: "For kort" } },
-        { status: 400 }
+        { error: message, fieldErrors: { slug: message } },
+        { status: check.reason === "too_short" ? 400 : 409 }
       );
     }
-    const taken = await prisma.team.findFirst({
-      where: { slug, id: { not: params.id } },
-      select: { id: true }
-    });
-    if (taken) {
-      return NextResponse.json(
-        { error: "Holdkoden er allerede i brug", fieldErrors: { slug: "Holdkoden er allerede i brug" } },
-        { status: 409 }
-      );
-    }
+    slug = check.slug;
   }
 
   const updateData = {

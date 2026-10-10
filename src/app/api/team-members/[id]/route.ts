@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { authOptions } from "@/lib/auth";
-import { createNotifications } from "@/lib/notifications";
+import { notifyMembershipActivated } from "@/lib/membershipNotify";
 import { notificationRef, resolveNotifications } from "@/lib/notificationRefs";
 import { prisma } from "@/lib/prisma";
 
@@ -48,16 +48,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
   if (membership.status === "PENDING" && updated.status === "ACTIVE") {
     await resolveNotifications([notificationRef.membership(membership.teamId, membership.userId)]);
-    await createNotifications([
-      {
-        userId: membership.userId,
-        teamId: membership.teamId,
-        type: "GENERAL",
-        title: "Din adgang er godkendt",
-        body: "Du har nu adgang til holdet.",
-        link: "/dashboard"
-      }
-    ]);
+    await notifyMembershipActivated({ userId: membership.userId, teamId: membership.teamId });
   }
 
   return NextResponse.json({ membership: updated });

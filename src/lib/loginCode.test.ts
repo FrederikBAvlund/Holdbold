@@ -9,6 +9,7 @@ import {
   hashLoginCode,
   requestLoginCode,
   requestSignupCode,
+  requestTeamRequesterCode,
   verifyLoginCode
 } from "./loginCode";
 
@@ -17,6 +18,7 @@ vi.mock("@/lib/prisma", () => ({
     user: { findFirst: vi.fn() },
     team: { findUnique: vi.fn() },
     membership: { findFirst: vi.fn() },
+    teamRequest: { findFirst: vi.fn() },
     loginCode: { findMany: vi.fn(), findFirst: vi.fn(), create: vi.fn(), update: vi.fn(), updateMany: vi.fn() }
   }
 }));
@@ -27,12 +29,14 @@ const db = prisma as unknown as {
   user: { findFirst: ReturnType<typeof vi.fn> };
   membership: { findFirst: ReturnType<typeof vi.fn> };
   team: { findUnique: ReturnType<typeof vi.fn> };
+  teamRequest: { findFirst: ReturnType<typeof vi.fn> };
   loginCode: Record<"findMany" | "findFirst" | "create" | "update" | "updateMany", ReturnType<typeof vi.fn>>;
 };
 
 beforeEach(() => {
   vi.stubEnv("NEXTAUTH_SECRET", "test-secret");
   vi.mocked(checkRateLimit).mockResolvedValue({ allowed: true, count: 1 });
+  db.teamRequest.findFirst.mockResolvedValue(null);
 });
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -118,7 +122,7 @@ describe("verifyLoginCode", () => {
   it("accepts a correct code once", async () => {
     db.loginCode.findFirst.mockResolvedValue(record());
     db.loginCode.updateMany.mockResolvedValue({ count: 1 });
-    expect(await verifyLoginCode("a@b.dk", "123456")).toEqual({ ok: true, signup: null });
+    expect(await verifyLoginCode("a@b.dk", "123456")).toEqual({ ok: true, signup: null, teamRequestSignup: null });
 
     db.loginCode.updateMany.mockResolvedValue({ count: 0 });
     expect(await verifyLoginCode("a@b.dk", "123456")).toEqual({ ok: false });
@@ -172,6 +176,41 @@ describe("signup codes", () => {
       signupTeamId: "t1"
     });
     db.loginCode.updateMany.mockResolvedValue({ count: 1 });
-    expect(await verifyLoginCode("ny@b.dk", "123456")).toEqual({ ok: true, signup: { name: "Ny Bruger", teamId: "t1" } });
+    expect(await verifyLoginCode("ny@b.dk", "123456")).toEqual({ ok: true, signup: { name: "Ny Bruger", teamId: "t1" }, teamRequestSignup: null });
+  });
+});
+
+describe("team requester codes", () => {
+  beforeEach(() => {
+    db.loginCode.findMany.mockResolvedValue([]);
+    db.membership.findFirst.mockResolvedValue(null);
+  });
+
+  it("sends a code flagged for team request signup to a new email", async () => {
+    db.user.findFirst.mockResolvedValue(null);
+    expect(await requestTeamRequesterCode({ email: "Ny@B.dk", name: "Ny" })).toEqual({ status: "sent" });
+    expect(db.loginCode.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ email: "ny@b.dk", signupName: "Ny", signupTeamId: null, signupForTeamRequest: true })
+    });
+    expect(sendMail).toHaveBeenCalledTimes(1);
+  });
+
+  it("tells existing users with a team to log in instead", async () => {
+    db.user.findFirst.mockResolvedValue({ id: "u1" });
+    db.membership.findFirst.mockResolvedValue({ id: "m1" });
+    expect(await requestTeamRequesterCode({ email: "a@b.dk", name: "A" })).toEqual({ status: "email_taken" });
+    expect(sendMail).not.toHaveBeenCalled();
+  });
+
+  it("lets an abandoned account without team or request try again", async () => {
+    db.user.findFirst.mockResolvedValue({ id: "u1" });
+    expect(await requestTeamRequesterCode({ email: "a@b.dk", name: "A" })).toEqual({ status: "sent" });
+  });
+
+  it("lets users with only a team request log in", async () => {
+    db.user.findFirst.mockResolvedValue({ id: "u1" });
+    db.teamRequest.findFirst.mockResolvedValue({ id: "r1" });
+    await requestLoginCode("a@b.dk");
+    expect(sendMail).toHaveBeenCalledTimes(1);
   });
 });

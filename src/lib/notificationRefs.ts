@@ -6,6 +6,7 @@ export const notificationRef = {
   template: (templateId: string) => `template:${templateId}`,
   payment: (teamId: string, userId: string) => `payment:${teamId}:${userId}`,
   membership: (teamId: string, userId: string) => `membership:${teamId}:${userId}`,
+  teamRequest: (requestId: string) => `team-request:${requestId}`,
   absence: (absenceId: string) => `absence:${absenceId}`
 };
 

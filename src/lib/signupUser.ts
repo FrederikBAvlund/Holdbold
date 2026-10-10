@@ -24,6 +24,16 @@ export async function createUserFromSignup(input: { email: string; name: string;
   return user;
 }
 
+/** Opretter en bruger uden hold, som vil anmode om et nyt hold. Returnerer null, hvis e-mailen allerede findes. */
+export async function createUserForTeamRequest(input: { email: string; name: string }) {
+  try {
+    return await prisma.user.create({ data: { name: input.name, email: input.email } });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") return null;
+    throw error;
+  }
+}
+
 /** Giver holdets admins besked om, at en bruger afventer godkendelse. */
 export async function notifyAdminsOfPendingMember(input: { teamId: string; userId: string; name: string }) {
   const [team, admins] = await Promise.all([

@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { signOut, useSession } from "next-auth/react";
 import { cn } from "@/lib/utils";
 import { setCustomTheme, setTheme } from "@/components/ThemeProvider";
-import { getStoredTeamId, setStoredTeamId } from "@/components/appState";
+import { clearStoredTheme, getStoredTeamId, setStoredTeamId } from "@/components/appState";
 import { useToast } from "@/components/ToastProvider";
 import { invalidateDashboardTeam, useDashboardTeam } from "@/components/DashboardTeamProvider";
 import CalendarFeedSettings from "@/components/CalendarFeedSettings";
@@ -340,6 +340,7 @@ export default function ProfilPage() {
   async function handleSignOut() {
     if (signingOut) return;
     setSigningOut(true);
+    clearStoredTheme();
     await signOut({ callbackUrl: "/login" });
   }
 
