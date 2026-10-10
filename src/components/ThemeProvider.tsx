@@ -3,22 +3,12 @@
 import { useEffect } from "react";
 import { getStoredTeamId, getStoredTheme, setStoredTeamId, setStoredTheme } from "@/components/appState";
 import { fetchMeCached } from "@/lib/meClientCache";
+import { THEME_PRESETS } from "@/lib/themePresets";
 
 const DEFAULT_THEME = "atlantic";
-const SUPPORTED_THEMES = [
-  "atlantic",
-  "forest",
-  "crimson",
-  "sunset",
-  "lavender",
-  "ocean",
-  "midnight",
-  "neon",
-  "mono",
-  "custom"
-];
+const SUPPORTED_THEMES: string[] = [...THEME_PRESETS.map((preset) => preset.id), "custom"];
 
-// Ældre presets (sandstone, neon osv.) er udgået og falder tilbage til standardtemaet.
+// Ældre presets (sandstone, mono, sunset, neon osv.) er udgået og falder tilbage til standardtemaet.
 function normalizeTheme(theme: string | null | undefined) {
   return theme && SUPPORTED_THEMES.includes(theme) ? theme : DEFAULT_THEME;
 }

@@ -93,7 +93,7 @@ export default function RsvpControl({
     const selected = current === kind;
     if (onHero) {
       if (selected) return kind === "IN" ? "bg-white text-[#0b0f14]" : "bg-[#0b0f14]/35 text-white ring-2 ring-white/70";
-      return "bg-white/15 text-white hover:bg-white/25";
+      return "bg-on-primary/15 text-on-primary hover:bg-on-primary/25";
     }
     if (selected) return kind === "IN" ? "bg-in text-on-solid" : "bg-out text-on-solid";
     return kind === "IN" ? "bg-in/12 text-in hover:bg-in/20" : "bg-out/10 text-out hover:bg-out/15";

@@ -29,10 +29,10 @@
   --fog: color-mix(in srgb, var(--color-fog) 30%, #ffffff);
   --moss: var(--color-moss);
   --ember: var(--color-ember);
-  --bg: color-mix(in srgb, var(--color-moss) 5%, #f4f6fa);
-  --surface: color-mix(in srgb, var(--color-fog) 22%, #ffffff);
-  --surface-2: color-mix(in srgb, var(--color-ink) 4%, var(--surface));
-  --line: color-mix(in srgb, var(--color-ink) 10%, transparent);
+  --bg: color-mix(in srgb, var(--color-moss) 9%, #f1f4f9);
+  --surface: color-mix(in srgb, var(--color-moss) 2%, color-mix(in srgb, var(--color-fog) 22%, #ffffff));
+  --surface-2: color-mix(in srgb, var(--color-moss) 7%, var(--surface));
+  --line: color-mix(in srgb, var(--color-moss) 18%, transparent);
   --primary: var(--color-button);
   --on-primary: var(--color-button-text);
   --success: #15803d;
@@ -51,9 +51,12 @@
   --surface-soft: var(--surface-2);
   --surface-border: var(--line);
 
-  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05), 0 2px 8px -2px rgba(15, 23, 42, 0.06);
-  --shadow-md: 0 1px 2px rgba(15, 23, 42, 0.05), 0 10px 28px -14px rgba(15, 23, 42, 0.16);
-  --shadow-lg: 0 24px 60px -24px rgba(15, 23, 42, 0.35);
+  /* Skygger farves af temaet, så kort "løfter sig" i hovedfarven frem for at være grå. */
+  --shadow-sm: 0 1px 2px color-mix(in srgb, var(--color-ink) 8%, transparent),
+    0 2px 8px -2px color-mix(in srgb, var(--color-moss) 18%, transparent);
+  --shadow-md: 0 1px 2px color-mix(in srgb, var(--color-ink) 8%, transparent),
+    0 12px 28px -12px color-mix(in srgb, var(--color-moss) 38%, transparent);
+  --shadow-lg: 0 24px 60px -22px color-mix(in srgb, var(--color-ink) 50%, transparent);
 
   --radius-card: 1.25rem;
   --radius-card-soft: 1rem;
@@ -85,6 +88,40 @@
     --shadow-md: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 28px -14px rgba(0, 0, 0, 0.6);
     --shadow-lg: 0 24px 60px -20px rgba(0, 0, 0, 0.8);
   }
+}
+
+/*
+  Mørke temaer: altid mørke, uanset systemets indstilling.
+  Samme afledte tokens som mørk tilstand ovenfor, så de skal holdes ens.
+*/
+:root[data-theme="graphite"],
+:root[data-theme="obsidian"],
+:root[data-theme="nightfall"],
+:root[data-theme="embers"],
+:root[data-theme="blackgold"] {
+  color-scheme: dark;
+  --ink: color-mix(in srgb, var(--color-fog) 88%, #ffffff);
+  --bg: color-mix(in srgb, var(--color-ink) 55%, #05070b);
+  --fog: color-mix(in srgb, var(--bg) 88%, #ffffff);
+  --surface: color-mix(in srgb, var(--bg) 91%, #ffffff);
+  --surface-2: color-mix(in srgb, var(--bg) 83%, #ffffff);
+  --line: color-mix(in srgb, #ffffff 12%, transparent);
+  --moss: color-mix(in srgb, var(--color-moss) 68%, #ffffff);
+  --ember: color-mix(in srgb, var(--color-ember) 70%, #ffffff);
+  --primary: color-mix(in srgb, var(--color-moss) 68%, #ffffff);
+  --on-primary: color-mix(in srgb, var(--color-ink) 80%, #000000);
+  --success: #4ade80;
+  --on-solid: #0b0f14;
+  --warning: #fbbf24;
+  --danger: #f05252;
+  --scrim: rgba(0, 0, 0, 0.62);
+  --in: #4ade80;
+  --out: #fb7185;
+  --pending: #fbbf24;
+  --kind-training: #94a3b8;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 28px -14px rgba(0, 0, 0, 0.6);
+  --shadow-lg: 0 24px 60px -20px rgba(0, 0, 0, 0.8);
 }
 
 * {
@@ -137,11 +174,14 @@ h3 {
   position: relative;
   isolation: isolate;
   overflow: hidden;
-  background: linear-gradient(
-    135deg,
-    var(--primary) 0%,
-    color-mix(in srgb, var(--primary) 78%, #000000) 100%
-  );
+  background:
+    radial-gradient(120% 90% at 0% 0%, color-mix(in srgb, #ffffff 13%, transparent) 0%, transparent 55%),
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--primary) 94%, #ffffff) 0%,
+      var(--primary) 40%,
+      color-mix(in srgb, var(--primary) 82%, var(--color-ember)) 100%
+    );
   color: var(--on-primary);
 }
 
@@ -382,17 +422,6 @@ button {
   --color-button-text: #ffffff;
 }
 
-/* Orange og varm – klassisk "bortetrøje"-energi */
-:root[data-theme="sunset"] {
-  --color-ink: #2a1408;
-  --color-clay: #fdba74;
-  --color-moss: #ea580c;
-  --color-ember: #f59e0b;
-  --color-fog: #fff7ed;
-  --color-button: #ea580c;
-  --color-button-text: #ffffff;
-}
-
 /* Lilla med kant */
 :root[data-theme="lavender"] {
   --color-ink: #1e1035;
@@ -426,25 +455,92 @@ button {
   --color-button-text: #ffffff;
 }
 
-/* Neon: limegrøn som et træningsvest */
-:root[data-theme="neon"] {
-  --color-ink: #111a05;
-  --color-clay: #bef264;
-  --color-moss: #4d7c0f;
-  --color-ember: #65a30d;
-  --color-fog: #f7fee7;
-  --color-button: #3f6212;
-  --color-button-text: #f7fee7;
+/* Berry: mørk magenta med lyserød accent */
+:root[data-theme="berry"] {
+  --color-ink: #2a0a2e;
+  --color-clay: #f0abfc;
+  --color-moss: #a21caf;
+  --color-ember: #ec4899;
+  --color-fog: #fdf4ff;
+  --color-button: #a21caf;
+  --color-button-text: #ffffff;
 }
 
-:root[data-theme="mono"] {
-  --color-ink: #0f172a;
-  --color-clay: #9ca3af;
-  --color-moss: #334155;
-  --color-ember: #2563eb;
-  --color-fog: #f8fafc;
-  --color-button: #1f2937;
+/* Slate: kølig stålgrå med himmelblå accent */
+:root[data-theme="slate"] {
+  --color-ink: #0f1b2d;
+  --color-clay: #94a3b8;
+  --color-moss: #475569;
+  --color-ember: #0ea5e9;
+  --color-fog: #f1f5f9;
+  --color-button: #334155;
   --color-button-text: #ffffff;
+}
+
+/* Guld: sol-gul med mørk tekst på knapper og hero */
+:root[data-theme="gold"] {
+  --color-ink: #2b2106;
+  --color-clay: #fde68a;
+  --color-moss: #a16207;
+  --color-ember: #ca8a04;
+  --color-fog: #fffbeb;
+  --color-button: #eab308;
+  --color-button-text: #2b2106;
+}
+
+/* Mørke temaer – kun rå brand-farver; mørke tokens afledes i blokken ovenfor */
+:root[data-theme="graphite"] {
+  --color-ink: #1c2128;
+  --color-clay: #8b949e;
+  --color-moss: #2f81f7;
+  --color-ember: #3fb950;
+  --color-fog: #e6edf3;
+  --color-button: #2f6feb;
+  --color-button-text: #ffffff;
+}
+
+/* Ren sort – sparer batteri på OLED-skærme */
+:root[data-theme="obsidian"] {
+  --color-ink: #000000;
+  --color-clay: #52525b;
+  --color-moss: #06b6d4;
+  --color-ember: #22d3ee;
+  --color-fog: #fafafa;
+  --color-button: #0e7490;
+  --color-button-text: #ffffff;
+}
+
+/* Indigo aften med lyserød accent */
+:root[data-theme="nightfall"] {
+  --color-ink: #1b1740;
+  --color-clay: #a5b4fc;
+  --color-moss: #818cf8;
+  --color-ember: #f472b6;
+  --color-fog: #eef2ff;
+  --color-button: #4f46e5;
+  --color-button-text: #ffffff;
+}
+
+/* Varm mørk rød/orange */
+:root[data-theme="embers"] {
+  --color-ink: #2a0f0a;
+  --color-clay: #fdba74;
+  --color-moss: #f97316;
+  --color-ember: #facc15;
+  --color-fog: #fff7ed;
+  --color-button: #c2410c;
+  --color-button-text: #ffffff;
+}
+
+/* Sort og guld */
+:root[data-theme="blackgold"] {
+  --color-ink: #15110a;
+  --color-clay: #a8892f;
+  --color-moss: #eab308;
+  --color-ember: #f59e0b;
+  --color-fog: #fef3c7;
+  --color-button: #eab308;
+  --color-button-text: #2b2106;
 }
 
 @media (prefers-reduced-motion: reduce) {
