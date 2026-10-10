@@ -244,6 +244,8 @@ model Event {
   matchHomeGoals Int?
   matchAwayGoals Int?
   matchMotmUserId String?
+  /// Sat når en træner/admin selv har rettet titel, dato eller sted – så import ikke overskriver det
+  manualOverride Boolean      @default(false)
   seasonId       String
   createdAt      DateTime     @default(now())
 

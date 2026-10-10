@@ -153,6 +153,7 @@ export async function POST(request: Request) {
 
     if (existing) {
       if (existing.seasonId !== activeSeason.id) continue; // arkiveret kamp i lukket sæson røres ikke
+      if (existing.manualOverride) continue; // rettet manuelt af træner/admin – import overskriver det ikke
       await prisma.event.update({
         where: { id: existing.id },
         data: {
