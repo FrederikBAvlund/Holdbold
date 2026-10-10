@@ -108,3 +108,7 @@ Der er ingen Realtime-dialog, talesvar eller parallel fortolkning af lyden. Mode
 koden matcher dem til database-id'er. Usikre navne vælges som vurderede forslag, og manglende frie beløb
 vurderes ud fra holdets takster (25 kr uden takster). Hvert forslag kan rettes eller fjernes før Tildel.
 Lydoptagelsen lagres ikke i databasen. Uploads må højst være 25 MB; hostingens uploadgrænse kan være lavere.
+
+## Hetzner-deployment
+
+Brug [Coolify-guiden](deploy/COOLIFY.md) til automatisk deployment fra `main`, privat PostgreSQL og lokal cron. [Den manuelle guide](deploy/README.md) beskriver også dataflytning, billeder og rollback.

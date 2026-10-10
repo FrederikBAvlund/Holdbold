@@ -1,0 +1,12 @@
+.git
+.next
+node_modules
+dist
+.env
+.env.*
+!.env.example
+public/uploads
+*.log
+*.dump
+backups
+tsconfig.tsbuildinfo

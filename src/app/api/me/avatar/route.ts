@@ -6,6 +6,7 @@ import { resolveProfileImageUrl } from "@/lib/profileImages";
 import { randomUUID } from "crypto";
 import path from "path";
 import { mkdir, writeFile } from "fs/promises";
+import { LOCAL_PROFILE_IMAGE_PREFIX, localProfileImagePath, profileImageExtension } from "@/lib/localProfileImages";
 
 const MAX_SIZE_BYTES = 5 * 1024 * 1024;
 const SUPABASE_BUCKET = process.env.SUPABASE_PROFILE_BUCKET ?? "profile-images";
@@ -39,7 +40,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Filstørrelse er for stor (max 5MB)" }, { status: 400 });
   }
 
-  const ext = getExtension(file.name, file.type);
+  const ext = process.env.LOCAL_PROFILE_UPLOAD_DIR
+    ? profileImageExtension(file.type)
+    : getExtension(file.name, file.type);
+  if (!ext) return NextResponse.json({ error: "Billedformatet understøttes ikke" }, { status: 400 });
   const filename = `${session.user.id}-${randomUUID()}${ext}`;
   const buffer = Buffer.from(await file.arrayBuffer());
 
@@ -47,7 +51,13 @@ export async function POST(request: Request) {
   const supabaseUrl = process.env.SUPABASE_URL;
   const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-  if (supabaseUrl && supabaseServiceRoleKey) {
+  if (process.env.LOCAL_PROFILE_UPLOAD_DIR) {
+    const target = localProfileImagePath(filename);
+    if (!target) return NextResponse.json({ error: "Billedlager er ikke konfigureret korrekt" }, { status: 500 });
+    await mkdir(path.dirname(target), { recursive: true });
+    await writeFile(target, buffer);
+    storedImageValue = `${LOCAL_PROFILE_IMAGE_PREFIX}${filename}`;
+  } else if (supabaseUrl && supabaseServiceRoleKey) {
     const objectPath = `profiles/${filename}`;
     const uploadResponse = await fetch(
       `${supabaseUrl}/storage/v1/object/${SUPABASE_BUCKET}/${objectPath}`,
