@@ -72,9 +72,8 @@ describe("computeGuideState", () => {
     expect(step(s, "fines.assign")).toMatchObject({ status: "done", doneBy: "you" });
   });
 
-  it("siger, at bødeformanden må bede admin om MobilePay Box", () => {
-    expect(step(state({ role: "BOEDEKASSEFORMAND" }), "fines.mobilepay")?.waitingFor).toBe("admin");
-    expect(step(state({ role: "ADMIN" }), "fines.mobilepay")?.waitingFor).toBeNull();
+  it("lader bødeformanden selv tilknytte MobilePay Box, når holdet mangler den", () => {
+    expect(step(state({ role: "BOEDEKASSEFORMAND" }), "fines.mobilepay")?.status).toBe("todo");
   });
 
   it("regner set info-trin som klaret, men ikke set opgaver", () => {

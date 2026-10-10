@@ -44,8 +44,6 @@ export type GuideStep = {
   href: string;
   /** `data-guide`-ankeret på siden, som markeres */
   anchor?: string;
-  /** Hvis kun en anden rettighed kan udføre trinet (fx kan kun admin gemme MobilePay Box) */
-  performedBy?: Capability;
   /** Trinet vises kun, når det giver mening for holdet */
   isRelevant?: (facts: GuideFacts) => boolean;
   /** Afledt af data. Mangler den, er trinet klaret, når brugeren har set det. */
@@ -171,7 +169,6 @@ export const GUIDE_STEPS: readonly GuideStep[] = [
     description: "Så kan spillerne betale deres bøder direkte fra appen.",
     href: "/dashboard/boder?fane=kassen",
     anchor: "mobilepay-box",
-    performedBy: "admin",
     isDone: (f) => f.team.mobilePayBox
   },
   {

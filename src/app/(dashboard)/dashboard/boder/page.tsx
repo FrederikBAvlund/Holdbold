@@ -172,7 +172,6 @@ export default function BoderPage() {
           teamId={teamId}
           data={data}
           memberById={memberById}
-          isAdmin={isAdmin}
           readOnly={isReadOnlySeason}
           busyKey={busyKey}
           run={run}
@@ -599,7 +598,6 @@ function KassenTab({
   teamId,
   data,
   memberById,
-  isAdmin,
   readOnly,
   busyKey,
   run,
@@ -615,7 +613,6 @@ function KassenTab({
   teamId: string;
   data: ReturnType<typeof useFineData>;
   memberById: Map<string, DashboardTeamMember>;
-  isAdmin: boolean;
   readOnly: boolean;
   busyKey: string | null;
   run: ReturnType<typeof useFineActions>["run"];
@@ -721,7 +718,7 @@ function KassenTab({
         <MobilePayCard
           teamId={teamId}
           value={data.mobilePayBox}
-          editable={isAdmin && !readOnly}
+          editable={!readOnly}
           onSaved={onSavedMobilePay}
           pushError={pushError}
         />

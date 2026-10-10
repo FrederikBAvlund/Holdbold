@@ -1,5 +1,5 @@
 import type { Role } from "@/lib/roles";
-import { capabilitiesForRole, hasCapability, newCapabilities, type Capability } from "@/lib/guide/capabilities";
+import { capabilitiesForRole, newCapabilities, type Capability } from "@/lib/guide/capabilities";
 import { GUIDE_STEPS, type GuideFacts, type GuideStep, type GuideStepKind } from "@/lib/guide/steps";
 
 export type GuideProgressStatus = "SEEN" | "DONE" | "SKIPPED";
@@ -15,8 +15,6 @@ export type GuideStepState = {
   status: "todo" | "done" | "skipped";
   /** team: holdet har det allerede (fx en anden har sat MobilePay op). you: brugeren har selv klaret det. */
   doneBy: "team" | "you" | null;
-  /** Sat når brugeren ikke selv kan udføre trinet og må bede fx admin om det */
-  waitingFor: Capability | null;
 };
 
 export type GuidePromotion = {
@@ -62,9 +60,6 @@ function stepState(step: GuideStep, input: GuideStateInput): GuideStepState {
     status = "skipped";
   }
 
-  const waitingFor =
-    status === "todo" && step.performedBy && !hasCapability(input.role, step.performedBy) ? step.performedBy : null;
-
   return {
     id: step.id,
     capability: step.capability,
@@ -74,8 +69,7 @@ function stepState(step: GuideStep, input: GuideStateInput): GuideStepState {
     href: step.href,
     anchor: step.anchor ?? null,
     status,
-    doneBy,
-    waitingFor
+    doneBy
   };
 }
 
