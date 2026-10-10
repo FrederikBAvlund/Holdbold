@@ -48,8 +48,8 @@ beforeEach(() => {
   vi.mocked(requireSession).mockResolvedValue({ ok: true, userId: "u1" });
   vi.mocked(prisma.membership.findFirst).mockResolvedValue({
     id: "m1",
-    role: "TRAENER",
-    guideRole: "SPILLER",
+    roles: ["TRAENER"],
+    guideRoles: ["SPILLER"],
     guideDismissedAt: null,
     guideStartedAt: null
   } as never);
@@ -71,7 +71,7 @@ describe("GET /api/guide", () => {
     const response = await GET(new Request("http://localhost/api/guide?teamId=t1"));
     expect(response.status).toBe(200);
     const body = await response.json();
-    expect(body.role).toBe("TRAENER");
+    expect(body.roles).toEqual(["TRAENER"]);
     expect(body.promotion.capabilities).toEqual(["events"]);
     expect(body.steps.some((s: { id: string }) => s.id === "events.create")).toBe(true);
   });
@@ -100,14 +100,14 @@ describe("POST /api/guide", () => {
 
   it("følger den nuværende rolle, når velkomst eller forfremmelse er vist", async () => {
     await POST(post({ teamId: "t1", action: "acknowledge-role" }));
-    expect(prisma.membership.update).toHaveBeenCalledWith({ where: { id: "m1" }, data: { guideRole: "TRAENER" } });
+    expect(prisma.membership.update).toHaveBeenCalledWith({ where: { id: "m1" }, data: { guideRoles: ["TRAENER"] } });
   });
 
   it("starter guiden", async () => {
     await POST(post({ teamId: "t1", action: "start" }));
     expect(prisma.membership.update).toHaveBeenCalledWith({
       where: { id: "m1" },
-      data: { guideRole: "TRAENER", guideStartedAt: expect.any(Date), guideDismissedAt: null }
+      data: { guideRoles: ["TRAENER"], guideStartedAt: expect.any(Date), guideDismissedAt: null }
     });
   });
 
@@ -115,7 +115,7 @@ describe("POST /api/guide", () => {
     await POST(post({ teamId: "t1", action: "dismiss" }));
     expect(prisma.membership.update).toHaveBeenCalledWith({
       where: { id: "m1" },
-      data: { guideRole: "TRAENER", guideDismissedAt: expect.any(Date) }
+      data: { guideRoles: ["TRAENER"], guideDismissedAt: expect.any(Date) }
     });
   });
 

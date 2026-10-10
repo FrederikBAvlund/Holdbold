@@ -1,17 +1,17 @@
 import type { Role } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { createNotifications } from "@/lib/notifications";
-import { resolveAutomationTemplate, roleExcludedFromFineAutomation } from "@/lib/fineAutomation";
+import { resolveAutomationTemplate, rolesExcludedFromFineAutomation } from "@/lib/fineAutomation";
 import type { MotmSelectionInput } from "@/lib/motm";
 
 export async function syncMotmSelfVoteProposedFines(params: {
   teamId: string;
   eventId: string;
   voterId: string;
-  voterRole: Role;
+  voterRoles: Role[];
   selections: MotmSelectionInput[];
 }) {
-  const { teamId, eventId, voterId, voterRole, selections } = params;
+  const { teamId, eventId, voterId, voterRoles, selections } = params;
 
   await prisma.fine.deleteMany({
     where: {
@@ -24,7 +24,7 @@ export async function syncMotmSelfVoteProposedFines(params: {
   });
 
   const resolved = await resolveAutomationTemplate(teamId, "MATCH_MOTM_SELF_VOTE", "MATCH");
-  if (!resolved || roleExcludedFromFineAutomation(voterRole, resolved.excludedRoles)) {
+  if (!resolved || rolesExcludedFromFineAutomation(voterRoles, resolved.excludedRoles)) {
     return;
   }
 
@@ -60,7 +60,7 @@ export async function syncMotmSelfVoteProposedFines(params: {
   });
 
   const managers = await prisma.membership.findMany({
-    where: { teamId, role: { in: ["ADMIN", "BOEDEKASSEFORMAND"] } },
+    where: { teamId, roles: { hasSome: ["ADMIN", "BOEDEKASSEFORMAND"] } },
     select: { userId: true }
   });
   if (managers.length > 0) {

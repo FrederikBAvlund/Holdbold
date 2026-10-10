@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import Icon from "@/components/ui/Icon";
-import { roleLabel } from "@/lib/roleLabels";
+import { rolesLabel } from "@/lib/roleLabels";
 import type { GuideState } from "@/lib/guide/state";
 import { CAPABILITY_META } from "@/components/guide/guideMeta";
 
@@ -29,7 +29,7 @@ export default function GuideWelcome({
   const [mounted, setMounted] = useState(false);
   const touchStart = useRef<number | null>(null);
   const nextRef = useRef<HTMLButtonElement>(null);
-  const role = roleLabel(state.role);
+  const role = rolesLabel(state.roles);
   const already = state.summary.done;
 
   const slides: { key: string; content: ReactNode }[] = [

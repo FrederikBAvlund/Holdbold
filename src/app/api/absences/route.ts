@@ -8,6 +8,7 @@ import {
   requireActiveTeamMember,
   requireSession
 } from "@/lib/apiAuth";
+import { hasAnyRole } from "@/lib/roles";
 
 const createSchema = z.object({
   teamId: z.string().min(1),
@@ -26,7 +27,7 @@ export async function GET(request: Request) {
   const member = await requireActiveTeamMember(session.userId, teamId);
   if (!member.ok) return member.response;
 
-  const canManage = ABSENCE_MANAGER_ROLES.includes(member.role);
+  const canManage = hasAnyRole(member.roles, ABSENCE_MANAGER_ROLES);
   const absences = await prisma.absence.findMany({
     where: { teamId, ...(canManage ? {} : { userId: session.userId }) },
     include: {
@@ -90,7 +91,7 @@ export async function POST(request: Request) {
   const [user, managers] = await Promise.all([
     prisma.user.findUnique({ where: { id: session.userId }, select: { name: true } }),
     prisma.membership.findMany({
-      where: { teamId: body.teamId, status: "ACTIVE", role: { in: [...ABSENCE_MANAGER_ROLES] } },
+      where: { teamId: body.teamId, status: "ACTIVE", roles: { hasSome: [...ABSENCE_MANAGER_ROLES] } },
       select: { userId: true }
     })
   ]);

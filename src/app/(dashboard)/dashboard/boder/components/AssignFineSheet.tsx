@@ -9,7 +9,7 @@ import Avatar from "@/components/ui/Avatar";
 import Button from "@/components/ui/Button";
 import Sheet from "@/components/ui/Sheet";
 import { Field, inputClass } from "@/components/ui/primitives";
-import { roleLabel } from "@/lib/roleLabels";
+import { rolesLabel } from "@/lib/roleLabels";
 import { formatKr } from "@/lib/format";
 import { categoryLabel } from "../boderConstants";
 import type { FineTemplate } from "../boderTypes";
@@ -296,7 +296,7 @@ export default function AssignFineSheet({
                     <Avatar name={member.user.name} image={member.user.image} size="sm" />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate font-semibold text-ink">{member.user.name}</span>
-                      <span className="block text-xs text-ink/50">{roleLabel(member.role)}</span>
+                      <span className="block text-xs text-ink/50">{rolesLabel(member.roles)}</span>
                     </span>
                     <span
                       className={cn(

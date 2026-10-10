@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { notificationRef, resolveBulkFineProposalNotifications, resolveNotifications } from "@/lib/notificationRefs";
 import { prisma } from "@/lib/prisma";
+import { FINE_MANAGER_ROLES, hasAnyRole } from "@/lib/roles";
 
 export async function POST(_request: Request, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
@@ -20,8 +21,7 @@ export async function POST(_request: Request, { params }: { params: { id: string
   const membership = await prisma.membership.findFirst({
     where: { teamId: template.teamId, userId: session.user.id }
   });
-  const role = membership?.role ?? "SPILLER";
-  if (!["ADMIN", "BOEDEKASSEFORMAND"].includes(role)) {
+  if (!hasAnyRole(membership?.roles, FINE_MANAGER_ROLES)) {
     return NextResponse.json({ error: "Ikke adgang" }, { status: 403 });
   }
 

@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { z } from "zod";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { isAdminRoles } from "@/lib/roles";
 
 const querySchema = z.object({
   teamId: z.string().min(1)
@@ -19,9 +20,9 @@ export async function GET(request: Request) {
 
   const membership = await prisma.membership.findFirst({
     where: { teamId: parsed.teamId, userId: session.user.id, status: "ACTIVE" },
-    select: { role: true }
+    select: { roles: true }
   });
-  if (!membership || membership.role !== "ADMIN") {
+  if (!membership || !isAdminRoles(membership.roles)) {
     return NextResponse.json({ error: "Kun admin kan se betalinger til godkendelse" }, { status: 403 });
   }
 

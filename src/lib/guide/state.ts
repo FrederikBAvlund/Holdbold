@@ -1,5 +1,5 @@
 import type { Role } from "@/lib/roles";
-import { capabilitiesForRole, newCapabilities, type Capability } from "@/lib/guide/capabilities";
+import { capabilitiesForRoles, newCapabilities, type Capability } from "@/lib/guide/capabilities";
 import { GUIDE_STEPS, type GuideFacts, type GuideStep, type GuideStepKind } from "@/lib/guide/steps";
 
 export type GuideProgressStatus = "SEEN" | "DONE" | "SKIPPED";
@@ -18,8 +18,10 @@ export type GuideStepState = {
 };
 
 export type GuidePromotion = {
-  from: Role;
-  to: Role;
+  from: Role[];
+  to: Role[];
+  /** De roller, brugeren har fået siden sidst */
+  gainedRoles: Role[];
   capabilities: Capability[];
   /** Trin i de nye rettigheder, der ikke allerede er klaret */
   stepIds: string[];
@@ -34,7 +36,7 @@ export type GuidePromotion = {
 export type GuideMode = "intro" | "announce" | "checklist" | "hidden";
 
 export type GuideState = {
-  role: Role;
+  roles: Role[];
   capabilities: Capability[];
   mode: GuideMode;
   promotion: GuidePromotion | null;
@@ -43,8 +45,9 @@ export type GuideState = {
 };
 
 export type GuideStateInput = {
-  role: Role;
-  guideRole: Role | null;
+  roles: Role[];
+  /** Rollerne brugeren sidst fik guide til. Tom: har aldrig fået guiden. */
+  guideRoles: Role[];
   dismissed: boolean;
   started: boolean;
   facts: GuideFacts;
@@ -81,18 +84,19 @@ function stepState(step: GuideStep, input: GuideStateInput): GuideStepState {
 }
 
 export function computeGuideState(input: GuideStateInput): GuideState {
-  const caps = capabilitiesForRole(input.role);
+  const caps = capabilitiesForRoles(input.roles);
   const steps = GUIDE_STEPS.filter(
     (step) => caps.includes(step.capability) && (step.isRelevant?.(input.facts) ?? true)
   ).map((step) => stepState(step, input));
 
   let promotion: GuidePromotion | null = null;
-  if (input.guideRole && input.guideRole !== input.role) {
-    const gained = newCapabilities(input.guideRole, input.role);
+  if (input.guideRoles.length > 0) {
+    const gained = newCapabilities(input.guideRoles, input.roles);
     if (gained.length > 0) {
       promotion = {
-        from: input.guideRole,
-        to: input.role,
+        from: input.guideRoles,
+        to: input.roles,
+        gainedRoles: input.roles.filter((role) => !input.guideRoles.includes(role)),
         capabilities: gained,
         stepIds: steps.filter((s) => gained.includes(s.capability) && s.status === "todo").map((s) => s.id)
       };
@@ -102,7 +106,7 @@ export function computeGuideState(input: GuideStateInput): GuideState {
   const count = (status: GuideStepState["status"]) => steps.filter((s) => s.status === status).length;
 
   return {
-    role: input.role,
+    roles: input.roles,
     capabilities: caps,
     mode: guideMode(input),
     promotion,
@@ -125,14 +129,14 @@ export function nextGuideSteps(steps: GuideStepState[], count: number) {
 function guideMode(input: GuideStateInput): GuideMode {
   if (input.dismissed) return "hidden";
   if (input.started) return "checklist";
-  return input.guideRole === null ? "intro" : "announce";
+  return input.guideRoles.length === 0 ? "intro" : "announce";
 }
 
 /**
- * Hvilken `guideRole` en membership skal have efter et rolleskift.
- * Ved forfremmelse beholdes den gamle, så guiden kan vise de nye dele. Uden nye rettigheder er der intet at vise.
+ * Hvilke `guideRoles` en membership skal have efter et rolleskift.
+ * Giver de nye roller noget nyt, beholdes de gamle, så guiden kan vise de nye dele. Ellers er der intet at vise.
  */
-export function guideRoleAfterRoleChange(guideRole: Role | null, newRole: Role): Role | null {
-  if (guideRole === null) return null;
-  return newCapabilities(guideRole, newRole).length > 0 ? guideRole : newRole;
+export function guideRolesAfterRoleChange(guideRoles: readonly Role[], newRoles: readonly Role[]): Role[] {
+  if (guideRoles.length === 0) return [];
+  return newCapabilities(guideRoles, newRoles).length > 0 ? [...guideRoles] : [...newRoles];
 }

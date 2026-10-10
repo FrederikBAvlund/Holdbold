@@ -4,6 +4,7 @@ import { z } from "zod";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { resolveProfileImageUrl } from "@/lib/profileImages";
+import { isAdminRoles } from "@/lib/roles";
 
 const listSchema = z.object({
   teamId: z.string().min(1),
@@ -30,13 +31,13 @@ export async function GET(request: Request) {
       userId: session.user.id,
       status: "ACTIVE"
     },
-    select: { role: true }
+    select: { roles: true }
   });
   if (!actingMembership) {
     return NextResponse.json({ error: "Ikke adgang" }, { status: 403 });
   }
 
-  const canIncludePending = parsed.includePending && actingMembership.role === "ADMIN";
+  const canIncludePending = parsed.includePending && isAdminRoles(actingMembership.roles);
 
   const members = await prisma.membership.findMany({
     where: {

@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { resolveSeason } from "@/lib/seasons";
+import { FINE_MANAGER_ROLES, hasAnyRole, isAdminRoles } from "@/lib/roles";
 
 export type NavBadges = {
   /** Forslag og betalinger, der venter på bødekassen */
@@ -19,12 +20,12 @@ const EMPTY: NavBadges = { fines: 0, team: 0, absences: 0 };
 export async function getNavBadges(userId: string, teamId: string, seasonId: string | null): Promise<NavBadges> {
   const membership = await prisma.membership.findFirst({
     where: { teamId, userId, status: "ACTIVE" },
-    select: { role: true }
+    select: { roles: true }
   });
   if (!membership) return EMPTY;
 
-  const isAdmin = membership.role === "ADMIN";
-  const isFineManager = isAdmin || membership.role === "BOEDEKASSEFORMAND";
+  const isAdmin = isAdminRoles(membership.roles);
+  const isFineManager = hasAnyRole(membership.roles, FINE_MANAGER_ROLES);
   if (!isFineManager) return EMPTY;
 
   const season = await resolveSeason(teamId, seasonId);

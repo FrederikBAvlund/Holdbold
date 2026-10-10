@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { buildMotmPollApiView, eventMotmAvailabilityError } from "@/lib/motmPolls";
 import { resolveProfileImageUrl } from "@/lib/profileImages";
 import { ensureEventSeasonOpen } from "@/lib/seasons";
+import { hasAnyRole } from "@/lib/roles";
 
 function calendarFocusHrefForEvent(event: {
   id: string;
@@ -92,7 +93,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
     : null;
 
   return NextResponse.json({
-    poll: poll ? buildMotmPollApiView(poll, session.userId, MOTM_MANAGER_ROLES.includes(member.role)) : null,
+    poll: poll ? buildMotmPollApiView(poll, session.userId, hasAnyRole(member.roles, MOTM_MANAGER_ROLES)) : null,
     matchMotmUser: event.matchMotmUser
       ? {
           id: event.matchMotmUser.id,
@@ -130,7 +131,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
   const member = await requireActiveTeamMember(session.userId, event.teamId);
   if (!member.ok) return member.response;
-  if (!MOTM_MANAGER_ROLES.includes(member.role)) {
+  if (!hasAnyRole(member.roles, MOTM_MANAGER_ROLES)) {
     return NextResponse.json({ error: "Ikke adgang" }, { status: 403 });
   }
 
@@ -231,7 +232,7 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
 
   const member = await requireActiveTeamMember(session.userId, event.teamId);
   if (!member.ok) return member.response;
-  if (!MOTM_MANAGER_ROLES.includes(member.role)) {
+  if (!hasAnyRole(member.roles, MOTM_MANAGER_ROLES)) {
     return NextResponse.json({ error: "Ikke adgang" }, { status: 403 });
   }
 

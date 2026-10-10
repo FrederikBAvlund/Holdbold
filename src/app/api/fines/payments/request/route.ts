@@ -54,7 +54,7 @@ export async function POST(request: Request) {
   });
 
   const admins = await prisma.membership.findMany({
-    where: { teamId: body.teamId, status: "ACTIVE", role: "ADMIN" },
+    where: { teamId: body.teamId, status: "ACTIVE", roles: { has: "ADMIN" } },
     select: { userId: true }
   });
 

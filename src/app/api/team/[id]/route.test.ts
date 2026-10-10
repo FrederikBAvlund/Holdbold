@@ -15,7 +15,7 @@ const patch = (body: unknown) =>
     params: { id: "t1" }
   });
 
-const asRole = (role: string) => vi.mocked(prisma.membership.findFirst).mockResolvedValue({ role } as never);
+const asRole = (role: string) => vi.mocked(prisma.membership.findFirst).mockResolvedValue({ roles: [role] } as never);
 
 beforeEach(() => {
   vi.resetAllMocks();

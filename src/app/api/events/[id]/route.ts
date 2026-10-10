@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { ensureEventSeasonOpen } from "@/lib/seasons";
 import { createNotifications } from "@/lib/notifications";
 import { formatDateTimeCopenhagen } from "@/lib/format";
+import { FINE_MANAGER_ROLES, hasAnyRole } from "@/lib/roles";
 
 const updateSchema = z.object({
   title: z.string().trim().min(1, "Titel må ikke være tom").max(120).optional(),
@@ -34,7 +35,8 @@ const updateSchema = z.object({
     .optional()
 });
 
-const matchMetaRoles = new Set(["ADMIN", "BOEDEKASSEFORMAND"]);
+/** Mødetid og svarfrist til kampe: træneren styrer kampen, og bødekassen bruger fristen til bøder */
+const MATCH_META_ROLES = [...EVENT_MANAGER_ROLES, ...FINE_MANAGER_ROLES];
 
 export async function GET(_request: Request, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
@@ -81,7 +83,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
 
   const membership = await prisma.membership.findFirst({
     where: { teamId: event.teamId, userId: session.user.id, status: "ACTIVE" },
-    select: { role: true }
+    select: { roles: true }
   });
   if (!membership) {
     return NextResponse.json({ error: "Ikke adgang" }, { status: 403 });
@@ -133,13 +135,13 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
   const membership = await prisma.membership.findFirst({
     where: { teamId: event.teamId, userId: session.user.id, status: "ACTIVE" },
-    select: { role: true }
+    select: { roles: true }
   });
   if (!membership) {
     return NextResponse.json({ error: "Ikke adgang" }, { status: 403 });
   }
 
-  const isEventManager = EVENT_MANAGER_ROLES.includes(membership.role);
+  const isEventManager = hasAnyRole(membership.roles, EVENT_MANAGER_ROLES);
 
   const effectiveKind = body.kind ?? event.kind;
 
@@ -147,7 +149,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     if (effectiveKind !== "MATCH") {
       return NextResponse.json({ error: "Kun kampe har mødetid og svarfrist her" }, { status: 400 });
     }
-    if (!matchMetaRoles.has(membership.role)) {
+    if (!hasAnyRole(membership.roles, MATCH_META_ROLES)) {
       return NextResponse.json({ error: "Ikke adgang" }, { status: 403 });
     }
   }

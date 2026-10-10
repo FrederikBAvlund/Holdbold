@@ -6,6 +6,7 @@ import { createNotifications } from "@/lib/notifications";
 import { notificationRef } from "@/lib/notificationRefs";
 import { prisma } from "@/lib/prisma";
 import { getActiveSeason, resolveSeason, seasonClosedResponse } from "@/lib/seasons";
+import { FINE_MANAGER_ROLES, hasAnyRole } from "@/lib/roles";
 
 const FINE_STATUSES = [
   "UNPAID",
@@ -80,7 +81,7 @@ export async function GET(request: Request) {
 
   const actingMembership = await prisma.membership.findFirst({
     where: { teamId: parsed.teamId, userId: session.user.id, status: "ACTIVE" },
-    select: { role: true }
+    select: { roles: true }
   });
   if (!actingMembership) {
     return NextResponse.json({ error: "Ikke adgang" }, { status: 403 });
@@ -89,7 +90,7 @@ export async function GET(request: Request) {
   if (
     parsed.userId &&
     parsed.userId !== session.user.id &&
-    !["ADMIN", "BOEDEKASSEFORMAND"].includes(actingMembership.role)
+    !hasAnyRole(actingMembership.roles, FINE_MANAGER_ROLES)
   ) {
     return NextResponse.json({ error: "Ikke adgang til andre spilleres bøder" }, { status: 403 });
   }
@@ -97,7 +98,7 @@ export async function GET(request: Request) {
   if (
     parsed.createdById &&
     parsed.createdById !== session.user.id &&
-    !["ADMIN", "BOEDEKASSEFORMAND"].includes(actingMembership.role)
+    !hasAnyRole(actingMembership.roles, FINE_MANAGER_ROLES)
   ) {
     return NextResponse.json({ error: "Ikke adgang til andre spilleres bøder" }, { status: 403 });
   }
@@ -163,7 +164,7 @@ export async function POST(request: Request) {
   let description = body.description?.trim() || null;
   const actingMembership = await prisma.membership.findFirst({
     where: { teamId: body.teamId, userId: session.user.id, status: "ACTIVE" },
-    select: { role: true }
+    select: { roles: true }
   });
   if (!actingMembership) {
     return NextResponse.json({ error: "Ikke adgang" }, { status: 403 });
@@ -178,7 +179,7 @@ export async function POST(request: Request) {
   }
 
   let templateId: string | undefined = body.templateId;
-  const canDirectAssign = ["ADMIN", "BOEDEKASSEFORMAND"].includes(actingMembership.role);
+  const canDirectAssign = hasAnyRole(actingMembership.roles, FINE_MANAGER_ROLES);
   const status: "UNPAID" | "FORESLAET" = canDirectAssign ? "UNPAID" : "FORESLAET";
 
   if (body.templateId) {
@@ -254,7 +255,7 @@ export async function POST(request: Request) {
 
   if (status === "FORESLAET") {
     const managers = await prisma.membership.findMany({
-      where: { teamId: body.teamId, status: "ACTIVE", role: { in: ["ADMIN", "BOEDEKASSEFORMAND"] } },
+      where: { teamId: body.teamId, status: "ACTIVE", roles: { hasSome: ["ADMIN", "BOEDEKASSEFORMAND"] } },
       select: { userId: true }
     });
 

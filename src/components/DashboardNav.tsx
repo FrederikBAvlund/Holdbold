@@ -16,7 +16,7 @@ import { useRouter } from "next/navigation";
 import Button from "@/components/ui/Button";
 import { inputClass } from "@/components/ui/primitives";
 import { clearMeClientCache } from "@/lib/meClientCache";
-import { roleLabel } from "@/lib/roleLabels";
+import { rolesLabel } from "@/lib/roleLabels";
 
 type NavItem = { href: string; label: string; icon: IconName };
 
@@ -265,7 +265,7 @@ function TeamSwitcherSheet({ open, onClose }: { open: boolean; onClose: () => vo
               <Avatar name={membership.team?.name ?? "Hold"} size="md" className="rounded-xl" />
               <span className="min-w-0 flex-1">
                 <span className="block truncate font-semibold text-ink">{membership.team?.name ?? "Hold"}</span>
-                <span className="block text-sm text-ink/55">{roleLabel(membership.role)}</span>
+                <span className="block text-sm text-ink/55">{rolesLabel(membership.roles)}</span>
               </span>
               {active ? <Icon name="check" className="h-5 w-5 text-moss" strokeWidth={2.6} /> : null}
             </button>

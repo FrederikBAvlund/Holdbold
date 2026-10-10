@@ -15,13 +15,14 @@ import { clearMeClientCache } from "@/lib/meClientCache";
 import { DEFAULT_THEME_ID, THEME_PRESETS } from "@/lib/themePresets";
 import { formatRelativePast } from "@/lib/format";
 import { slugify } from "@/lib/superAdmin";
+import { isAdminRoles } from "@/lib/roles";
 
 type Feed = { id: string; name: string; url: string; lastImportedAt?: string | null };
 
 export default function TeamSettingsPage() {
   const { pushToast } = useToast();
   const { teamId, memberships, actingMember, membersLoading } = useDashboardTeam();
-  const isAdmin = actingMember?.role === "ADMIN";
+  const isAdmin = isAdminRoles(actingMember?.roles);
   const team = memberships.find((membership) => membership.team?.id === teamId)?.team;
 
   if (!isAdmin && !membersLoading && actingMember) {

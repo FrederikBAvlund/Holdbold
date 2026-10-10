@@ -4,6 +4,7 @@ import { z } from "zod";
 import { authOptions } from "@/lib/auth";
 import { createNotifications } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
+import { FINE_MANAGER_ROLES, hasAnyRole } from "@/lib/roles";
 
 const querySchema = z.object({
   teamId: z.string().min(1)
@@ -18,9 +19,9 @@ const createSchema = z.object({
 async function requireManager(teamId: string, userId: string) {
   const membership = await prisma.membership.findFirst({
     where: { teamId, userId, status: "ACTIVE" },
-    select: { role: true }
+    select: { roles: true }
   });
-  if (!membership || !["ADMIN", "BOEDEKASSEFORMAND"].includes(membership.role)) {
+  if (!membership || !hasAnyRole(membership.roles, FINE_MANAGER_ROLES)) {
     return null;
   }
   return membership;

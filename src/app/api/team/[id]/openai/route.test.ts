@@ -18,7 +18,7 @@ describe("team OpenAI settings", () => {
   beforeEach(() => {
     vi.stubEnv("TEAM_API_KEY_ENCRYPTION_KEY", "ab".repeat(32));
     vi.mocked(requireSession).mockResolvedValue({ ok: true, userId: "admin" });
-    vi.mocked(requireActiveTeamMemberWithRoles).mockResolvedValue({ ok: true, role: "ADMIN" });
+    vi.mocked(requireActiveTeamMemberWithRoles).mockResolvedValue({ ok: true, roles: ["ADMIN"] });
   });
   afterEach(() => { vi.resetAllMocks(); vi.unstubAllEnvs(); });
 

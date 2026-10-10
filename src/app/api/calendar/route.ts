@@ -35,13 +35,13 @@ export async function GET(request: Request) {
 
   const actingMembership = await prisma.membership.findFirst({
     where: { teamId: parsed.teamId, userId: session.user.id, status: "ACTIVE" },
-    select: { role: true }
+    select: { roles: true }
   });
   if (!actingMembership) {
     return NextResponse.json({ error: "Ikke adgang" }, { status: 403 });
   }
 
-  if (parsed.userId && !canViewSignupOf(session.user.id, actingMembership.role, parsed.userId)) {
+  if (parsed.userId && !canViewSignupOf(session.user.id, actingMembership.roles, parsed.userId)) {
     return NextResponse.json({ error: "Ikke adgang til andre spilleres tilmeldingsstatus" }, { status: 403 });
   }
 

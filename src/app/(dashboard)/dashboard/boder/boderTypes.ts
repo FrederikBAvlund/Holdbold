@@ -15,7 +15,7 @@ export type FineTemplate = {
 };
 
 export type Member = {
-  role: string;
+  roles: string[];
   user: {
     id: string;
     name: string;

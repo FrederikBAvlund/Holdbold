@@ -50,7 +50,7 @@ describe("importFeedEvents", () => {
     feedId = feed.id;
     const user = await prisma.user.create({ data: { name: "Medlem", email: `m-${suffix}@test.dk` } });
     memberId = user.id;
-    await prisma.membership.create({ data: { userId: memberId, teamId, role: "SPILLER", status: "ACTIVE" } });
+    await prisma.membership.create({ data: { userId: memberId, teamId, roles: ["SPILLER"], status: "ACTIVE" } });
   });
 
   afterAll(async () => {

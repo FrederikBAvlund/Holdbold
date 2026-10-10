@@ -7,7 +7,7 @@ import { useToast } from "@/components/ToastProvider";
 import Button from "@/components/ui/Button";
 import Icon from "@/components/ui/Icon";
 import { Card } from "@/components/ui/primitives";
-import { roleLabel } from "@/lib/roleLabels";
+import { rolesLabel } from "@/lib/roleLabels";
 import GuideChecklist from "@/components/guide/GuideChecklist";
 import GuideWelcome from "@/components/guide/GuideWelcome";
 import { useGuide } from "@/components/guide/guideClient";
@@ -87,7 +87,7 @@ export default function GuideHome() {
           <div className="min-w-0 flex-1">
             <p className="font-display text-xl font-bold uppercase leading-tight">Nyt: Kom godt i gang</p>
             <p className="mt-1 text-sm text-ink/70">
-              Se hvad du kan som {roleLabel(state.role)} –{" "}
+              Se hvad du kan som {rolesLabel(state.roles)} –{" "}
               {state.summary.todo === 1 ? "1 ting" : `${state.summary.todo} ting`}, du ikke har prøvet endnu.
             </p>
             <div className="mt-3 flex flex-wrap gap-2">

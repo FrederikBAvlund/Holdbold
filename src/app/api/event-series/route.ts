@@ -4,6 +4,7 @@ import { EVENT_MANAGER_ROLES, requireActiveTeamMember, requireSession } from "@/
 import { prisma } from "@/lib/prisma";
 import { getActiveSeason } from "@/lib/seasons";
 import { ensureSeriesEvents } from "@/lib/seriesEvents";
+import { hasAnyRole } from "@/lib/roles";
 
 const listSchema = z.object({
   teamId: z.string().min(1)
@@ -50,7 +51,7 @@ export async function POST(request: Request) {
 
   const member = await requireActiveTeamMember(session.userId, body.teamId);
   if (!member.ok) return member.response;
-  if (!EVENT_MANAGER_ROLES.includes(member.role)) {
+  if (!hasAnyRole(member.roles, EVENT_MANAGER_ROLES)) {
     return NextResponse.json({ error: "Kun trænere/admin kan oprette gentagelser" }, { status: 403 });
   }
 

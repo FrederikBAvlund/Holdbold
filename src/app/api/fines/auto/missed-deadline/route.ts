@@ -4,7 +4,7 @@ import { createNotifications } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 import { ensureEventSeasonOpen } from "@/lib/seasons";
 import { FINE_AUTOMATION_ROLES, requireActiveTeamMemberWithRoles, requireSession } from "@/lib/apiAuth";
-import { resolveAutomationTemplate, roleExcludedFromFineAutomation } from "@/lib/fineAutomation";
+import { resolveAutomationTemplate, rolesExcludedFromFineAutomation } from "@/lib/fineAutomation";
 
 const bodySchema = z.object({
   teamId: z.string().min(1),
@@ -51,7 +51,7 @@ export async function POST(request: Request) {
 
   const members = await prisma.membership.findMany({
     where: { teamId: body.teamId, status: "ACTIVE" },
-    select: { userId: true, role: true, createdAt: true, user: { select: { name: true } } }
+    select: { userId: true, roles: true, createdAt: true, user: { select: { name: true } } }
   });
 
   const deadlineAt = event.signupDeadline;
@@ -62,7 +62,7 @@ export async function POST(request: Request) {
   let singlePlayerName: string | null = null;
   for (const member of members) {
     if (member.createdAt > deadlineAt) continue;
-    if (roleExcludedFromFineAutomation(member.role, resolved.excludedRoles)) continue;
+    if (rolesExcludedFromFineAutomation(member.roles, resolved.excludedRoles)) continue;
     const status = signupMap.get(member.userId);
     if (status === "IN" || status === "OUT") continue;
 
@@ -98,7 +98,7 @@ export async function POST(request: Request) {
 
   if (created > 0) {
     const managers = await prisma.membership.findMany({
-      where: { teamId: body.teamId, role: { in: ["ADMIN", "BOEDEKASSEFORMAND"] } },
+      where: { teamId: body.teamId, roles: { hasSome: ["ADMIN", "BOEDEKASSEFORMAND"] } },
       select: { userId: true }
     });
 

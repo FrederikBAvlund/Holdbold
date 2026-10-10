@@ -10,7 +10,7 @@ export async function createTeamWithAdmin(
   });
   await tx.season.create({ data: { teamId: team.id, name: "Sæson 1" } });
   await tx.membership.create({
-    data: { teamId: team.id, userId: input.adminUserId, role: "ADMIN", status: "ACTIVE" }
+    data: { teamId: team.id, userId: input.adminUserId, roles: ["ADMIN"], status: "ACTIVE" }
   });
   return team;
 }
