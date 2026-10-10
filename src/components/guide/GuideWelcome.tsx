@@ -41,7 +41,7 @@ export default function GuideWelcome({
             ⚽
           </span>
           <p className="text-sm font-bold uppercase tracking-[0.25em] text-on-primary/75">Velkommen til</p>
-          <h2 className="mt-2 font-display text-5xl font-extrabold uppercase leading-[0.95]">
+          <h2 className="mt-2 max-w-full break-words font-display text-[clamp(2rem,11vw,3rem)] font-extrabold uppercase leading-[0.95]">
             {teamName || "holdet"}
           </h2>
           <p className="mt-4 inline-flex rounded-full bg-on-primary/15 px-4 py-1.5 text-sm font-semibold">Du er {role}</p>

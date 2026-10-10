@@ -2,6 +2,9 @@ import { prisma } from "@/lib/prisma";
 import { sendMail } from "@/lib/mail";
 import { createNotifications } from "@/lib/notifications";
 import { membershipActivatedMail } from "@/lib/mailTemplates";
+import { newCapabilities } from "@/lib/guide/capabilities";
+import { rolesLabel } from "@/lib/roleLabels";
+import type { Role } from "@/lib/roles";
 
 /**
  * Giver en bruger besked om, at vedkommende er godkendt til et hold. Har brugeren ikke sat
@@ -33,4 +36,28 @@ export async function notifyMembershipActivated(input: { userId: string; teamId:
       console.error("Kunne ikke sende mail om godkendt tilmelding", error);
     }
   }
+}
+
+/** Giver et medlem besked om nye roller, der åbner for noget nyt – så guiden kan vise de nye dele. */
+export async function notifyRolesGained(input: {
+  userId: string;
+  teamId: string;
+  previousRoles: readonly Role[];
+  roles: readonly Role[];
+}) {
+  if (newCapabilities(input.previousRoles, input.roles).length === 0) return;
+  const gained = input.roles.filter((role) => !input.previousRoles.includes(role));
+  const team = await prisma.team.findUnique({ where: { id: input.teamId }, select: { name: true } });
+  if (!team) return;
+
+  await createNotifications([
+    {
+      userId: input.userId,
+      teamId: input.teamId,
+      type: "GENERAL",
+      title: `Du er nu ${rolesLabel(gained).toLowerCase()} 🎉`,
+      body: `Se hvad du har fået adgang til på ${team.name}.`,
+      link: "/dashboard"
+    }
+  ]);
 }
