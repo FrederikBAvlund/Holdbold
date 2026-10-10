@@ -52,8 +52,24 @@ export default function BoderPage() {
   const [collectionOpen, setCollectionOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [voiceOpen, setVoiceOpen] = useState(false);
+  const [voiceEnabled, setVoiceEnabled] = useState(false);
   const [memberSheet, setMemberSheet] = useState<{ userId: string; fines: FineItem[] | null } | null>(null);
   const [deleteFine, setDeleteFine] = useState<FineItem | null>(null);
+
+  useEffect(() => {
+    if (!canManage || !teamId) {
+      setVoiceEnabled(false);
+      return;
+    }
+    let cancelled = false;
+    fetch(`/api/fines/voice/status?teamId=${encodeURIComponent(teamId)}`, { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : { enabled: false }))
+      .then((body) => !cancelled && setVoiceEnabled(Boolean(body.enabled)))
+      .catch(() => !cancelled && setVoiceEnabled(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [canManage, teamId]);
 
   useEffect(() => {
     const requested = searchParams.get("fane");
@@ -95,6 +111,8 @@ export default function BoderPage() {
   }
 
   const assignLabel = canManage ? "Giv bøde" : "Foreslå bøde";
+  // Med OpenAI-nøgle åbner "Giv bøde" direkte i stemmetilstand (med genvej til den manuelle formular).
+  const openAssign = () => (voiceEnabled && canManage ? setVoiceOpen(true) : setAssign({}));
   const memberForSheet = memberSheet ? memberById.get(memberSheet.userId) : undefined;
   const debtorName = memberSheet
     ? memberForSheet?.user.name ?? data.debtors.find((d) => d.userId === memberSheet.userId)?.name ?? "Medlem"
@@ -107,7 +125,7 @@ export default function BoderPage() {
         subtitle={canManage ? "Holdets bødekasse – hold styr på det hele." : "Dine bøder og holdets bødetavle."}
         action={
           !isReadOnlySeason ? (
-            <Button icon="plus" className="hidden sm:inline-flex" onClick={() => setAssign({})}>
+            <Button icon="plus" className="hidden sm:inline-flex" onClick={openAssign}>
               {assignLabel}
             </Button>
           ) : null
@@ -176,8 +194,8 @@ export default function BoderPage() {
           readOnly={isReadOnlySeason}
           busyKey={busyKey}
           run={run}
-          onVoice={() => setVoiceOpen(true)}
-          onAssign={() => setAssign({})}
+          voiceEnabled={voiceEnabled}
+          onAssign={openAssign}
           onCollection={() => setCollectionOpen(true)}
           onEditTemplate={(template) => setTemplateSheet({ template })}
           onNewTemplate={() => setTemplateSheet({ template: null })}
@@ -191,7 +209,7 @@ export default function BoderPage() {
       {!isReadOnlySeason ? (
         <button
           type="button"
-          onClick={() => setAssign({})}
+          onClick={openAssign}
           className="fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom,0px))] right-4 z-40 inline-flex h-14 items-center gap-2 rounded-full bg-primary px-5 font-semibold text-on-primary shadow-[var(--shadow-lg)] transition active:scale-95 sm:hidden"
         >
           <Icon name="plus" strokeWidth={2.6} />
@@ -263,6 +281,10 @@ export default function BoderPage() {
           members={members as unknown as Parameters<typeof VoiceFinesModal>[0]["members"]}
           templates={data.templates}
           onClose={() => setVoiceOpen(false)}
+          onManual={() => {
+            setVoiceOpen(false);
+            setAssign({});
+          }}
           onCreated={data.refresh}
         />
       ) : null}
@@ -603,7 +625,7 @@ function KassenTab({
   readOnly,
   busyKey,
   run,
-  onVoice,
+  voiceEnabled,
   onAssign,
   onCollection,
   onEditTemplate,
@@ -619,7 +641,7 @@ function KassenTab({
   readOnly: boolean;
   busyKey: string | null;
   run: ReturnType<typeof useFineActions>["run"];
-  onVoice: () => void;
+  voiceEnabled: boolean;
   onAssign: () => void;
   onCollection: () => void;
   onEditTemplate: (template: FineTemplate) => void;
@@ -630,8 +652,9 @@ function KassenTab({
 }) {
   const pendingTemplates = data.templates.filter((t) => t.status === "PENDING");
   const actions: Array<{ icon: IconName | "mic"; label: string; hint: string; onClick: () => void; hero?: boolean }> = [
-    { icon: "mic", label: "Indtal bøder", hint: "Hold knappen nede og rems dem op – så laves forslagene", onClick: onVoice, hero: true },
-    { icon: "receipt", label: "Giv bøde", hint: "Én eller flere spillere", onClick: onAssign },
+    voiceEnabled
+      ? { icon: "mic", label: "Giv bøde", hint: "Hold knappen nede og rems dem op – så laves forslagene", onClick: onAssign, hero: true }
+      : { icon: "receipt", label: "Giv bøde", hint: "Én eller flere spillere", onClick: onAssign },
     { icon: "hourglass", label: "Indsamling", hint: "Bøde ved for sen betaling", onClick: onCollection }
   ];
 

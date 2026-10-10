@@ -38,13 +38,15 @@ type Props = {
   members: Member[];
   templates: FineTemplate[];
   onClose: () => void;
+  /** Skift til den almindelige "Giv bøde"-formular. */
+  onManual?: () => void;
   onCreated: () => Promise<void> | void;
 };
 
 let rowCounter = 0;
 const nextKey = () => `row-${++rowCounter}`;
 
-export function VoiceFinesModal({ open = true, teamId, members, templates, onClose, onCreated }: Props) {
+export function VoiceFinesModal({ open = true, teamId, members, templates, onClose, onManual, onCreated }: Props) {
   const { pushToast } = useToast();
   const [rows, setRows] = useState<Row[]>([]);
   const [transcripts, setTranscripts] = useState<string[]>([]);
@@ -188,7 +190,7 @@ export function VoiceFinesModal({ open = true, teamId, members, templates, onClo
         onClose();
       }}
       dismissible={!locked}
-      title="Indtal bøder"
+      title="Giv bøde"
       description="Fx “Mikkel for sent, Jonas glemte vestene”."
       footer={
         <div className="space-y-2">
@@ -321,6 +323,19 @@ export function VoiceFinesModal({ open = true, teamId, members, templates, onClo
         <Button block variant="secondary" icon="plus" onClick={addEmptyRow}>
           Tilføj bøde manuelt
         </Button>
+        {onManual ? (
+          <button
+            type="button"
+            disabled={locked}
+            onClick={() => {
+              cancel();
+              onManual();
+            }}
+            className="w-full py-2 text-center text-sm font-semibold text-moss disabled:opacity-50"
+          >
+            Brug den almindelige formular
+          </button>
+        ) : null}
       </div>
     </Sheet>
   );
