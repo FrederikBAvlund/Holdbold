@@ -12,6 +12,7 @@ import Avatar from "@/components/ui/Avatar";
 import Sheet from "@/components/ui/Sheet";
 import { CountBadge } from "@/components/ui/Button";
 import { useDashboardTeam } from "@/components/DashboardTeamProvider";
+import { useRouter } from "next/navigation";
 import { roleLabel } from "@/lib/roleLabels";
 
 type NavItem = { href: string; label: string; icon: IconName };
@@ -25,6 +26,7 @@ const NAV_ITEMS: NavItem[] = [
 
 const SECONDARY_ITEMS: NavItem[] = [{ href: "/dashboard/fravaer", label: "Skade & fravær", icon: "heart" }];
 
+const ADMIN_HREF = "/dashboard/admin";
 const PROFILE_HREF = "/dashboard/profil";
 const NOTIFICATIONS_HREF = "/dashboard/notifikationer";
 
@@ -137,18 +139,46 @@ function useNavBadges(teamId: string, seasonQuery: string, pathname: string) {
 
 function TeamSwitcherSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { memberships, teamId, setTeamId } = useDashboardTeam();
+  const { data: session } = useSession();
+  const router = useRouter();
+  const pathname = usePathname();
+  const isSuperAdmin = session?.user?.isSuperAdmin === true;
+  const adminActive = pathname.startsWith(ADMIN_HREF);
   return (
     <Sheet open={open} onClose={onClose} title="Skift hold" description="Vælg det hold, du vil se.">
       <div className="space-y-2">
+        {isSuperAdmin ? (
+          <button
+            type="button"
+            onClick={() => {
+              router.push(ADMIN_HREF);
+              onClose();
+            }}
+            className={cn(
+              "flex min-h-[3.75rem] w-full items-center gap-3 rounded-2xl border px-4 text-left transition active:scale-[0.99]",
+              adminActive ? "border-moss bg-moss/10" : "border-line hover:bg-ink/[0.03]"
+            )}
+          >
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-ink text-bg">
+              <Icon name="settings" className="h-5 w-5" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate font-semibold text-ink">Admin</span>
+              <span className="block text-sm text-ink/55">Opret og administrér hold</span>
+            </span>
+            {adminActive ? <Icon name="check" className="h-5 w-5 text-moss" strokeWidth={2.6} /> : null}
+          </button>
+        ) : null}
         {memberships.map((membership) => {
           const id = membership.team?.id ?? "";
-          const active = id === teamId;
+          const active = id === teamId && !adminActive;
           return (
             <button
               key={id}
               type="button"
               onClick={() => {
                 setTeamId(id);
+                if (adminActive) router.push("/dashboard");
                 onClose();
               }}
               className={cn(
@@ -200,8 +230,11 @@ export default function DashboardNav({
     () => memberships.find((membership) => membership.team?.id === teamId) ?? memberships[0],
     [memberships, teamId]
   );
-  const teamName = activeTeam?.team?.name ?? "Holdbold";
-  const canSwitchTeam = memberships.length > 1;
+  const teamName = pathname.startsWith(ADMIN_HREF) && session?.user?.isSuperAdmin
+    ? "Admin"
+    : activeTeam?.team?.name ?? "Holdbold";
+  const isSuperAdmin = session?.user?.isSuperAdmin === true;
+  const canSwitchTeam = memberships.length > 1 || isSuperAdmin;
 
   const items = pendingOnly ? [] : NAV_ITEMS;
   const isActive = (href: string) =>

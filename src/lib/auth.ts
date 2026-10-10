@@ -6,6 +6,7 @@ import bcrypt from "bcryptjs";
 import { verifyLoginCode } from "@/lib/loginCode";
 import { checkRateLimit, getClientIp } from "@/lib/rateLimit";
 import { createUserFromSignup } from "@/lib/signupUser";
+import { isSuperAdminEmail } from "@/lib/superAdmin";
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
@@ -140,6 +141,7 @@ export const authOptions: NextAuthOptions = {
         session.user.id = token.id as string;
         session.user.hasActiveMembership = Boolean(token.hasActiveMembership);
         session.user.hasPendingMembership = Boolean(token.hasPendingMembership);
+        session.user.isSuperAdmin = isSuperAdminEmail(typeof token.email === "string" ? token.email : null);
         if (typeof token.name === "string") session.user.name = token.name;
         if (typeof token.email === "string") session.user.email = token.email;
         if (typeof token.picture === "string") session.user.image = token.picture;

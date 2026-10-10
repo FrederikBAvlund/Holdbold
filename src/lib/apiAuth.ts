@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import type { Role } from "@prisma/client";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { isSuperAdminEmail } from "@/lib/superAdmin";
 
 const unauthorized = () => NextResponse.json({ error: "Ikke logget ind" }, { status: 401 });
 const forbidden = () => NextResponse.json({ error: "Ikke adgang" }, { status: 403 });
@@ -65,4 +66,18 @@ export async function requireActiveTeamMemberWithRoles(
     return { ok: false, response: forbidden() };
   }
   return member;
+}
+
+/** Kun platformadministratorer (se SUPER_ADMIN_EMAILS) */
+export async function requireSuperAdmin(): Promise<
+  { ok: true; userId: string } | { ok: false; response: NextResponse }
+> {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return { ok: false, response: unauthorized() };
+  }
+  if (!isSuperAdminEmail(session.user.email)) {
+    return { ok: false, response: forbidden() };
+  }
+  return { ok: true, userId: session.user.id };
 }
