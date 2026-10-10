@@ -6,6 +6,7 @@ declare module "next-auth" {
       id: string;
       hasActiveMembership?: boolean;
       hasPendingMembership?: boolean;
+      isSuperAdmin?: boolean;
     } & DefaultSession["user"];
   }
 }
