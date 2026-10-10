@@ -74,6 +74,7 @@ export default function HoldPage() {
       pushToast(approve ? `${member.user.name ?? "Medlemmet"} er velkommen på holdet 🎉` : "Anmodningen er afvist", "success");
       invalidateDashboardTeam();
       await loadPending();
+      window.dispatchEvent(new Event("nav:refresh"));
     } finally {
       setDecidingId(null);
     }

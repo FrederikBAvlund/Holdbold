@@ -16,6 +16,9 @@ export const MOTM_MANAGER_ROLES: readonly Role[] = ["ADMIN", "BOEDEKASSEFORMAND"
 /** Kun admin og bødekasse kan køre visse automations-endpoints manuelt */
 export const FINE_AUTOMATION_ROLES: readonly Role[] = ["ADMIN", "BOEDEKASSEFORMAND"];
 
+/** Admin og bødekasseformand styrer bødekassen */
+export const FINE_MANAGER_ROLES: readonly Role[] = ["ADMIN", "BOEDEKASSEFORMAND"];
+
 /** Bødekassen (og admin) godkender fravær */
 export const ABSENCE_MANAGER_ROLES: readonly Role[] = ["ADMIN", "BOEDEKASSEFORMAND"];
 

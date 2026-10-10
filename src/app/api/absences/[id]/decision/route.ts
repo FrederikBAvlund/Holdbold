@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { createNotifications } from "@/lib/notifications";
+import { notificationRef, resolveNotifications } from "@/lib/notificationRefs";
 import { applyAbsenceToUpcomingEvents } from "@/lib/absences";
 import { ABSENCE_MANAGER_ROLES, requireActiveTeamMemberWithRoles, requireSession } from "@/lib/apiAuth";
 
@@ -43,6 +44,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
   if (!decided) {
     return NextResponse.json({ error: "Anmodningen er allerede afgjort eller trukket tilbage" }, { status: 409 });
   }
+
+  await resolveNotifications([notificationRef.absence(absence.id)]);
 
   if (absence.userId !== session.userId) {
     await createNotifications([

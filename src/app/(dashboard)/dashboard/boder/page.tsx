@@ -81,6 +81,17 @@ export default function BoderPage() {
     }
   }
 
+  async function settleFine(fine: FineItem) {
+    const ok = await run(`settle-${fine.id}`, `/api/fines/${fine.id}/settle`, {
+      success: "Bøden er markeret som betalt",
+      error: "Kunne ikke markere bøden som betalt"
+    });
+    if (ok) {
+      window.dispatchEvent(new Event("nav:refresh"));
+      if (memberSheet) openMember(memberSheet.userId);
+    }
+  }
+
   const assignLabel = canManage ? "Giv bøde" : "Foreslå bøde";
   const memberForSheet = memberSheet ? memberById.get(memberSheet.userId) : undefined;
   const debtorName = memberSheet
@@ -224,6 +235,8 @@ export default function BoderPage() {
         fines={memberSheet?.fines ?? null}
         canManage={canManage && !isReadOnlySeason}
         onDelete={setDeleteFine}
+        onSettle={settleFine}
+        settlingId={busyKey?.startsWith("settle-") ? busyKey.slice("settle-".length) : null}
       />
       <ConfirmSheet
         open={deleteFine !== null}

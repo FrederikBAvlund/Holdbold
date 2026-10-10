@@ -86,7 +86,7 @@ export async function processDueFineCollections(teamId: string) {
       type: "FINE_PROPOSED" as const,
       title: "Foreslået bøde",
       body: `${debtors.length} spiller(e) mangler betaling. ${collection.template.title} (${collection.template.amount} kr) afventer godkendelse.`,
-      link: "/dashboard/boder"
+      link: "/dashboard/boder?fane=kassen"
     }));
 
     await createNotifications(managerNotifications);

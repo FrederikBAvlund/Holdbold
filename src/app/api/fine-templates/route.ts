@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createNotifications } from "@/lib/notifications";
+import { notificationRef } from "@/lib/notificationRefs";
 import { prisma } from "@/lib/prisma";
 import { requireActiveTeamMember, requireSession } from "@/lib/apiAuth";
 
@@ -76,7 +77,8 @@ export async function POST(request: Request) {
       type: "FINE_PROPOSED" as const,
       title: "Ny foreslået bødeskabelon",
       body: `${template.title} · ${template.amount} kr`,
-      link: "/dashboard/boder"
+      link: "/dashboard/boder?fane=kassen",
+      refKey: notificationRef.template(template.id)
     }));
     if (notifications.length > 0) {
       await createNotifications(notifications);

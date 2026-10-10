@@ -66,6 +66,11 @@ export function rankDebtors(debtors: Array<{ userId: string; name: string; total
   });
 }
 
+/** Bødekassen kan markere ubetalte (og afventende) bøder som betalt på vegne af spilleren. */
+export function canSettleFine(status: string) {
+  return status === "UNPAID" || status === "PAID_PENDING";
+}
+
 export function canDeleteFine(status: string) {
   return ["UNPAID", "PAID_PENDING", "AFVIST"].includes(status);
 }

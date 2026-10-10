@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { z } from "zod";
 import { authOptions } from "@/lib/auth";
 import { createNotifications } from "@/lib/notifications";
+import { notificationRef } from "@/lib/notificationRefs";
 import { prisma } from "@/lib/prisma";
 import { getActiveSeason, resolveSeason, seasonClosedResponse } from "@/lib/seasons";
 
@@ -236,6 +237,7 @@ export async function POST(request: Request) {
     title: string;
     body: string;
     link: string;
+    refKey?: string;
   }> = [];
 
   // Only a real assigned fine should notify recipient and count as debt.
@@ -264,7 +266,8 @@ export async function POST(request: Request) {
         type: "FINE_PROPOSED" as const,
         title: "Foreslået bøde",
         body: `${reason} · ${amount} kr`,
-        link: "/dashboard/boder"
+        link: "/dashboard/boder?fane=kassen",
+        refKey: notificationRef.fine(fine.id)
       }));
     notifications.push(...managerNotifications);
   }

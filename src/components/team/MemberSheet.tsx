@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/ToastProvider";
-import { invalidateDashboardTeam, type DashboardTeamMember } from "@/components/DashboardTeamProvider";
+import { invalidateDashboardTeam, useDashboardTeam, type DashboardTeamMember } from "@/components/DashboardTeamProvider";
 import Avatar from "@/components/ui/Avatar";
 import Button from "@/components/ui/Button";
 import Icon from "@/components/ui/Icon";
@@ -36,6 +36,7 @@ export default function MemberSheet({
   onChanged: () => Promise<void> | void;
 }) {
   const { pushToast } = useToast();
+  const { removeMemberLocally } = useDashboardTeam();
   const [saving, setSaving] = useState<string | null>(null);
   const [confirmRemove, setConfirmRemove] = useState(false);
 
@@ -68,18 +69,26 @@ export default function MemberSheet({
       const response = await fetch(`/api/team-members/${member.id}`, { method: "DELETE" });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
+        // Serveren kan nå at fjerne medlemmet, selvom svaret fejler – hent listen igen, så den er sand.
+        invalidateDashboardTeam();
         pushToast(typeof data.error === "string" ? data.error : "Kunne ikke fjerne medlemmet", "error");
         return;
       }
-      pushToast(typeof data.warning === "string" ? data.warning : "Medlemmet er fjernet fra holdet", "success");
-      invalidateDashboardTeam();
+      removeMemberLocally(member.id);
       setConfirmRemove(false);
       onClose();
+      pushToast(typeof data.warning === "string" ? data.warning : "Medlemmet er fjernet fra holdet", "success");
+      invalidateDashboardTeam();
       await onChanged();
     } finally {
       setSaving(null);
     }
   }
+
+  // Nulstil bekræftelsen, når der vælges et andet (eller intet) medlem, så dialogen aldrig hænger fast.
+  useEffect(() => {
+    setConfirmRemove(false);
+  }, [member?.id]);
 
   const name = member?.user.name ?? "Medlem";
 

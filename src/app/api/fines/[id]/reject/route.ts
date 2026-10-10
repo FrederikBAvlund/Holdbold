@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { notificationRef, resolveBulkFineProposalNotifications, resolveNotifications } from "@/lib/notificationRefs";
 import { prisma } from "@/lib/prisma";
 import { ensureFineSeasonOpen } from "@/lib/seasons";
 
@@ -40,6 +41,9 @@ export async function POST(_request: Request, { params }: { params: { id: string
       rejectedById: session.user.id
     }
   });
+
+  await resolveNotifications([notificationRef.fine(fine.id)]);
+  await resolveBulkFineProposalNotifications(fineToReject.teamId);
 
   if (fineToReject.createdById && fineToReject.createdById !== session.user.id) {
     await prisma.notification.create({

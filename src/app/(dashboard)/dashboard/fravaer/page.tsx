@@ -85,6 +85,7 @@ export default function FravaerPage() {
     }
     pushToast(successMessage, "success");
     await load();
+    window.dispatchEvent(new Event("nav:refresh"));
     return true;
   }
 

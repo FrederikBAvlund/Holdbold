@@ -11,7 +11,7 @@ import Avatar from "@/components/ui/Avatar";
 import Sheet from "@/components/ui/Sheet";
 import { CountBadge } from "@/components/ui/Button";
 import { useDashboardTeam } from "@/components/DashboardTeamProvider";
-import { FINE_MANAGER_ROLES, roleLabel } from "@/lib/roleLabels";
+import { roleLabel } from "@/lib/roleLabels";
 
 type NavItem = { href: string; label: string; icon: IconName };
 
@@ -83,46 +83,55 @@ function useUnreadCount(sessionUserId: string | undefined, pathname: string) {
   return unreadCount;
 }
 
-/** Antal forslag/betalinger, der venter på bødekassen (kun for admin og bødekasseformand). */
-function useFineInboxCount(teamId: string, seasonQuery: string, enabled: boolean, pathname: string) {
-  const [count, setCount] = useState(0);
+type NavBadges = { fines: number; team: number; absences: number };
+const NO_BADGES: NavBadges = { fines: 0, team: 0, absences: 0 };
+
+/** Ting brugeren selv skal tage stilling til (rollebaseret) – uafhængigt af om notifikationerne er læst. */
+function useNavBadges(teamId: string, seasonQuery: string, pathname: string) {
+  const [badges, setBadges] = useState<NavBadges>(NO_BADGES);
 
   const load = useCallback(async () => {
-    if (!enabled || !teamId) {
-      setCount(0);
+    if (!teamId) {
+      setBadges(NO_BADGES);
       return;
     }
     try {
-      const response = await fetch(`/api/fines/inbox-count?teamId=${teamId}${seasonQuery}`, { cache: "no-store" });
+      const response = await fetch(`/api/nav-badges?teamId=${teamId}${seasonQuery}`, { cache: "no-store" });
       if (!response.ok) return;
       const data = await response.json();
-      setCount(typeof data.count === "number" ? data.count : 0);
+      setBadges({
+        fines: Number(data.fines) || 0,
+        team: Number(data.team) || 0,
+        absences: Number(data.absences) || 0
+      });
     } catch {
       // badge er kun en hjælp – ignorér netværksfejl
     }
-  }, [enabled, teamId, seasonQuery]);
+  }, [teamId, seasonQuery]);
 
   useEffect(() => {
     void load();
   }, [load, pathname]);
 
   useEffect(() => {
-    if (!enabled) return;
     const onVisible = () => {
       if (!document.hidden) void load();
     };
-    const onUpdate = (event: Event) => setCount((event as CustomEvent<number>).detail ?? 0);
+    const onFines = (event: Event) => setBadges((prev) => ({ ...prev, fines: (event as CustomEvent<number>).detail ?? 0 }));
+    const onRefresh = () => void load();
     window.addEventListener("focus", onVisible);
     document.addEventListener("visibilitychange", onVisible);
-    window.addEventListener("fines:inbox", onUpdate);
+    window.addEventListener("fines:inbox", onFines);
+    window.addEventListener("nav:refresh", onRefresh);
     return () => {
       window.removeEventListener("focus", onVisible);
       document.removeEventListener("visibilitychange", onVisible);
-      window.removeEventListener("fines:inbox", onUpdate);
+      window.removeEventListener("fines:inbox", onFines);
+      window.removeEventListener("nav:refresh", onRefresh);
     };
-  }, [enabled, load]);
+  }, [load]);
 
-  return enabled ? count : 0;
+  return badges;
 }
 
 function TeamSwitcherSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -169,13 +178,13 @@ export default function DashboardNav({
 }) {
   const { data: session } = useSession();
   const pathname = usePathname();
-  const { memberships, teamId, members, userId, actingMember, seasonQuery } = useDashboardTeam();
+  const { memberships, teamId, members, userId, seasonQuery } = useDashboardTeam();
   const [mounted, setMounted] = useState(false);
   const [teamSheetOpen, setTeamSheetOpen] = useState(false);
   const unreadCount = useUnreadCount(session?.user?.id, pathname);
-  const canManageFines = FINE_MANAGER_ROLES.includes(actingMember?.role ?? "");
-  const fineInboxCount = useFineInboxCount(teamId, seasonQuery, canManageFines, pathname);
-  const badgeFor = (href: string) => (href === "/dashboard/boder" ? fineInboxCount : 0);
+  const navBadges = useNavBadges(teamId, seasonQuery, pathname);
+  const badgeFor = (href: string) =>
+    href === "/dashboard/boder" ? navBadges.fines : href === "/dashboard/hold" ? navBadges.team : href === "/dashboard/fravaer" ? navBadges.absences : 0;
 
   const hasActiveMembership = session?.user?.hasActiveMembership === true;
   const hasPendingMembership = session?.user?.hasPendingMembership === true;
@@ -328,7 +337,8 @@ export default function DashboardNav({
                 )}
               >
                 <Icon name={item.icon} />
-                {item.label}
+                <span className="flex-1">{item.label}</span>
+                {badgeFor(item.href) > 0 ? <CountBadge count={badgeFor(item.href)} className="ring-0" /> : null}
               </Link>
             ))}
             <Link

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   canDeleteFine,
+  canSettleFine,
   fineStatusMeta,
   groupByReason,
   inboxDecisionUrl,
@@ -20,6 +21,16 @@ describe("parseIntegerAmountInput", () => {
     expect(parseIntegerAmountInput("")).toEqual({ ok: false });
     expect(parseIntegerAmountInput("12.5")).toEqual({ ok: false });
     expect(parseIntegerAmountInput("abc")).toEqual({ ok: false });
+  });
+});
+
+describe("canSettleFine", () => {
+  it("kan kun markere ubetalte og afventende bøder som betalt", () => {
+    expect(canSettleFine("UNPAID")).toBe(true);
+    expect(canSettleFine("PAID_PENDING")).toBe(true);
+    expect(canSettleFine("PAID_APPROVED")).toBe(false);
+    expect(canSettleFine("FORESLAET")).toBe(false);
+    expect(canSettleFine("AFVIST")).toBe(false);
   });
 });
 

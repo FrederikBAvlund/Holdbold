@@ -419,6 +419,8 @@ model Notification {
   title     String
   body      String?
   link      String?
+  /// Peger på det, notifikationen handler om (fx "fine:<id>"), så den kan markeres læst, når sagen er afgjort
+  refKey    String?
   readAt    DateTime?
   createdAt DateTime         @default(now())
 
@@ -426,6 +428,7 @@ model Notification {
   team Team? @relation(fields: [teamId], references: [id])
 
   @@index([userId, readAt])
+  @@index([refKey])
   @@index([teamId, createdAt])
 }
 
