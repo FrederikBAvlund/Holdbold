@@ -8,7 +8,7 @@ const IP_LIMIT = { limit: 10, windowSeconds: 10 * 60 };
 const bodySchema = z.object({
   name: z.string().trim().min(1, "Navn er paakraevet").max(100),
   email: z.string().trim().email("Email er ugyldig"),
-  teamSlug: z.string().trim().min(1, "Hold slug er paakraevet")
+  teamSlug: z.string().trim().min(1, "Holdkode er påkrævet")
 });
 
 /** Trin 1 i oprettelse: validerer og sender en kode. Brugeren oprettes først, når koden er bekræftet ved login. */
@@ -40,7 +40,7 @@ export async function POST(request: Request) {
     const result = await requestSignupCode(parsed.data);
     if (result.status === "team_not_found") {
       return NextResponse.json(
-        { error: "Holdslug findes ikke", fieldErrors: { teamSlug: "Holdslug findes ikke" } },
+        { error: "Holdkode findes ikke", fieldErrors: { teamSlug: "Holdkode findes ikke" } },
         { status: 404 }
       );
     }

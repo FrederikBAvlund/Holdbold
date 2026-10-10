@@ -34,7 +34,7 @@ export async function createUserFromSignup(input: { email: string; name: string;
         teamId: input.teamId,
         type: "GENERAL" as const,
         title: "Ny bruger afventer godkendelse",
-        body: `${input.name} har oprettet sig med slug ${team?.slug ?? ""}`,
+        body: `${input.name} har oprettet sig med holdkode ${team?.slug ?? ""}`,
         link: "/dashboard/hold",
         refKey: notificationRef.membership(input.teamId, user.id)
       }))
