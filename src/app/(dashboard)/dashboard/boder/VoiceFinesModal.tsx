@@ -190,7 +190,7 @@ export function VoiceFinesModal({ open = true, teamId, members, templates, onClo
         onClose();
       }}
       dismissible={!locked}
-      title="Giv bøde"
+      title="Indtal bøder"
       description="Fx “Mikkel for sent, Jonas glemte vestene”."
       footer={
         <div className="space-y-2">
