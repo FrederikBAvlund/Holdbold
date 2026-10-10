@@ -22,6 +22,7 @@
     "db:up": "docker compose up -d --wait db",
     "db:reset": "prisma migrate reset --force",
     "dev:setup": "npm run db:up && prisma generate && prisma migrate deploy && prisma db seed",
+    "dev:personas": "prisma db seed",
     "guide:screenshots": "node scripts/guide-screenshots.mjs",
     "cron:build": "node scripts/build-cron.mjs",
     "cron:run": "node dist/cron.cjs"

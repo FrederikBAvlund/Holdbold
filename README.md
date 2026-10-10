@@ -17,6 +17,34 @@ npm run dev:setup  # starter Postgres i Docker, koerer migrationer og seed
 npm run dev
 ```
 
+Log ind på http://localhost:3000 med fx `admin@holdbold.local` og kodeordet `1`. Se [Test roller og nytilkomne lokalt](#test-roller-og-nytilkomne-lokalt) for alle testbrugerne.
+
+## Test roller og nytilkomne lokalt
+
+Du behøver kun Docker (til databasen) og Node. `npm run dev:setup` opretter databasen og alle testbrugerne, og appen selv kører med `npm run dev` uden for Docker. Alle testbrugere har kodeordet fra `SEED_DEV_PASSWORD` i `.env` (som standard `1`):
+
+| Log ind som | Rolle | Hvad du ser |
+|---|---|---|
+| `admin@holdbold.local` | Admin | Ny admin: velkomst og holdopsætning |
+| `traener@holdbold.local` | Træner | Ny træner: begivenheder |
+| `boedekasse@holdbold.local` | Bødekasseformand | Ny bødekasseformand: bødekassen |
+| `spiller@holdbold.local` | Spiller | Ny spiller: kun det grundlæggende |
+| `some@holdbold.local` | SoMe | Ny SoMe-ansvarlig |
+| `flere@holdbold.local` | Træner + bødekasseformand + spiller | Flere roller på én gang |
+| `veteran@holdbold.local` | Spiller | Medlem fra før guiden: "Nyt"-kortet |
+| `forfremmet@holdbold.local` | Bødekasseformand + spiller | Er blevet forfremmet: "Du er blevet …" |
+| `afventer@holdbold.local` | Spiller | Venter på, at admin godkender |
+| `spiller1@…` til `spiller20@holdbold.local` | Spiller | Resten af holdet, så der er nogen at give bøder |
+
+Test som flere brugere på én gang ved at bruge et privat vindue eller en anden browser pr. bruger.
+
+- **Nulstil testbrugerne** (roller, kodeord, afventer-status og guidens tilstand): `npm run dev:personas`. Det tager et par sekunder og rører ikke ved resten af dataen.
+- **Nulstil alt** (også bøder, begivenheder og tilmeldinger): `npm run db:reset`.
+- **Prøv at forfremme nogen:** log ind som `admin@holdbold.local`, åbn et medlem under Hold og kryds en ekstra rolle af. Log så ind som medlemmet.
+- **Slå testbrugerne fra:** fjern `SEED_DEV_PASSWORD` fra `.env`.
+
+`SEED_DEV_PASSWORD` giver alle testbrugere et svagt kodeord, så seed'en afviser at køre, hvis `DATABASE_URL` ikke peger på din egen maskine (`localhost`). Brug den aldrig mod produktions- eller Supabase-databasen.
+
 ## Lokal udvikling
 
 - Databasen koerer lokalt i Docker (`docker-compose.yml`, Postgres 16). Start med `npm run db:up`.
@@ -65,6 +93,8 @@ Admin kan angive en iCal URL og starte en import manuelt.
 - Email/telefon login er muligt, hvis `AUTH_CREDENTIALS_ENABLED=true`
 
 ## Seed (valgfri)
+
+Testbrugerne til lokal udvikling styres af `SEED_DEV_PASSWORD` (se ovenfor). Derudover kan seed'en oprette enkelte brugere med egne kodeord.
 
 Miljoevariabler for at oprette en admin-bruger i seed:
 

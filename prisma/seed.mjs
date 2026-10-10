@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { applyDevPersonas, assertLocalDatabase, DEV_PERSONAS } from "./dev-personas.mjs";
 
 const prisma = new PrismaClient();
 
@@ -100,6 +101,10 @@ function templateKey(input) {
 }
 
 async function main() {
+  // Testbrugere med svagt kodeord: afvis en ikke-lokal database, inden der røres ved noget
+  const devPassword = process.env.SEED_DEV_PASSWORD;
+  if (devPassword) assertLocalDatabase();
+
   const teamSlug = process.env.SEED_TEAM_SLUG ?? "hold-1";
   const teamName = process.env.SEED_TEAM_NAME ?? "Hold 1";
 
@@ -209,6 +214,13 @@ async function main() {
         update: { roles: ["BOEDEKASSEFORMAND"], status: "ACTIVE" }
       });
     }
+  }
+
+  if (devPassword) {
+    const ids = await applyDevPersonas(prisma, { teamId: team.id, password: devPassword });
+    adminUserId ??= ids.get("admin@holdbold.local") ?? null;
+    console.log(`Testbrugere klar (kodeord: ${devPassword}):`);
+    for (const persona of DEV_PERSONAS) console.log(`  ${persona.email.padEnd(28)} ${persona.note ?? ""}`);
   }
 
   const existingTemplates = await prisma.fineTemplate.findMany({
