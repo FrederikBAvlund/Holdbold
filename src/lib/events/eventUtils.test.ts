@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildRecurrenceSummary, computeLateGroups, deadlineLabel, mergeHistory, sumVotes } from "./eventUtils";
 
-const member = (id: string, role = "SPILLER") => ({ role, user: { id } });
+const member = (id: string, role = "SPILLER") => ({ roles: [role], user: { id } });
 
 describe("computeLateGroups", () => {
   const deadlineAt = "2026-10-10T12:00:00.000Z";

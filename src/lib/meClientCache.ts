@@ -7,8 +7,8 @@ export type MePayload = {
     themePreset?: string | null;
     themeConfig?: Record<string, string> | null;
   } | null;
-  memberships?: Array<{ role?: string; status?: string; team?: { id?: string; name?: string; slug?: string } }>;
-  pendingMemberships?: Array<{ role?: string; status?: string; team?: { id?: string; name?: string; slug?: string } }>;
+  memberships?: Array<{ roles?: string[]; status?: string; team?: { id?: string; name?: string; slug?: string } }>;
+  pendingMemberships?: Array<{ roles?: string[]; status?: string; team?: { id?: string; name?: string; slug?: string } }>;
 };
 
 type MeFetchResult = { ok: boolean; data: MePayload };

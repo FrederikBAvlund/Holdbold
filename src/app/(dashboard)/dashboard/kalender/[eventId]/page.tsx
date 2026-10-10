@@ -34,7 +34,8 @@ import {
   type SignupStatus
 } from "@/lib/events/client";
 import { formatCountdown, formatDayLabel, formatTime } from "@/lib/format";
-import { EVENT_MANAGER_ROLES, FINE_MANAGER_ROLES, roleLabel } from "@/lib/roleLabels";
+import { rolesLabel } from "@/lib/roleLabels";
+import { EVENT_MANAGER_ROLES, FINE_MANAGER_ROLES, hasAnyRole } from "@/lib/roles";
 
 type Tab = "IN" | "OUT" | "UNKNOWN";
 type DutyField = "thingCarrierId" | "beerCarrierId";
@@ -65,9 +66,8 @@ export default function EventPage() {
   const [logs, setLogs] = useState<SignupLog[] | null>(null);
   const [eventLogs, setEventLogs] = useState<EventLog[] | null>(null);
 
-  const role = actingMember?.role ?? "";
-  const canManageEvents = EVENT_MANAGER_ROLES.includes(role);
-  const canEditOthers = FINE_MANAGER_ROLES.includes(role);
+  const canManageEvents = hasAnyRole(actingMember?.roles, EVENT_MANAGER_ROLES);
+  const canEditOthers = hasAnyRole(actingMember?.roles, FINE_MANAGER_ROLES);
 
   // Serie-forekomster findes først som rigtig begivenhed, når de åbnes.
   useEffect(() => {
@@ -358,7 +358,7 @@ export default function EventPage() {
                     {member.user.id === userId ? <span className="ml-1.5 text-ink/45">(dig)</span> : null}
                   </>
                 }
-                subtitle={signup?.status === "OUT" && signup.reason ? `“${signup.reason}”` : roleLabel(member.role)}
+                subtitle={signup?.status === "OUT" && signup.reason ? `“${signup.reason}”` : rolesLabel(member.roles)}
                 trailing={
                   event.thingCarrierId === member.user.id || event.beerCarrierId === member.user.id ? (
                     <span className="flex gap-1 text-ink/50">

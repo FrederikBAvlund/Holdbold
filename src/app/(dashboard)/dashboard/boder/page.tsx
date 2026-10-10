@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/primitives";
 import FineRow, { FineAmount } from "@/components/fines/FineRow";
 import { formatDayTime, formatKr, formatRelativePast } from "@/lib/format";
-import { FINE_MANAGER_ROLES } from "@/lib/roleLabels";
+import { FINE_MANAGER_ROLES, hasAnyRole, isAdminRoles } from "@/lib/roles";
 import { categoryLabel } from "./boderConstants";
 import type { FineItem, FineTemplate } from "./boderTypes";
 import { rankDebtors, summarizeFines } from "./boderUtils";
@@ -39,8 +39,8 @@ export default function BoderPage() {
   const searchParams = useSearchParams();
   const { pushToast } = useToast();
   const { teamId, userId, members, actingMember, seasonQuery, isReadOnlySeason } = useDashboardTeam();
-  const canManage = FINE_MANAGER_ROLES.includes(actingMember?.role ?? "");
-  const isAdmin = actingMember?.role === "ADMIN";
+  const canManage = hasAnyRole(actingMember?.roles, FINE_MANAGER_ROLES);
+  const isAdmin = isAdminRoles(actingMember?.roles);
 
   const data = useFineData({ teamId, userId, seasonQuery, canManage, isAdmin });
   const { run, busyKey } = useFineActions(data.refresh);

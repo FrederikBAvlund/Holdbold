@@ -26,8 +26,9 @@ export function isSameCalendarDayAsEvent(eventDate: Date, now: Date = new Date()
   return fmt.format(eventDate) === fmt.format(now);
 }
 
-export function roleExcludedFromFineAutomation(role: Role, excludedRoles: Role[]): boolean {
-  return excludedRoles.includes(role);
+/** Et medlem slipper for automatiske bøder, hvis bare én af medlemmets roller er undtaget (fx SoMe). */
+export function rolesExcludedFromFineAutomation(memberRoles: readonly Role[], excludedRoles: readonly Role[]): boolean {
+  return memberRoles.some((role) => excludedRoles.includes(role));
 }
 
 export function isPostDeadlineWithdrawal(

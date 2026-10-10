@@ -58,7 +58,7 @@ export async function processDueFineCollections(teamId: string) {
       where: {
         teamId,
         status: "ACTIVE",
-        role: { in: ["ADMIN", "BOEDEKASSEFORMAND"] }
+        roles: { hasSome: ["ADMIN", "BOEDEKASSEFORMAND"] }
       },
       select: { userId: true }
     });

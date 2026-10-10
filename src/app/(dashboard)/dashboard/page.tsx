@@ -22,7 +22,7 @@ import {
   type SignupStatus
 } from "@/lib/events/client";
 import { firstName, formatCountdown, formatDayLabel, formatKr, formatTime } from "@/lib/format";
-import { FINE_MANAGER_ROLES } from "@/lib/roleLabels";
+import { FINE_MANAGER_ROLES, hasAnyRole, isAdminRoles } from "@/lib/roles";
 import { LEADERBOARD_CATEGORIES, type LeaderboardCategory, type LeaderboardTop } from "@/lib/leaderboardsShared";
 import { LEADERBOARD_SHORT } from "@/lib/leaderboardDisplay";
 
@@ -49,8 +49,8 @@ export default function HomePage() {
   const [proposedFines, setProposedFines] = useState(0);
 
   const teamName = memberships.find((membership) => membership.team?.id === teamId)?.team?.name ?? "";
-  const canManageFines = FINE_MANAGER_ROLES.includes(actingMember?.role ?? "");
-  const isAdmin = actingMember?.role === "ADMIN";
+  const canManageFines = hasAnyRole(actingMember?.roles, FINE_MANAGER_ROLES);
+  const isAdmin = isAdminRoles(actingMember?.roles);
 
   const loadEvents = useCallback(async () => {
     if (!teamId || !userId) return;

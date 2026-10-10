@@ -7,7 +7,7 @@ import Button from "@/components/ui/Button";
 import Icon from "@/components/ui/Icon";
 import Sheet from "@/components/ui/Sheet";
 import { ListRow } from "@/components/ui/primitives";
-import { roleLabel } from "@/lib/roleLabels";
+import { rolesLabel } from "@/lib/roleLabels";
 import GuideStepList from "@/components/guide/GuideStepList";
 import { ProgressRing } from "@/components/guide/GuideChecklist";
 import { useGuide } from "@/components/guide/guideClient";
@@ -42,13 +42,13 @@ export default function GuideRow() {
           </span>
         }
         title="Kom godt i gang"
-        subtitle={`Guide til dig som ${roleLabel(state.role)} · ${state.summary.done} af ${state.summary.total} klaret`}
+        subtitle={`Guide til dig som ${rolesLabel(state.roles)} · ${state.summary.done} af ${state.summary.total} klaret`}
       />
       <Sheet
         open={open}
         onClose={() => setOpen(false)}
         title="Kom godt i gang"
-        description={`Det hele, du kan som ${roleLabel(state.role)}.`}
+        description={`Det hele, du kan som ${rolesLabel(state.roles)}.`}
       >
         <div className="-mx-4 sm:-mx-5">
           <div className="flex items-center gap-3 px-4 pb-4 sm:px-5">

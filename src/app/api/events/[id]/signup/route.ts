@@ -10,8 +10,9 @@ import {
   isPostDeadlineWithdrawal,
   isSameCalendarDayAsEvent,
   resolveAutomationTemplate,
-  roleExcludedFromFineAutomation
+  rolesExcludedFromFineAutomation
 } from "@/lib/fineAutomation";
+import { FINE_MANAGER_ROLES, hasAnyRole } from "@/lib/roles";
 
 const bodySchema = z.object({
   userId: z.string().min(1),
@@ -40,7 +41,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
   const member = await requireActiveTeamMember(session.userId, eventTeam.teamId);
   if (!member.ok) return member.response;
 
-  if (!canViewSignupOf(session.userId, member.role, userId)) {
+  if (!canViewSignupOf(session.userId, member.roles, userId)) {
     return NextResponse.json({ error: "Ikke adgang til andre spilleres tilmeldingsstatus" }, { status: 403 });
   }
 
@@ -124,7 +125,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
       userId: session.user.id,
       status: "ACTIVE"
     },
-    select: { role: true }
+    select: { roles: true }
   });
   if (!actingMembership) {
     return NextResponse.json({ error: "Ikke adgang" }, { status: 403 });
@@ -132,7 +133,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
   const isOwnSignup = body.userId === session.user.id;
   const canManageOtherSignups =
-    actingMembership.role === "ADMIN" || actingMembership.role === "BOEDEKASSEFORMAND";
+    hasAnyRole(actingMembership.roles, FINE_MANAGER_ROLES);
   if (!isOwnSignup && !canManageOtherSignups) {
     return NextResponse.json({ error: "Kun admin/bødekasseformand kan opdatere andres svar" }, { status: 403 });
   }
@@ -151,7 +152,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
       userId: body.userId,
       status: "ACTIVE"
     },
-    select: { role: true, userId: true, createdAt: true }
+    select: { roles: true, userId: true, createdAt: true }
   });
   if (!targetMembership) {
     return NextResponse.json({ error: "Spiller ikke fundet på holdet" }, { status: 404 });
@@ -254,7 +255,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
       const resolved = await resolveAutomationTemplate(event.teamId, automationAction, event.kind);
       if (
         resolved &&
-        !roleExcludedFromFineAutomation(targetMembership.role, resolved.excludedRoles)
+        !rolesExcludedFromFineAutomation(targetMembership.roles, resolved.excludedRoles)
       ) {
         const template = resolved.template;
         await prisma.fine.create({
@@ -278,7 +279,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
           where: {
             teamId: event.teamId,
             status: "ACTIVE",
-            role: { in: ["ADMIN", "BOEDEKASSEFORMAND"] }
+            roles: { hasSome: ["ADMIN", "BOEDEKASSEFORMAND"] }
           },
           select: { userId: true }
         });

@@ -6,6 +6,7 @@ import { FINE_MANAGER_ROLES } from "@/lib/apiAuth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { checkSlugAvailable, SLUG_ERROR_MESSAGES } from "@/lib/reservedSlugs";
+import { hasAnyRole, isAdminRoles } from "@/lib/roles";
 
 const themeConfigSchema = z
   .object({
@@ -75,7 +76,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
   const membership = await prisma.membership.findFirst({
     where: { teamId: params.id, userId: session.user.id, status: "ACTIVE" },
-    select: { role: true }
+    select: { roles: true }
   });
   // Bødekasseformanden må selv sætte MobilePay Box, men ikke resten af holdindstillingerne
   const onlyMobilePay =
@@ -83,7 +84,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     body.themePreset === undefined &&
     body.themeConfig === undefined &&
     body.slug === undefined;
-  const allowed = membership && (membership.role === "ADMIN" || (onlyMobilePay && FINE_MANAGER_ROLES.includes(membership.role)));
+  const allowed = membership && (isAdminRoles(membership.roles) || (onlyMobilePay && hasAnyRole(membership.roles, FINE_MANAGER_ROLES)));
   if (!allowed) {
     return NextResponse.json({ error: "Kun admin kan opdatere holdindstillinger" }, { status: 403 });
   }

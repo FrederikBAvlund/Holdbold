@@ -199,10 +199,11 @@ model Membership {
   id        String   @id @default(cuid())
   userId    String
   teamId    String
-  role      Role
+  /// Et medlem kan have flere roller (fx Spiller + Træner). Rettigheder gælder, hvis én af rollerne giver dem.
+  roles     Role[]   @default([SPILLER])
   status    MembershipStatus @default(ACTIVE)
-  /// Rollen brugeren sidst fik guide til. Afviger den fra `role`, er brugeren blevet forfremmet.
-  guideRole Role?
+  /// Rollerne brugeren sidst fik guide til. Tom: har aldrig fået guiden. Mangler en af `roles`, er brugeren forfremmet.
+  guideRoles Role[]  @default([])
   /// Sat når brugeren har valgt "Spring hele guiden over" på holdet
   guideDismissedAt DateTime?
   /// Sat når brugeren har sagt ja til guiden (fra velkomsten, "Nyt"-kortet eller Profil)
@@ -213,7 +214,6 @@ model Membership {
   team Team @relation(fields: [teamId], references: [id])
 
   @@unique([userId, teamId])
-  @@index([teamId, role])
   @@index([teamId, status])
   @@index([userId, status])
 }

@@ -9,19 +9,20 @@ import Button from "@/components/ui/Button";
 import Icon from "@/components/ui/Icon";
 import Sheet, { ConfirmSheet } from "@/components/ui/Sheet";
 import { Chip } from "@/components/ui/primitives";
-import { ROLE_LABELS, roleLabel } from "@/lib/roleLabels";
+import { ROLE_LABELS, rolesLabel } from "@/lib/roleLabels";
+import { normalizeRoles, type Role } from "@/lib/roles";
 
 const ROLE_HINTS: Record<string, string> = {
   ADMIN: "Styrer alt på holdet",
-  TRAENER: "Opretter og aflyser begivenheder",
-  BOEDEKASSEFORMAND: "Styrer bødekassen",
+  TRAENER: "Opretter, retter og aflyser begivenheder",
+  BOEDEKASSEFORMAND: "Styrer bødekassen, fravær og kampens spiller",
   SPILLER: "Almindelig spiller",
   SOME: "Sociale medier – får ikke automatiske bøder"
 };
 
 const ROLES = ["ADMIN", "TRAENER", "BOEDEKASSEFORMAND", "SPILLER", "SOME"] as const;
 
-/** Medlem: rolle (gemmes ved valg) og fjernelse. Kun admin kan ændre noget. */
+/** Medlem: roller (gemmes ved hvert valg – man kan have flere) og fjernelse. Kun admin kan ændre noget. */
 export default function MemberSheet({
   member,
   isSelf,
@@ -40,21 +41,24 @@ export default function MemberSheet({
   const [saving, setSaving] = useState<string | null>(null);
   const [confirmRemove, setConfirmRemove] = useState(false);
 
-  async function setRole(role: string) {
-    if (!member || role === member.role) return;
+  async function toggleRole(role: Role) {
+    if (!member) return;
+    const current = member.roles as Role[];
+    const next = current.includes(role) ? current.filter((r) => r !== role) : [...current, role];
+    if (next.length === 0) return;
     setSaving(role);
     try {
       const response = await fetch(`/api/team-members/${member.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role })
+        body: JSON.stringify({ roles: normalizeRoles(next) })
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
         pushToast(typeof data.error === "string" ? data.error : "Kunne ikke ændre rollen", "error");
         return;
       }
-      pushToast(`${member.user.name?.split(" ")[0] ?? "Medlemmet"} er nu ${roleLabel(role).toLowerCase()}`, "success");
+      pushToast(`${member.user.name?.split(" ")[0] ?? "Medlemmet"} er nu ${rolesLabel(next).toLowerCase()}`, "success");
       invalidateDashboardTeam();
       await onChanged();
     } finally {
@@ -102,7 +106,7 @@ export default function MemberSheet({
               <div className="min-w-0">
                 <p className="truncate text-sm text-ink/60">{member.user.email ?? "Ingen email"}</p>
                 <div className="mt-2 flex flex-wrap gap-1.5">
-                  <Chip tone="primary">{roleLabel(member.role)}</Chip>
+                  <Chip tone="primary">{rolesLabel(member.roles)}</Chip>
                   {member.status !== "ACTIVE" ? <Chip tone="pending">Afventer</Chip> : null}
                   {isSelf ? <Chip>Dig</Chip> : null}
                 </div>
@@ -112,33 +116,45 @@ export default function MemberSheet({
             {canEdit ? (
               <>
                 <div className="space-y-2">
-                  <p className="text-sm font-semibold text-ink/80">Rolle</p>
-                  {isSelf ? (
-                    <p className="text-sm text-ink/55">Du kan ikke ændre din egen rolle. Bed en anden admin om det.</p>
-                  ) : null}
+                  <div>
+                    <p className="text-sm font-semibold text-ink/80">Roller</p>
+                    <p className="text-sm text-ink/55">
+                      {isSelf ? "Du kan ikke ændre dine egne roller. Bed en anden admin om det." : "Vælg alle, der passer."}
+                    </p>
+                  </div>
                   <ul className="space-y-1.5">
                     {ROLES.map((role) => {
-                      const selected = member.role === role;
+                      const selected = member.roles.includes(role);
+                      // Et medlem skal have mindst én rolle
+                      const onlyRole = selected && member.roles.length === 1;
                       return (
                         <li key={role}>
                           <button
                             type="button"
-                            disabled={isSelf || saving !== null}
-                            onClick={() => setRole(role)}
+                            disabled={isSelf || saving !== null || onlyRole}
+                            onClick={() => void toggleRole(role)}
                             aria-pressed={selected}
                             className={cn(
                               "flex min-h-14 w-full items-center gap-3 rounded-2xl border px-4 text-left transition active:scale-[0.99] disabled:opacity-60",
-                              selected ? "border-moss bg-moss/10" : "border-line hover:bg-ink/[0.03]"
+                              selected ? "border-moss bg-moss/10" : "border-line hover:bg-ink/[0.03]",
+                              onlyRole && "disabled:opacity-100"
                             )}
                           >
+                            <span
+                              className={cn(
+                                "inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border-2 transition",
+                                selected ? "border-moss bg-moss text-on-solid" : "border-ink/25"
+                              )}
+                              aria-hidden
+                            >
+                              {selected ? <Icon name="check" className="h-4 w-4" strokeWidth={3} /> : null}
+                            </span>
                             <span className="min-w-0 flex-1">
                               <span className="block font-semibold text-ink">{ROLE_LABELS[role]}</span>
                               <span className="block text-sm text-ink/55">{ROLE_HINTS[role]}</span>
                             </span>
                             {saving === role ? (
                               <span className="h-5 w-5 animate-spin rounded-full border-2 border-ink/20 border-t-ink" />
-                            ) : selected ? (
-                              <Icon name="check" className="h-5 w-5 text-moss" strokeWidth={2.6} />
                             ) : null}
                           </button>
                         </li>

@@ -11,7 +11,7 @@ export async function createUserFromSignup(input: { email: string; name: string;
       data: {
         name: input.name,
         email: input.email,
-        memberships: { create: { teamId: input.teamId, role: "SPILLER", status: "PENDING" } }
+        memberships: { create: { teamId: input.teamId, roles: ["SPILLER"], status: "PENDING" } }
       }
     });
   } catch (error) {
@@ -39,7 +39,7 @@ export async function notifyAdminsOfPendingMember(input: { teamId: string; userI
   const [team, admins] = await Promise.all([
     prisma.team.findUnique({ where: { id: input.teamId }, select: { slug: true } }),
     prisma.membership.findMany({
-      where: { teamId: input.teamId, status: "ACTIVE", role: "ADMIN" },
+      where: { teamId: input.teamId, status: "ACTIVE", roles: { has: "ADMIN" } },
       select: { userId: true }
     })
   ]);

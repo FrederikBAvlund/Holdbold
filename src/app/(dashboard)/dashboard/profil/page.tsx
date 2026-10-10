@@ -19,11 +19,12 @@ import Icon, { type IconName } from "@/components/ui/Icon";
 import Sheet from "@/components/ui/Sheet";
 import { Card, Chip, Field, ListGroup, ListRow, Section, Skeleton, inputClass } from "@/components/ui/primitives";
 import { clearMeClientCache } from "@/lib/meClientCache";
-import { roleLabel } from "@/lib/roleLabels";
+import { rolesLabel } from "@/lib/roleLabels";
+import { FINE_MANAGER_ROLES, hasAnyRole, isAdminRoles } from "@/lib/roles";
 import { DEFAULT_THEME_ID, THEME_PRESETS } from "@/lib/themePresets";
 
 type Membership = {
-  role: string;
+  roles: string[];
   status?: string;
   team: { id: string; name: string; slug: string };
 };
@@ -362,9 +363,8 @@ export default function ProfilPage() {
     memberships.find((item) => item.team.id === teamId) ??
     pendingMemberships.find((item) => item.team.id === teamId) ??
     memberships[0];
-  const isAdmin = membership?.role === "ADMIN" && membership.status !== "PENDING";
-  const canManageFines =
-    (membership?.role === "ADMIN" || membership?.role === "BOEDEKASSEFORMAND") && membership.status !== "PENDING";
+  const isAdmin = isAdminRoles(membership?.roles) && membership.status !== "PENDING";
+  const canManageFines = hasAnyRole(membership?.roles, FINE_MANAGER_ROLES) && membership.status !== "PENDING";
   const displayName = name || session.user.name || "Dig";
   const selectedPreset = PRESETS.some((item) => item.id === active) ? active : DEFAULT_THEME_ID;
 
@@ -409,7 +409,7 @@ export default function ProfilPage() {
             <p className="mt-3 inline-flex items-center gap-2 rounded-full bg-on-primary/15 px-3.5 py-1.5 text-sm font-semibold">
               {membership.team.name}
               <span className="opacity-60">·</span>
-              {membership.status === "PENDING" ? "Afventer" : roleLabel(membership.role)}
+              {membership.status === "PENDING" ? "Afventer" : rolesLabel(membership.roles)}
             </p>
           ) : null}
         </div>

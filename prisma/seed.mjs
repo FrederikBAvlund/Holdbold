@@ -141,8 +141,8 @@ async function main() {
 
     await prisma.membership.upsert({
       where: { userId_teamId: { userId: user.id, teamId: team.id } },
-      create: { userId: user.id, teamId: team.id, role: "ADMIN", status: "ACTIVE" },
-      update: { role: "ADMIN", status: "ACTIVE" }
+      create: { userId: user.id, teamId: team.id, roles: ["ADMIN"], status: "ACTIVE" },
+      update: { roles: ["ADMIN"], status: "ACTIVE" }
     });
   }
 
@@ -161,8 +161,8 @@ async function main() {
 
     await prisma.membership.upsert({
       where: { userId_teamId: { userId: user.id, teamId: team.id } },
-      create: { userId: user.id, teamId: team.id, role: "SPILLER", status: "ACTIVE" },
-      update: { role: "SPILLER", status: "ACTIVE" }
+      create: { userId: user.id, teamId: team.id, roles: ["SPILLER"], status: "ACTIVE" },
+      update: { roles: ["SPILLER"], status: "ACTIVE" }
     });
   }
 
@@ -184,8 +184,8 @@ async function main() {
 
       await prisma.membership.upsert({
         where: { userId_teamId: { userId: user.id, teamId: team.id } },
-        create: { userId: user.id, teamId: team.id, role: "SPILLER", status: "ACTIVE" },
-        update: { role: "SPILLER", status: "ACTIVE" }
+        create: { userId: user.id, teamId: team.id, roles: ["SPILLER"], status: "ACTIVE" },
+        update: { roles: ["SPILLER"], status: "ACTIVE" }
       });
     }
   }
@@ -205,8 +205,8 @@ async function main() {
 
       await prisma.membership.upsert({
         where: { userId_teamId: { userId: user.id, teamId: team.id } },
-        create: { userId: user.id, teamId: team.id, role: "BOEDEKASSEFORMAND", status: "ACTIVE" },
-        update: { role: "BOEDEKASSEFORMAND", status: "ACTIVE" }
+        create: { userId: user.id, teamId: team.id, roles: ["BOEDEKASSEFORMAND"], status: "ACTIVE" },
+        update: { roles: ["BOEDEKASSEFORMAND"], status: "ACTIVE" }
       });
     }
   }

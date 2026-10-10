@@ -40,7 +40,7 @@ export async function loadGuideFacts(userId: string, teamId: string): Promise<Gu
     prisma.teamOpenAiCredential.findUnique({ where: { teamId }, select: { teamId: true } }),
     prisma.membership.findFirst({ where: { teamId, status: "ACTIVE", userId: { not: userId } }, ...id }),
     prisma.membership.findFirst({
-      where: { teamId, status: "ACTIVE", role: { in: ["TRAENER", "BOEDEKASSEFORMAND", "SOME"] } },
+      where: { teamId, status: "ACTIVE", roles: { hasSome: ["TRAENER", "BOEDEKASSEFORMAND", "SOME"] } },
       ...id
     }),
     prisma.pushSubscription.findFirst({ where: { userId }, ...id }),

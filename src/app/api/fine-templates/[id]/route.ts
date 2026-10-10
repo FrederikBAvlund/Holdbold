@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { z } from "zod";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { FINE_MANAGER_ROLES, hasAnyRole } from "@/lib/roles";
 
 const updateSchema = z.object({
   title: z.string().min(1),
@@ -31,8 +32,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   const membership = await prisma.membership.findFirst({
     where: { teamId: template.teamId, userId: session.user.id }
   });
-  const role = membership?.role ?? "SPILLER";
-  if (!["ADMIN", "BOEDEKASSEFORMAND"].includes(role)) {
+  if (!hasAnyRole(membership?.roles, FINE_MANAGER_ROLES)) {
     return NextResponse.json({ error: "Ikke adgang" }, { status: 403 });
   }
 
@@ -66,8 +66,7 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
   const membership = await prisma.membership.findFirst({
     where: { teamId: template.teamId, userId: session.user.id, status: "ACTIVE" }
   });
-  const role = membership?.role ?? "SPILLER";
-  if (!["ADMIN", "BOEDEKASSEFORMAND"].includes(role)) {
+  if (!hasAnyRole(membership?.roles, FINE_MANAGER_ROLES)) {
     return NextResponse.json({ error: "Ikke adgang" }, { status: 403 });
   }
 

@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { EVENT_MANAGER_ROLES, requireActiveTeamMember, requireSession } from "@/lib/apiAuth";
+import { MOTM_MANAGER_ROLES, requireActiveTeamMember, requireSession } from "@/lib/apiAuth";
 import { normalizeMotmSelections } from "@/lib/motm";
 import { buildMotmPollApiView, eventMotmAvailabilityError } from "@/lib/motmPolls";
 import { syncMotmSelfVoteProposedFines } from "@/lib/motmSelfVoteFines";
 import { prisma } from "@/lib/prisma";
 import { ensureEventSeasonOpen } from "@/lib/seasons";
+import { hasAnyRole } from "@/lib/roles";
 
 const voteSchema = z.object({
   selections: z.array(
@@ -143,7 +144,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
     teamId: event.teamId,
     eventId: event.id,
     voterId: session.userId,
-    voterRole: member.role,
+    voterRoles: member.roles,
     selections
   });
 
@@ -156,6 +157,6 @@ export async function POST(request: Request, { params }: { params: { id: string 
   }
 
   return NextResponse.json({
-    poll: buildMotmPollApiView(updatedPoll, session.userId, EVENT_MANAGER_ROLES.includes(member.role))
+    poll: buildMotmPollApiView(updatedPoll, session.userId, hasAnyRole(member.roles, MOTM_MANAGER_ROLES))
   });
 }

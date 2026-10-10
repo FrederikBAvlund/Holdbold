@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireActiveTeamMember, requireSession } from "@/lib/apiAuth";
-import { resolveAutomationTemplate, roleExcludedFromFineAutomation } from "@/lib/fineAutomation";
+import { resolveAutomationTemplate, rolesExcludedFromFineAutomation } from "@/lib/fineAutomation";
 import { buildScoreRowsFromPollBallots, buildMotmPollApiView } from "@/lib/motmPolls";
 import { createNotifications } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
@@ -123,7 +123,7 @@ export async function POST(_request: Request, { params }: { params: { id: string
           status: "ACTIVE"
         },
         select: {
-          role: true,
+          roles: true,
           user: {
             select: {
               name: true
@@ -146,7 +146,7 @@ export async function POST(_request: Request, { params }: { params: { id: string
       resolved &&
       winnerMembership &&
       !existingFine &&
-      !roleExcludedFromFineAutomation(winnerMembership.role, resolved.excludedRoles)
+      !rolesExcludedFromFineAutomation(winnerMembership.roles, resolved.excludedRoles)
     ) {
       await prisma.fine.create({
         data: {
@@ -166,7 +166,7 @@ export async function POST(_request: Request, { params }: { params: { id: string
       });
 
       const managers = await prisma.membership.findMany({
-        where: { teamId: event.teamId, role: { in: ["ADMIN", "BOEDEKASSEFORMAND"] } },
+        where: { teamId: event.teamId, roles: { hasSome: ["ADMIN", "BOEDEKASSEFORMAND"] } },
         select: { userId: true }
       });
       if (managers.length > 0) {

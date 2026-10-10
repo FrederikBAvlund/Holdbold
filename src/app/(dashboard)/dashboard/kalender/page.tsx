@@ -10,7 +10,7 @@ import { EmptyState, FilterChips, PageHeader, SegmentedControl, Skeleton } from 
 import EventCard from "@/components/events/EventCard";
 import { eventHref, fetchCalendarEvents, type CalendarEvent, type SignupStatus } from "@/lib/events/client";
 import { formatDayLabel, formatMonthYear } from "@/lib/format";
-import { EVENT_MANAGER_ROLES } from "@/lib/roleLabels";
+import { EVENT_MANAGER_ROLES, hasAnyRole } from "@/lib/roles";
 
 type Filter = "all" | "MATCH" | "TRAINING" | "missing";
 type View = "list" | "month";
@@ -43,7 +43,7 @@ export default function KalenderPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { teamId, userId, actingMember, seasonQuery } = useDashboardTeam();
-  const canManage = EVENT_MANAGER_ROLES.includes(actingMember?.role ?? "");
+  const canManage = hasAnyRole(actingMember?.roles, EVENT_MANAGER_ROLES);
 
   const [view, setView] = useState<View>("list");
   const [filter, setFilter] = useState<Filter>(() =>

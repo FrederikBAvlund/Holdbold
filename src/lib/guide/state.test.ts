@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeGuideState, guideRoleAfterRoleChange, nextGuideSteps, type GuideStateInput } from "@/lib/guide/state";
+import { computeGuideState, guideRolesAfterRoleChange, nextGuideSteps, type GuideStateInput } from "@/lib/guide/state";
 import { GUIDE_STEPS, type GuideFacts } from "@/lib/guide/steps";
 
 function facts(overrides: { team?: Partial<GuideFacts["team"]>; user?: Partial<GuideFacts["user"]> } = {}): GuideFacts {
@@ -35,8 +35,8 @@ function facts(overrides: { team?: Partial<GuideFacts["team"]>; user?: Partial<G
 
 function state(input: Partial<GuideStateInput> = {}) {
   return computeGuideState({
-    role: "SPILLER",
-    guideRole: null,
+    roles: ["SPILLER"],
+    guideRoles: [],
     dismissed: false,
     started: false,
     facts: facts(),
@@ -64,24 +64,36 @@ describe("computeGuideState", () => {
     expect(s.mode).toBe("intro");
   });
 
+  it("viser ikke bødekasseformanden begivenheder", () => {
+    const s = state({ roles: ["BOEDEKASSEFORMAND"] });
+    expect(ids(s)).toContain("fines.assign");
+    expect(ids(s).some((id) => id.startsWith("events."))).toBe(false);
+  });
+
+  it("viser begge dele til et medlem med flere roller", () => {
+    const s = state({ roles: ["TRAENER", "BOEDEKASSEFORMAND"] });
+    expect(ids(s)).toContain("events.create");
+    expect(ids(s)).toContain("fines.assign");
+  });
+
   it("viser træneren begivenheder, men ikke bødekassen", () => {
-    const s = state({ role: "TRAENER" });
+    const s = state({ roles: ["TRAENER"] });
     expect(ids(s)).toContain("events.create");
     expect(ids(s).some((id) => id.startsWith("fines."))).toBe(false);
   });
 
   it("markerer opsætning, som holdet allerede har, som klaret af holdet", () => {
-    const s = state({ role: "BOEDEKASSEFORMAND", facts: facts({ team: { mobilePayBox: true } }) });
+    const s = state({ roles: ["BOEDEKASSEFORMAND"], facts: facts({ team: { mobilePayBox: true } }) });
     expect(step(s, "fines.mobilepay")).toMatchObject({ status: "done", doneBy: "team" });
   });
 
   it("markerer færdigheder, brugeren allerede har brugt, som klaret", () => {
-    const s = state({ role: "BOEDEKASSEFORMAND", facts: facts({ user: { createdFine: true } }) });
+    const s = state({ roles: ["BOEDEKASSEFORMAND"], facts: facts({ user: { createdFine: true } }) });
     expect(step(s, "fines.assign")).toMatchObject({ status: "done", doneBy: "you" });
   });
 
   it("lader bødeformanden selv tilknytte MobilePay Box, når holdet mangler den", () => {
-    expect(step(state({ role: "BOEDEKASSEFORMAND" }), "fines.mobilepay")?.status).toBe("todo");
+    expect(step(state({ roles: ["BOEDEKASSEFORMAND"] }), "fines.mobilepay")?.status).toBe("todo");
   });
 
   it("regner set info-trin som klaret, men ikke set opgaver", () => {
@@ -97,18 +109,19 @@ describe("computeGuideState", () => {
   });
 
   it("skjuler indtalte bøder, når holdet ikke har en OpenAI-nøgle", () => {
-    expect(ids(state({ role: "ADMIN" }))).not.toContain("fines.voice");
-    expect(ids(state({ role: "ADMIN", facts: facts({ team: { openAiKey: true } }) }))).toContain("fines.voice");
+    expect(ids(state({ roles: ["ADMIN"] }))).not.toContain("fines.voice");
+    expect(ids(state({ roles: ["ADMIN"], facts: facts({ team: { openAiKey: true } }) }))).toContain("fines.voice");
   });
 
   it("viser kun nye, ikke-klarede trin ved forfremmelse", () => {
+    // En træner, der også bliver bødekasseformand
     const s = state({
-      role: "BOEDEKASSEFORMAND",
-      guideRole: "TRAENER",
+      roles: ["TRAENER", "BOEDEKASSEFORMAND", "SPILLER"],
+      guideRoles: ["TRAENER", "SPILLER"],
       facts: facts({ team: { mobilePayBox: true, fineTemplates: true } })
     });
     expect(s.mode).toBe("announce");
-    expect(s.promotion).toMatchObject({ from: "TRAENER", to: "BOEDEKASSEFORMAND" });
+    expect(s.promotion).toMatchObject({ gainedRoles: ["BOEDEKASSEFORMAND"], capabilities: ["fines", "absences", "motm"] });
     expect(s.promotion?.stepIds).toContain("fines.assign");
     expect(s.promotion?.stepIds).not.toContain("fines.mobilepay");
     expect(s.promotion?.stepIds).not.toContain("fines.templates");
@@ -116,7 +129,7 @@ describe("computeGuideState", () => {
   });
 
   it("viser forfremmelse, selvom guiden er sprunget over", () => {
-    const s = state({ role: "TRAENER", guideRole: "SPILLER", dismissed: true });
+    const s = state({ roles: ["TRAENER"], guideRoles: ["SPILLER"], dismissed: true });
     expect(s.promotion?.capabilities).toEqual(["events"]);
   });
 
@@ -126,19 +139,19 @@ describe("computeGuideState", () => {
   });
 
   it("viser 'Nyt'-kortet til medlemmer fra før guiden og tjeklisten, når guiden er startet", () => {
-    expect(state({ guideRole: "SPILLER" }).mode).toBe("announce");
-    expect(state({ guideRole: "SPILLER", started: true }).mode).toBe("checklist");
+    expect(state({ guideRoles: ["SPILLER"] }).mode).toBe("announce");
+    expect(state({ guideRoles: ["SPILLER"], started: true }).mode).toBe("checklist");
   });
 });
 
 describe("nextGuideSteps", () => {
   it("starter bødeformanden i bødekassen og springer det klarede over", () => {
-    const s = state({ role: "BOEDEKASSEFORMAND", facts: facts({ team: { mobilePayBox: true } }) });
+    const s = state({ roles: ["BOEDEKASSEFORMAND"], facts: facts({ team: { mobilePayBox: true } }) });
     expect(nextGuideSteps(s.steps, 3).map((x) => x.id)).toEqual(["fines.templates", "fines.automation", "fines.assign"]);
   });
 
   it("starter admin med at få holdet sat op", () => {
-    expect(nextGuideSteps(state({ role: "ADMIN" }).steps, 2).map((x) => x.id)).toEqual(["admin.invite", "admin.calendar-import"]);
+    expect(nextGuideSteps(state({ roles: ["ADMIN"] }).steps, 2).map((x) => x.id)).toEqual(["admin.invite", "admin.calendar-import"]);
   });
 
   it("holder guidens rækkefølge for spillere", () => {
@@ -146,20 +159,20 @@ describe("nextGuideSteps", () => {
   });
 });
 
-describe("guideRoleAfterRoleChange", () => {
-  it("beholder den gamle rolle ved forfremmelse, så de nye dele kan vises", () => {
-    expect(guideRoleAfterRoleChange("SPILLER", "BOEDEKASSEFORMAND")).toBe("SPILLER");
+describe("guideRolesAfterRoleChange", () => {
+  it("beholder de gamle roller, når en ny rolle giver noget nyt, så de nye dele kan vises", () => {
+    expect(guideRolesAfterRoleChange(["SPILLER"], ["SPILLER", "BOEDEKASSEFORMAND"])).toEqual(["SPILLER"]);
   });
 
-  it("følger med ved degradering", () => {
-    expect(guideRoleAfterRoleChange("ADMIN", "SPILLER")).toBe("SPILLER");
+  it("følger med, når man mister en rolle", () => {
+    expect(guideRolesAfterRoleChange(["ADMIN"], ["SPILLER"])).toEqual(["SPILLER"]);
   });
 
-  it("holder fast i en uset forfremmelse, hvis man går lidt ned igen", () => {
-    expect(guideRoleAfterRoleChange("SPILLER", "TRAENER")).toBe("SPILLER");
+  it("holder fast i en uset forfremmelse, hvis en af de nye roller fjernes igen", () => {
+    expect(guideRolesAfterRoleChange(["SPILLER"], ["SPILLER", "TRAENER"])).toEqual(["SPILLER"]);
   });
 
   it("lader nye medlemmer uden velkomst blive ved med at få den", () => {
-    expect(guideRoleAfterRoleChange(null, "TRAENER")).toBeNull();
+    expect(guideRolesAfterRoleChange([], ["TRAENER"])).toEqual([]);
   });
 });

@@ -5,6 +5,7 @@ import { createNotifications } from "@/lib/notifications";
 import { notificationRef, resolveBulkFineProposalNotifications, resolveNotifications } from "@/lib/notificationRefs";
 import { prisma } from "@/lib/prisma";
 import { ensureFineSeasonOpen } from "@/lib/seasons";
+import { FINE_MANAGER_ROLES, hasAnyRole } from "@/lib/roles";
 
 export async function POST(_request: Request, { params }: { params: { id: string } }) {
   const seasonGuard = await ensureFineSeasonOpen(params.id);
@@ -25,9 +26,9 @@ export async function POST(_request: Request, { params }: { params: { id: string
 
   const membership = await prisma.membership.findFirst({
     where: { teamId: fineToApprove.teamId, userId: session.user.id, status: "ACTIVE" },
-    select: { role: true }
+    select: { roles: true }
   });
-  if (!membership || !["ADMIN", "BOEDEKASSEFORMAND"].includes(membership.role)) {
+  if (!membership || !hasAnyRole(membership.roles, FINE_MANAGER_ROLES)) {
     return NextResponse.json({ error: "Ikke adgang" }, { status: 403 });
   }
   if (fineToApprove.status !== "FORESLAET") {

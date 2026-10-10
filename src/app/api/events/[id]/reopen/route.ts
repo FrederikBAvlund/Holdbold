@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { createNotifications } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 import { ensureEventSeasonOpen } from "@/lib/seasons";
+import { EVENT_MANAGER_ROLES, hasAnyRole } from "@/lib/roles";
 
 export async function POST(_request: Request, { params }: { params: { id: string } }) {
   const seasonGuard = await ensureEventSeasonOpen(params.id);
@@ -25,8 +26,7 @@ export async function POST(_request: Request, { params }: { params: { id: string
   const eventMembership = await prisma.membership.findFirst({
     where: { userId: session.user.id, teamId: event.teamId }
   });
-  const role = eventMembership?.role ?? "SPILLER";
-  if (!["ADMIN", "TRAENER", "BOEDEKASSEFORMAND"].includes(role)) {
+  if (!hasAnyRole(eventMembership?.roles, EVENT_MANAGER_ROLES)) {
     return NextResponse.json({ error: "Ikke adgang" }, { status: 403 });
   }
 

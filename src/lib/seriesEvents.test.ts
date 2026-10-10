@@ -34,7 +34,7 @@ describe("ensureSeriesEvents", () => {
     seasonId = season.id;
     const user = await prisma.user.create({ data: { name: "Medlem", email: `s-${suffix}@test.dk` } });
     memberId = user.id;
-    await prisma.membership.create({ data: { userId: memberId, teamId, role: "SPILLER", status: "ACTIVE" } });
+    await prisma.membership.create({ data: { userId: memberId, teamId, roles: ["SPILLER"], status: "ACTIVE" } });
     const start = new Date(Date.now() + 86_400_000);
     start.setUTCHours(17, 0, 0, 0);
     const series = await prisma.eventSeries.create({
