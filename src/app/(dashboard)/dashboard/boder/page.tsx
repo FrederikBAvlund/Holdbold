@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useDashboardTeam, type DashboardTeamMember } from "@/components/DashboardTeamProvider";
 import { useToast } from "@/components/ToastProvider";
@@ -52,8 +52,24 @@ export default function BoderPage() {
   const [collectionOpen, setCollectionOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [voiceOpen, setVoiceOpen] = useState(false);
+  const [voiceEnabled, setVoiceEnabled] = useState(false);
   const [memberSheet, setMemberSheet] = useState<{ userId: string; fines: FineItem[] | null } | null>(null);
   const [deleteFine, setDeleteFine] = useState<FineItem | null>(null);
+
+  useEffect(() => {
+    if (!canManage || !teamId) {
+      setVoiceEnabled(false);
+      return;
+    }
+    let cancelled = false;
+    fetch(`/api/fines/voice/status?teamId=${encodeURIComponent(teamId)}`, { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : { enabled: false }))
+      .then((body) => !cancelled && setVoiceEnabled(Boolean(body.enabled)))
+      .catch(() => !cancelled && setVoiceEnabled(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [canManage, teamId]);
 
   useEffect(() => {
     const requested = searchParams.get("fane");
@@ -95,6 +111,7 @@ export default function BoderPage() {
   }
 
   const assignLabel = canManage ? "Giv bøde" : "Foreslå bøde";
+  const openAssign = () => setAssign({});
   const memberForSheet = memberSheet ? memberById.get(memberSheet.userId) : undefined;
   const debtorName = memberSheet
     ? memberForSheet?.user.name ?? data.debtors.find((d) => d.userId === memberSheet.userId)?.name ?? "Medlem"
@@ -107,7 +124,7 @@ export default function BoderPage() {
         subtitle={canManage ? "Holdets bødekasse – hold styr på det hele." : "Dine bøder og holdets bødetavle."}
         action={
           !isReadOnlySeason ? (
-            <Button icon="plus" className="hidden sm:inline-flex" onClick={() => setAssign({})}>
+            <Button icon="plus" className="hidden sm:inline-flex" onClick={openAssign}>
               {assignLabel}
             </Button>
           ) : null
@@ -172,11 +189,13 @@ export default function BoderPage() {
           teamId={teamId}
           data={data}
           memberById={memberById}
+          isAdmin={isAdmin}
           readOnly={isReadOnlySeason}
           busyKey={busyKey}
           run={run}
+          voiceEnabled={voiceEnabled}
           onVoice={() => setVoiceOpen(true)}
-          onAssign={() => setAssign({})}
+          onAssign={openAssign}
           onCollection={() => setCollectionOpen(true)}
           onEditTemplate={(template) => setTemplateSheet({ template })}
           onNewTemplate={() => setTemplateSheet({ template: null })}
@@ -190,7 +209,7 @@ export default function BoderPage() {
       {!isReadOnlySeason ? (
         <button
           type="button"
-          onClick={() => setAssign({})}
+          onClick={openAssign}
           className="fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom,0px))] right-4 z-40 inline-flex h-14 items-center gap-2 rounded-full bg-primary px-5 font-semibold text-on-primary shadow-[var(--shadow-lg)] transition active:scale-95 sm:hidden"
         >
           <Icon name="plus" strokeWidth={2.6} />
@@ -206,6 +225,11 @@ export default function BoderPage() {
         members={members}
         canManage={canManage}
         initialTemplateId={assign?.templateId}
+        voiceEnabled={voiceEnabled && canManage}
+        onVoice={() => {
+          setAssign(null);
+          setVoiceOpen(true);
+        }}
         onDone={data.refresh}
       />
       <PaySheet
@@ -262,6 +286,10 @@ export default function BoderPage() {
           members={members as unknown as Parameters<typeof VoiceFinesModal>[0]["members"]}
           templates={data.templates}
           onClose={() => setVoiceOpen(false)}
+          onManual={() => {
+            setVoiceOpen(false);
+            setAssign({});
+          }}
           onCreated={data.refresh}
         />
       ) : null}
@@ -598,9 +626,11 @@ function KassenTab({
   teamId,
   data,
   memberById,
+  isAdmin,
   readOnly,
   busyKey,
   run,
+  voiceEnabled,
   onVoice,
   onAssign,
   onCollection,
@@ -613,9 +643,11 @@ function KassenTab({
   teamId: string;
   data: ReturnType<typeof useFineData>;
   memberById: Map<string, DashboardTeamMember>;
+  isAdmin: boolean;
   readOnly: boolean;
   busyKey: string | null;
   run: ReturnType<typeof useFineActions>["run"];
+  voiceEnabled: boolean;
   onVoice: () => void;
   onAssign: () => void;
   onCollection: () => void;
@@ -625,6 +657,7 @@ function KassenTab({
   onSavedMobilePay: (value: string) => void;
   pushError: (message: string) => void;
 }) {
+  const router = useRouter();
   const pendingTemplates = data.templates.filter((t) => t.status === "PENDING");
   const actions: Array<{
     icon: IconName | "mic";
@@ -632,16 +665,28 @@ function KassenTab({
     hint: string;
     onClick: () => void;
     hero?: boolean;
+    locked?: boolean;
     guide: string;
   }> = [
-    {
-      icon: "mic",
-      label: "Indtal bøder",
-      hint: "Hold knappen nede og rems dem op – så laves forslagene",
-      onClick: onVoice,
-      hero: true,
-      guide: "voice-fines"
-    },
+    voiceEnabled
+      ? {
+          icon: "mic",
+          label: "Indtal bøder",
+          hint: "Hold knappen nede og rems dem op – så laves forslagene",
+          onClick: onVoice,
+          hero: true,
+          guide: "voice-fines"
+        }
+      : {
+          icon: "mic",
+          label: "Indtal bøder",
+          hint: isAdmin
+            ? "Låst – tilknyt en OpenAI API-nøgle under Holdindstillinger for at bruge funktionen"
+            : "Låst – en admin skal tilknytte en OpenAI API-nøgle under Holdindstillinger",
+          onClick: () => (isAdmin ? router.push("/dashboard/hold/indstillinger") : undefined),
+          locked: true,
+          guide: "voice-fines"
+        },
     { icon: "receipt", label: "Giv bøde", hint: "Én eller flere spillere", onClick: onAssign, guide: "assign-fine" },
     { icon: "hourglass", label: "Indsamling", hint: "Bøde ved for sen betaling", onClick: onCollection, guide: "fine-collection" }
   ];
@@ -656,9 +701,11 @@ function KassenTab({
               type="button"
               onClick={action.onClick}
               data-guide={action.guide}
+              aria-disabled={action.locked || undefined}
               className={cn(
                 "flex min-h-[5.5rem] flex-col justify-between gap-2 rounded-[1.375rem] p-4 text-left transition active:scale-[0.98]",
-                action.hero ? "hero-surface col-span-2" : "border border-line bg-surface hover:border-ink/20"
+                action.hero ? "hero-surface col-span-2" : "border border-line bg-surface hover:border-ink/20",
+                action.locked && "col-span-2 border border-dashed border-line bg-ink/[0.03] text-ink/60"
               )}
             >
               <span className="flex items-center gap-2">
@@ -671,6 +718,12 @@ function KassenTab({
                   <Icon name={action.icon} className="h-5 w-5 text-moss" />
                 )}
                 <span className="font-display text-xl font-bold uppercase leading-none">{action.label}</span>
+                {action.locked ? (
+                  <svg viewBox="0 0 24 24" className="ml-auto h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-label="Låst">
+                    <rect x="5" y="11" width="14" height="10" rx="2" />
+                    <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+                  </svg>
+                ) : null}
               </span>
               <span className={cn("text-sm", action.hero ? "text-on-primary/80" : "text-ink/55")}>{action.hint}</span>
             </button>
