@@ -4,6 +4,7 @@ import { createNotifications } from "@/lib/notifications";
 import { notificationRef } from "@/lib/notificationRefs";
 import { prisma } from "@/lib/prisma";
 import { requireActiveTeamMember, requireSession } from "@/lib/apiAuth";
+import { PUBLIC_USER_SELECT } from "@/lib/publicUser";
 
 const listSchema = z.object({
   teamId: z.string().min(1)
@@ -31,9 +32,9 @@ export async function GET(request: Request) {
   const templates = await prisma.fineTemplate.findMany({
     where: { teamId: parsed.teamId },
     include: {
-      createdBy: true,
-      approvedBy: true,
-      rejectedBy: true
+      createdBy: { select: PUBLIC_USER_SELECT },
+      approvedBy: { select: PUBLIC_USER_SELECT },
+      rejectedBy: { select: PUBLIC_USER_SELECT }
     },
     orderBy: { createdAt: "desc" }
   });
