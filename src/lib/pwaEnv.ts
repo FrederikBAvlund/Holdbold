@@ -45,3 +45,16 @@ export function decideGuide(input: {
   if (pushSupported) return "push";
   return null;
 }
+
+export type IosGuideVersion = "new" | "classic";
+
+/**
+ * Gætter hvilken Safari-udgave brugeren har. Safari 26+ fastfryser "OS 18_6" i UA'en,
+ * så "Version/26" i Safari-delen er mere pålidelig end "OS x_y". Kun et forvalg – brugeren kan skifte.
+ */
+export function guessIosGuideVersion(userAgent: string): IosGuideVersion {
+  const safari = /Version\/(\d+)/.exec(userAgent);
+  const os = /OS (\d+)[_.]\d+/.exec(userAgent);
+  const major = Number(safari?.[1] ?? os?.[1] ?? 0);
+  return major >= 26 ? "new" : "classic";
+}

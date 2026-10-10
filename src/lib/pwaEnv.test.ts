@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { classifyDevice, decideGuide, type DeviceEnv } from "./pwaEnv";
+import { classifyDevice, decideGuide, guessIosGuideVersion, type DeviceEnv } from "./pwaEnv";
 
 const IPHONE_SAFARI =
   "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1";
@@ -57,5 +57,19 @@ describe("decideGuide", () => {
   });
   it("ikke understøttet push uden for iOS → ingen guide", () => {
     expect(decideGuide({ ...base, env: android, pushSupported: false })).toBeNull();
+  });
+});
+
+describe("guessIosGuideVersion", () => {
+  it("iOS 26+ Safari (UA fastfrosset på OS 18_6) → ny", () => {
+    const ua = IPHONE_SAFARI.replace("OS 17_5", "OS 18_6").replace("Version/17.5", "Version/26.0");
+    expect(guessIosGuideVersion(ua)).toBe("new");
+  });
+  it("iOS 18 → klassisk", () => {
+    expect(guessIosGuideVersion(IPHONE_SAFARI.replace("Version/17.5", "Version/18.1"))).toBe("classic");
+  });
+  it("uden Version-token bruges OS-versionen", () => {
+    expect(guessIosGuideVersion(IPHONE_CHROME)).toBe("classic");
+    expect(guessIosGuideVersion(IPHONE_CHROME.replace("OS 17_5", "OS 26_0"))).toBe("new");
   });
 });
