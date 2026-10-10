@@ -422,17 +422,6 @@ button {
   --color-button-text: #ffffff;
 }
 
-/* Orange og varm – klassisk "bortetrøje"-energi */
-:root[data-theme="sunset"] {
-  --color-ink: #2a1408;
-  --color-clay: #fdba74;
-  --color-moss: #ea580c;
-  --color-ember: #f59e0b;
-  --color-fog: #fff7ed;
-  --color-button: #ea580c;
-  --color-button-text: #ffffff;
-}
-
 /* Lilla med kant */
 :root[data-theme="lavender"] {
   --color-ink: #1e1035;
@@ -466,15 +455,26 @@ button {
   --color-button-text: #ffffff;
 }
 
-/* Neon: limegrøn som et træningsvest */
-:root[data-theme="neon"] {
-  --color-ink: #111a05;
-  --color-clay: #bef264;
-  --color-moss: #4d7c0f;
-  --color-ember: #65a30d;
-  --color-fog: #f7fee7;
-  --color-button: #3f6212;
-  --color-button-text: #f7fee7;
+/* Berry: mørk magenta med lyserød accent */
+:root[data-theme="berry"] {
+  --color-ink: #2a0a2e;
+  --color-clay: #f0abfc;
+  --color-moss: #a21caf;
+  --color-ember: #ec4899;
+  --color-fog: #fdf4ff;
+  --color-button: #a21caf;
+  --color-button-text: #ffffff;
+}
+
+/* Slate: kølig stålgrå med himmelblå accent */
+:root[data-theme="slate"] {
+  --color-ink: #0f1b2d;
+  --color-clay: #94a3b8;
+  --color-moss: #475569;
+  --color-ember: #0ea5e9;
+  --color-fog: #f1f5f9;
+  --color-button: #334155;
+  --color-button-text: #ffffff;
 }
 
 /* Guld: sol-gul med mørk tekst på knapper og hero */
