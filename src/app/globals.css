@@ -87,6 +87,39 @@
   }
 }
 
+/*
+  Mørke temaer: altid mørke, uanset systemets indstilling.
+  Samme afledte tokens som mørk tilstand ovenfor, så de skal holdes ens.
+*/
+:root[data-theme="graphite"],
+:root[data-theme="obsidian"],
+:root[data-theme="nightfall"],
+:root[data-theme="embers"] {
+  color-scheme: dark;
+  --ink: color-mix(in srgb, var(--color-fog) 88%, #ffffff);
+  --bg: color-mix(in srgb, var(--color-ink) 55%, #05070b);
+  --fog: color-mix(in srgb, var(--bg) 88%, #ffffff);
+  --surface: color-mix(in srgb, var(--bg) 91%, #ffffff);
+  --surface-2: color-mix(in srgb, var(--bg) 83%, #ffffff);
+  --line: color-mix(in srgb, #ffffff 12%, transparent);
+  --moss: color-mix(in srgb, var(--color-moss) 68%, #ffffff);
+  --ember: color-mix(in srgb, var(--color-ember) 70%, #ffffff);
+  --primary: color-mix(in srgb, var(--color-moss) 68%, #ffffff);
+  --on-primary: color-mix(in srgb, var(--color-ink) 80%, #000000);
+  --success: #4ade80;
+  --on-solid: #0b0f14;
+  --warning: #fbbf24;
+  --danger: #f05252;
+  --scrim: rgba(0, 0, 0, 0.62);
+  --in: #4ade80;
+  --out: #fb7185;
+  --pending: #fbbf24;
+  --kind-training: #94a3b8;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 28px -14px rgba(0, 0, 0, 0.6);
+  --shadow-lg: 0 24px 60px -20px rgba(0, 0, 0, 0.8);
+}
+
 * {
   box-sizing: border-box;
   -webkit-tap-highlight-color: transparent;
@@ -444,6 +477,50 @@ button {
   --color-ember: #2563eb;
   --color-fog: #f8fafc;
   --color-button: #1f2937;
+  --color-button-text: #ffffff;
+}
+
+/* Mørke temaer – kun rå brand-farver; mørke tokens afledes i blokken ovenfor */
+:root[data-theme="graphite"] {
+  --color-ink: #1c2128;
+  --color-clay: #8b949e;
+  --color-moss: #2f81f7;
+  --color-ember: #3fb950;
+  --color-fog: #e6edf3;
+  --color-button: #2f6feb;
+  --color-button-text: #ffffff;
+}
+
+/* Ren sort – sparer batteri på OLED-skærme */
+:root[data-theme="obsidian"] {
+  --color-ink: #000000;
+  --color-clay: #52525b;
+  --color-moss: #06b6d4;
+  --color-ember: #22d3ee;
+  --color-fog: #fafafa;
+  --color-button: #0e7490;
+  --color-button-text: #ffffff;
+}
+
+/* Indigo aften med lyserød accent */
+:root[data-theme="nightfall"] {
+  --color-ink: #1b1740;
+  --color-clay: #a5b4fc;
+  --color-moss: #818cf8;
+  --color-ember: #f472b6;
+  --color-fog: #eef2ff;
+  --color-button: #4f46e5;
+  --color-button-text: #ffffff;
+}
+
+/* Varm mørk rød/orange */
+:root[data-theme="embers"] {
+  --color-ink: #2a0f0a;
+  --color-clay: #fdba74;
+  --color-moss: #f97316;
+  --color-ember: #facc15;
+  --color-fog: #fff7ed;
+  --color-button: #c2410c;
   --color-button-text: #ffffff;
 }
 

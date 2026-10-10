@@ -9,13 +9,18 @@ function readCssVar(name: string) {
 
 function applyThemeColor(value: string) {
   if (!value) return;
-  let meta = document.querySelector('meta[name="theme-color"]');
-  if (!meta) {
-    meta = document.createElement("meta");
+  // Layoutet har én theme-color pr. systemtilstand; et mørkt tema skal vinde i begge.
+  let metas = Array.from(document.querySelectorAll('meta[name="theme-color"]'));
+  if (metas.length === 0) {
+    const meta = document.createElement("meta");
     meta.setAttribute("name", "theme-color");
     document.head.appendChild(meta);
+    metas = [meta];
   }
-  meta.setAttribute("content", value);
+  for (const meta of metas) {
+    meta.removeAttribute("media");
+    meta.setAttribute("content", value);
+  }
 }
 
 function resolveBackgroundHex() {
