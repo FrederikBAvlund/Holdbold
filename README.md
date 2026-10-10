@@ -109,6 +109,3 @@ koden matcher dem til database-id'er. Usikre navne vælges som vurderede forslag
 vurderes ud fra holdets takster (25 kr uden takster). Hvert forslag kan rettes eller fjernes før Tildel.
 Lydoptagelsen lagres ikke i databasen. Uploads må højst være 25 MB; hostingens uploadgrænse kan være lavere.
 
-## Hetzner-deployment
-
-Se [Coolify-opsætningen](deploy/COOLIFY.md) for deployment fra `main`, privat PostgreSQL, vedvarende profilbilleder og lokal cron.
