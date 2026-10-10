@@ -143,7 +143,7 @@ model Team {
   id          String        @id @default(cuid())
   name        String
   slug        String        @unique
-  themePreset String        @default("atlantic")
+  themePreset String        @default("graphite")
   themeConfig Json?
   mobilePayBox String?
   createdAt   DateTime      @default(now())

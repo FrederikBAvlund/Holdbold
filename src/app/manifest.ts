@@ -7,8 +7,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "Holdets kalender, tilmelding og bødekasse i ét system.",
     start_url: "/dashboard",
     display: "standalone",
-    background_color: "#f4f6fa",
-    theme_color: "#f4f6fa",
+    background_color: "#121519",
+    theme_color: "#121519",
     lang: "da",
     icons: [
       {

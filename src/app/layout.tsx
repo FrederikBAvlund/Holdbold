@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import { getServerSession } from "next-auth";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { THEME_PRESETS } from "@/lib/themePresets";
 import ThemeColorMeta from "@/components/ThemeColorMeta";
 import AuthSessionProvider from "@/components/SessionProvider";
 import ToastProvider from "@/components/ToastProvider";
@@ -49,13 +50,16 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f4f6fa" },
-    { media: "(prefers-color-scheme: dark)", color: "#0a1220" }
+    { media: "(prefers-color-scheme: light)", color: "#121519" },
+    { media: "(prefers-color-scheme: dark)", color: "#121519" }
   ],
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover"
 };
+
+// Sætter det gemte tema, før første tegning, så standardtemaet (mørkt) ikke blinker før et lyst valg.
+const themeBootScript = `try{var t=localStorage.getItem("holdbold-theme");if(${JSON.stringify(THEME_PRESETS.map((preset) => preset.id))}.indexOf(t)>-1)document.documentElement.dataset.theme=t}catch(e){}`;
 
 export default async function RootLayout({
   children
@@ -65,8 +69,9 @@ export default async function RootLayout({
   const session = await getServerSession(authOptions);
 
   return (
-    <html lang="da" className={`${display.variable} ${sans.variable}`}>
+    <html lang="da" suppressHydrationWarning className={`${display.variable} ${sans.variable}`}>
       <body>
+        <script dangerouslySetInnerHTML={{ __html: themeBootScript }} />
         <div className="status-scrim" aria-hidden />
         <PwaRegister />
         <ThemeProvider />
