@@ -97,7 +97,8 @@
 :root[data-theme="graphite"],
 :root[data-theme="obsidian"],
 :root[data-theme="nightfall"],
-:root[data-theme="embers"] {
+:root[data-theme="embers"],
+:root[data-theme="blackgold"] {
   color-scheme: dark;
   --ink: color-mix(in srgb, var(--color-fog) 88%, #ffffff);
   --bg: color-mix(in srgb, var(--color-ink) 55%, #05070b);
@@ -476,14 +477,15 @@ button {
   --color-button-text: #f7fee7;
 }
 
-:root[data-theme="mono"] {
-  --color-ink: #0f172a;
-  --color-clay: #9ca3af;
-  --color-moss: #334155;
-  --color-ember: #2563eb;
-  --color-fog: #f8fafc;
-  --color-button: #1f2937;
-  --color-button-text: #ffffff;
+/* Guld: sol-gul med mørk tekst på knapper og hero */
+:root[data-theme="gold"] {
+  --color-ink: #2b2106;
+  --color-clay: #fde68a;
+  --color-moss: #a16207;
+  --color-ember: #ca8a04;
+  --color-fog: #fffbeb;
+  --color-button: #eab308;
+  --color-button-text: #2b2106;
 }
 
 /* Mørke temaer – kun rå brand-farver; mørke tokens afledes i blokken ovenfor */
@@ -528,6 +530,17 @@ button {
   --color-fog: #fff7ed;
   --color-button: #c2410c;
   --color-button-text: #ffffff;
+}
+
+/* Sort og guld */
+:root[data-theme="blackgold"] {
+  --color-ink: #15110a;
+  --color-clay: #a8892f;
+  --color-moss: #eab308;
+  --color-ember: #f59e0b;
+  --color-fog: #fef3c7;
+  --color-button: #eab308;
+  --color-button-text: #2b2106;
 }
 
 @media (prefers-reduced-motion: reduce) {
