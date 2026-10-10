@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { resolveProfileImageUrl } from "@/lib/profileImages";
 import { requireActiveTeamMember, requireSession } from "@/lib/apiAuth";
+import { PUBLIC_USER_SELECT } from "@/lib/publicUser";
 
 export async function GET(_request: Request, { params }: { params: { id: string } }) {
   const session = await requireSession();
@@ -20,13 +21,13 @@ export async function GET(_request: Request, { params }: { params: { id: string 
 
   const logs = await prisma.signupLog.findMany({
     where: { eventId: params.id },
-    include: { user: true },
+    include: { user: { select: PUBLIC_USER_SELECT } },
     orderBy: { createdAt: "desc" }
   });
 
   const eventLogs = await prisma.eventLog.findMany({
     where: { eventId: params.id },
-    include: { actor: true },
+    include: { actor: { select: PUBLIC_USER_SELECT } },
     orderBy: { createdAt: "desc" }
   });
 
