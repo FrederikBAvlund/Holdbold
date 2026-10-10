@@ -24,6 +24,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Kalenderprogrammer (Apple Kalender m.fl.) abonnerer uden cookies – feedet har sin egen hemmelige nøgle.
+  if (pathname.startsWith("/api/calendar/feed/")) {
+    return NextResponse.next();
+  }
+
   if (pathname.startsWith("/api/")) {
     const apiToken = await getToken({
       req: request,

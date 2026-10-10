@@ -7,7 +7,8 @@ import { cn } from "@/lib/utils";
 import { setCustomTheme, setTheme } from "@/components/ThemeProvider";
 import { getStoredTeamId, setStoredTeamId } from "@/components/appState";
 import { useToast } from "@/components/ToastProvider";
-import { invalidateDashboardTeam } from "@/components/DashboardTeamProvider";
+import { invalidateDashboardTeam, useDashboardTeam } from "@/components/DashboardTeamProvider";
+import CalendarFeedSettings from "@/components/CalendarFeedSettings";
 import PushSettings from "@/components/PushSettings";
 import { SetupGuideBanner, SetupGuideRow } from "@/components/SetupGuide";
 import { SeasonViewerCard } from "@/components/SeasonSettingsCard";
@@ -81,6 +82,7 @@ export default function ProfilPage() {
   const { data: session, status: sessionStatus, update: updateSession } = useSession();
   const [loaded, setLoaded] = useState(false);
   const [memberships, setMemberships] = useState<Membership[]>([]);
+  const [pendingMemberships, setPendingMemberships] = useState<Membership[]>([]);
   const [teamId, setTeamId] = useState("");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -125,14 +127,20 @@ export default function ProfilPage() {
       if (!response.ok || !alive) return;
       const data = await response.json();
       const list: Membership[] = data.memberships ?? [];
+      const pendingList: Membership[] = data.pendingMemberships ?? [];
       setMemberships(list);
+      setPendingMemberships(pendingList);
       if (data.user) {
         setName(data.user.name ?? "");
         setEmail(data.user.email ?? "");
         setImage(data.user.image ?? "");
       }
       let resolvedTeamId = getStoredTeamId();
-      if (list.length > 0 && !list.some((item) => item.team.id === resolvedTeamId)) {
+      if (
+        list.length > 0 &&
+        !list.some((item) => item.team.id === resolvedTeamId) &&
+        !pendingList.some((item) => item.team.id === resolvedTeamId)
+      ) {
         resolvedTeamId = list[0].team.id;
         setStoredTeamId(resolvedTeamId);
       }
@@ -161,7 +169,10 @@ export default function ProfilPage() {
   }, [session?.user?.id]);
 
   // Venter på godkendelse: tjek jævnligt, om man er kommet på holdet.
-  const waiting = Boolean(session?.user?.id) && !session?.user?.hasActiveMembership && Boolean(session?.user?.hasPendingMembership);
+  const { teamPending, teamId: dashboardTeamId } = useDashboardTeam();
+  const waiting =
+    Boolean(session?.user?.id) &&
+    ((!session?.user?.hasActiveMembership && Boolean(session?.user?.hasPendingMembership)) || teamPending);
   useEffect(() => {
     if (!waiting) return;
     const interval = window.setInterval(async () => {
@@ -170,9 +181,12 @@ export default function ProfilPage() {
       const data = await response.json();
       const list: Membership[] = data.memberships ?? [];
       if (list.length === 0) return;
+      // Ved et ekstra hold afventer vi netop det hold, brugeren kigger på.
+      const approved = teamPending ? list.find((m) => m.team.id === dashboardTeamId) : list[0];
+      if (!approved) return;
       setMemberships(list);
-      setStoredTeamId(list[0].team.id);
-      setTeamId(list[0].team.id);
+      setStoredTeamId(approved.team.id);
+      setTeamId(approved.team.id);
       clearMeClientCache();
       invalidateDashboardTeam();
       await updateSession?.();
@@ -181,7 +195,7 @@ export default function ProfilPage() {
       window.location.href = "/dashboard";
     }, 15000);
     return () => window.clearInterval(interval);
-  }, [waiting, pushToast, updateSession]);
+  }, [waiting, teamPending, dashboardTeamId, pushToast, updateSession]);
 
   // Tilpasset tema gemmes automatisk, mens man justerer farverne.
   useEffect(() => {
@@ -342,7 +356,10 @@ export default function ProfilPage() {
     return <p className="pt-4 text-ink/70">Du skal være logget ind for at se din profil.</p>;
   }
 
-  const membership = memberships.find((item) => item.team.id === teamId) ?? memberships[0];
+  const membership =
+    memberships.find((item) => item.team.id === teamId) ??
+    pendingMemberships.find((item) => item.team.id === teamId) ??
+    memberships[0];
   const isAdmin = membership?.role === "ADMIN" && membership.status !== "PENDING";
   const canManageFines =
     (membership?.role === "ADMIN" || membership?.role === "BOEDEKASSEFORMAND") && membership.status !== "PENDING";
@@ -447,6 +464,14 @@ export default function ProfilPage() {
           <LinkRow href="/dashboard/notifikationer" icon="bell" title="Se alle notifikationer" subtitle="Dit seneste overblik" />
         </ListGroup>
       </Section>
+
+      {waiting ? null : (
+        <Section title="Kalender">
+          <ListGroup>
+            <CalendarFeedSettings />
+          </ListGroup>
+        </Section>
+      )}
 
       <Section title="Udseende">
         <Card className="space-y-4">

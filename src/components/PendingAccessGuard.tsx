@@ -3,9 +3,11 @@
 import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
+import { useDashboardTeam } from "@/components/DashboardTeamProvider";
 
 export default function PendingAccessGuard() {
   const { data: session } = useSession();
+  const { teamPending } = useDashboardTeam();
   const pathname = usePathname();
   const router = useRouter();
 
@@ -18,10 +20,10 @@ export default function PendingAccessGuard() {
       pathname === "/dashboard/indstillinger" ||
       pathname.startsWith("/dashboard/indstillinger/");
 
-    if (!hasActiveMembership && hasPendingMembership && !isSettingsPath) {
+    if (((!hasActiveMembership && hasPendingMembership) || teamPending) && !isSettingsPath) {
       router.replace("/dashboard/profil?notice=pending_approval");
     }
-  }, [pathname, router, session?.user?.hasActiveMembership, session?.user?.hasPendingMembership]);
+  }, [pathname, router, teamPending, session?.user?.hasActiveMembership, session?.user?.hasPendingMembership]);
 
   return null;
 }

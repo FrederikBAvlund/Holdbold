@@ -19,6 +19,13 @@ export async function createUserFromSignup(input: { email: string; name: string;
     throw error;
   }
 
+  await notifyAdminsOfPendingMember({ teamId: input.teamId, userId: user.id, name: input.name });
+
+  return user;
+}
+
+/** Giver holdets admins besked om, at en bruger afventer godkendelse. */
+export async function notifyAdminsOfPendingMember(input: { teamId: string; userId: string; name: string }) {
   const [team, admins] = await Promise.all([
     prisma.team.findUnique({ where: { id: input.teamId }, select: { slug: true } }),
     prisma.membership.findMany({
@@ -27,19 +34,16 @@ export async function createUserFromSignup(input: { email: string; name: string;
     })
   ]);
 
-  if (admins.length > 0) {
-    await createNotifications(
-      admins.map((admin) => ({
-        userId: admin.userId,
-        teamId: input.teamId,
-        type: "GENERAL" as const,
-        title: "Ny bruger afventer godkendelse",
-        body: `${input.name} har oprettet sig med holdkode ${team?.slug ?? ""}`,
-        link: "/dashboard/hold",
-        refKey: notificationRef.membership(input.teamId, user.id)
-      }))
-    );
-  }
-
-  return user;
+  if (admins.length === 0) return;
+  await createNotifications(
+    admins.map((admin) => ({
+      userId: admin.userId,
+      teamId: input.teamId,
+      type: "GENERAL" as const,
+      title: "Ny bruger afventer godkendelse",
+      body: `${input.name} har oprettet sig med holdkode ${team?.slug ?? ""}`,
+      link: "/dashboard/hold",
+      refKey: notificationRef.membership(input.teamId, input.userId)
+    }))
+  );
 }

@@ -108,6 +108,8 @@ model User {
   passwordHash String?
   themePreset  String?
   themeConfig  Json?
+  /// Hemmelig nøgle til personlig kalenderfeed (abonnement i Apple Kalender m.fl.)
+  calendarToken String?      @unique
   createdAt    DateTime      @default(now())
   accounts     Account[]
   sessions     Session[]

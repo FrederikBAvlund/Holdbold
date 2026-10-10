@@ -46,6 +46,10 @@ type DashboardTeamContextValue = {
   teamId: string;
   setTeamId: (id: string) => void;
   memberships: DashboardMembership[];
+  /** Hold, brugeren har bedt om at komme på, men endnu ikke er godkendt til */
+  pendingMemberships: DashboardMembership[];
+  /** true når det valgte hold afventer godkendelse – så vises kun den begrænsede visning */
+  teamPending: boolean;
   members: DashboardTeamMember[];
   actingMember: DashboardTeamMember | undefined;
   membersLoading: boolean;
@@ -84,16 +88,19 @@ export function useDashboardTeam() {
 
 export default function DashboardTeamProvider({
   children,
-  initialMemberships
+  initialMemberships,
+  initialPendingMemberships = []
 }: {
   children: ReactNode;
   initialMemberships: DashboardMembership[];
+  initialPendingMemberships?: DashboardMembership[];
 }) {
   const { data: session, status: sessionStatus } = useSession();
   const userId = session?.user?.id ?? "";
 
   const [teamId, setTeamIdState] = useState("");
   const [memberships, setMemberships] = useState<DashboardMembership[]>(initialMemberships);
+  const [pendingMemberships, setPendingMemberships] = useState<DashboardMembership[]>(initialPendingMemberships);
   const [members, setMembers] = useState<DashboardTeamMember[]>([]);
   const [membersLoading, setMembersLoading] = useState(false);
   const [membershipsLoading, setMembershipsLoading] = useState(false);
@@ -130,6 +137,7 @@ export default function DashboardTeamProvider({
     if (sessionStatus === "loading") return;
     if (!userId) {
       setMemberships([]);
+      setPendingMemberships([]);
       setMembershipsLoading(false);
       return;
     }
@@ -138,13 +146,21 @@ export default function DashboardTeamProvider({
     (async () => {
       const { ok, data } = await fetchMeCached();
       if (cancelled) return;
-      if (ok) setMemberships(data.memberships ?? []);
+      if (ok) {
+        setMemberships(data.memberships ?? []);
+        setPendingMemberships(data.pendingMemberships ?? []);
+      }
       setMembershipsLoading(false);
     })();
     return () => {
       cancelled = true;
     };
   }, [userId, sessionStatus]);
+
+  const teamPending =
+    Boolean(teamId) &&
+    !memberships.some((m) => m.team?.id === teamId) &&
+    pendingMemberships.some((m) => m.team?.id === teamId);
 
   useEffect(() => {
     if (!memberships.length) return;
@@ -153,7 +169,9 @@ export default function DashboardTeamProvider({
 
     const stored = getStoredTeamId();
     const effective = teamId || stored;
-    const isValid = memberships.some((m) => m.team?.id === effective);
+    const isValid =
+      memberships.some((m) => m.team?.id === effective) ||
+      pendingMemberships.some((m) => m.team?.id === effective);
 
     if (!effective || !isValid) {
       setTeamId(firstTeam);
@@ -163,10 +181,10 @@ export default function DashboardTeamProvider({
     if (teamId !== effective) {
       setTeamIdState(effective);
     }
-  }, [memberships, teamId, setTeamId]);
+  }, [memberships, pendingMemberships, teamId, setTeamId]);
 
   useEffect(() => {
-    if (!teamId || !userId) {
+    if (!teamId || !userId || teamPending) {
       setMembers([]);
       setMembersLoading(false);
       return;
@@ -190,10 +208,10 @@ export default function DashboardTeamProvider({
     return () => {
       cancelled = true;
     };
-  }, [teamId, userId, membersReloadNonce]);
+  }, [teamId, userId, teamPending, membersReloadNonce]);
 
   const refreshSeasons = useCallback(async () => {
-    if (!teamId || !userId) {
+    if (!teamId || !userId || teamPending) {
       setSeasons([]);
       return;
     }
@@ -205,7 +223,7 @@ export default function DashboardTeamProvider({
     } catch {
       /* sæsoner er valgfri for visningen – ignorer netværksfejl */
     }
-  }, [teamId, userId]);
+  }, [teamId, userId, teamPending]);
 
   useEffect(() => {
     setSeasons([]);
@@ -243,7 +261,10 @@ export default function DashboardTeamProvider({
   const refreshDashboardTeam = useCallback(async () => {
     clearMeClientCache();
     const { ok, data } = await fetchMeCached();
-    if (ok) setMemberships(data.memberships ?? []);
+    if (ok) {
+      setMemberships(data.memberships ?? []);
+      setPendingMemberships(data.pendingMemberships ?? []);
+    }
     setMembersReloadNonce((n) => n + 1);
   }, []);
 
@@ -273,6 +294,8 @@ export default function DashboardTeamProvider({
       teamId,
       setTeamId,
       memberships,
+      pendingMemberships,
+      teamPending,
       members,
       actingMember,
       membersLoading,
@@ -292,6 +315,8 @@ export default function DashboardTeamProvider({
       teamId,
       setTeamId,
       memberships,
+      pendingMemberships,
+      teamPending,
       members,
       actingMember,
       membersLoading,
