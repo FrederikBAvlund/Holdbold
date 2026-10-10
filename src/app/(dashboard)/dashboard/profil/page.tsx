@@ -11,6 +11,7 @@ import { invalidateDashboardTeam, useDashboardTeam } from "@/components/Dashboar
 import CalendarFeedSettings from "@/components/CalendarFeedSettings";
 import PushSettings from "@/components/PushSettings";
 import { SetupGuideBanner, SetupGuideRow } from "@/components/SetupGuide";
+import GuideRow from "@/components/guide/GuideRow";
 import { SeasonViewerCard } from "@/components/SeasonSettingsCard";
 import Avatar from "@/components/ui/Avatar";
 import Button from "@/components/ui/Button";
@@ -430,6 +431,14 @@ export default function ProfilPage() {
       ) : null}
 
       <SetupGuideBanner />
+
+      {waiting ? null : (
+        <Section title="Guide">
+          <ListGroup>
+            <GuideRow />
+          </ListGroup>
+        </Section>
+      )}
 
       <Section title="Konto">
         <ListGroup>

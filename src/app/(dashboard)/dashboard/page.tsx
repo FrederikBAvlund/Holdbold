@@ -8,7 +8,8 @@ import { useDashboardTeam } from "@/components/DashboardTeamProvider";
 import Icon, { type IconName } from "@/components/ui/Icon";
 import Avatar, { AvatarStack } from "@/components/ui/Avatar";
 import { Card, EmptyState, KindTag, Section, SectionLink, Skeleton } from "@/components/ui/primitives";
-import { SetupGuideBanner } from "@/components/SetupGuide";
+import GuideHome from "@/components/guide/GuideHome";
+import { refreshGuide } from "@/components/guide/guideClient";
 import EventCard from "@/components/events/EventCard";
 import RsvpControl from "@/components/events/RsvpControl";
 import {
@@ -145,6 +146,7 @@ export default function HomePage() {
     if (originalId === nextEvent?.id) {
       fetchEventSignups(realId).then(setNextSignups).catch(() => undefined);
     }
+    refreshGuide();
   }
 
   const actionItems: Array<{ icon: IconName; title: string; subtitle: string; href: string; tone: string }> = [];
@@ -197,7 +199,7 @@ export default function HomePage() {
         </h1>
       </header>
 
-      <SetupGuideBanner />
+      <GuideHome />
 
       {/* Næste begivenhed */}
       <section aria-label="Næste begivenhed">

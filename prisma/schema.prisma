@@ -205,6 +205,8 @@ model Membership {
   guideRole Role?
   /// Sat når brugeren har valgt "Spring hele guiden over" på holdet
   guideDismissedAt DateTime?
+  /// Sat når brugeren har sagt ja til guiden (fra velkomsten, "Nyt"-kortet eller Profil)
+  guideStartedAt DateTime?
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)

@@ -20,6 +20,8 @@ const bodySchema = z.discriminatedUnion("action", [
   }),
   // Velkomst eller "nye rettigheder" er vist – guiden følger nu den nuværende rolle
   z.object({ teamId: z.string().min(1), action: z.literal("acknowledge-role") }),
+  // "Vis mig rundt" fra velkomsten eller "Se guiden" fra "Nyt"-kortet
+  z.object({ teamId: z.string().min(1), action: z.literal("start") }),
   // "Spring hele guiden over"
   z.object({ teamId: z.string().min(1), action: z.literal("dismiss") }),
   // Start forfra fra Profil: guiden vises igen, og overspringede trin kommer tilbage
@@ -29,7 +31,7 @@ const bodySchema = z.discriminatedUnion("action", [
 async function findMembership(userId: string, teamId: string) {
   return prisma.membership.findFirst({
     where: { userId, teamId, status: "ACTIVE" },
-    select: { id: true, role: true, guideRole: true, guideDismissedAt: true }
+    select: { id: true, role: true, guideRole: true, guideDismissedAt: true, guideStartedAt: true }
   });
 }
 
@@ -44,6 +46,7 @@ async function guideState(userId: string, teamId: string) {
     role: membership.role,
     guideRole: membership.guideRole,
     dismissed: membership.guideDismissedAt !== null,
+    started: membership.guideStartedAt !== null,
     facts,
     progress: Object.fromEntries(progress.map((row) => [row.stepId, row.status]))
   });
@@ -103,6 +106,12 @@ export async function POST(request: Request) {
     case "acknowledge-role":
       await prisma.membership.update({ where: { id: membership.id }, data: { guideRole: membership.role } });
       break;
+    case "start":
+      await prisma.membership.update({
+        where: { id: membership.id },
+        data: { guideRole: membership.role, guideStartedAt: new Date(), guideDismissedAt: null }
+      });
+      break;
     case "dismiss":
       await prisma.membership.update({
         where: { id: membership.id },
@@ -111,7 +120,10 @@ export async function POST(request: Request) {
       break;
     case "restart":
       await prisma.$transaction([
-        prisma.membership.update({ where: { id: membership.id }, data: { guideDismissedAt: null } }),
+        prisma.membership.update({
+          where: { id: membership.id },
+          data: { guideRole: membership.role, guideStartedAt: new Date(), guideDismissedAt: null }
+        }),
         prisma.guideProgress.deleteMany({ where: { userId, teamId: body.teamId, status: "SKIPPED" } })
       ]);
       break;
