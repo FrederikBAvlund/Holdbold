@@ -146,7 +146,7 @@ export default function NewEventPage() {
       </div>
 
       <form onSubmit={submit} className="space-y-6">
-        <Section title="Hvad">
+        <Section title="Hvad" anchor="event-form">
           <div className="grid grid-cols-2 gap-2">
             {(["TRAINING", "MATCH"] as const).map((option) => (
               <button
@@ -200,7 +200,7 @@ export default function NewEventPage() {
                 required
               />
             </Field>
-            <div className="space-y-2">
+            <div className="space-y-2" data-guide="event-recurrence">
               <p className="text-sm font-semibold text-ink/80">Gentagelse</p>
               <div className="flex flex-wrap gap-2">
                 {RECURRENCES.map((option) => (

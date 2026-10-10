@@ -143,6 +143,7 @@ export default function HoldPage() {
         <button
           type="button"
           onClick={shareInvite}
+          data-guide="team-code"
           className="hero-surface flex min-h-[4.5rem] items-center gap-3 rounded-[1.375rem] px-4 text-left transition active:scale-[0.99]"
         >
           <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-on-primary/15">
@@ -216,7 +217,7 @@ export default function HoldPage() {
         </Section>
       ) : null}
 
-      <Section title="Truppen">
+      <Section title="Truppen" anchor="member-list">
         <div className="relative">
           <Icon name="search" className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-ink/40" />
           <input

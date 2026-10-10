@@ -266,6 +266,7 @@ export default function FineInbox({
 
   return (
     <Section
+      anchor="proposed-fines pending-payments"
       title="Indbakke"
       action={
         !readOnly && items.length > 1 ? (

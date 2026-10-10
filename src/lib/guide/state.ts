@@ -1,6 +1,6 @@
 import type { Role } from "@/lib/roles";
 import { capabilitiesForRoles, newCapabilities, type Capability } from "@/lib/guide/capabilities";
-import { GUIDE_STEPS, type GuideFacts, type GuideStep, type GuideStepKind } from "@/lib/guide/steps";
+import { GUIDE_STEPS, type GuideEntry, type GuideFacts, type GuideStep, type GuideStepKind } from "@/lib/guide/steps";
 
 export type GuideProgressStatus = "SEEN" | "DONE" | "SKIPPED";
 
@@ -12,6 +12,7 @@ export type GuideStepState = {
   description: string;
   href: string;
   anchor: string | null;
+  entry: GuideEntry | null;
   status: "todo" | "done" | "skipped";
   /** team: holdet har det allerede (fx en anden har sat MobilePay op). you: brugeren har selv klaret det. */
   doneBy: "team" | "you" | null;
@@ -78,6 +79,7 @@ function stepState(step: GuideStep, input: GuideStateInput): GuideStepState {
     description: step.description,
     href: step.href,
     anchor: step.anchor ?? null,
+    entry: step.entry ?? null,
     status,
     doneBy
   };
