@@ -30,6 +30,7 @@ import AssignFineSheet, { SearchInput } from "./components/AssignFineSheet";
 import { CollectionSheet, MemberFinesSheet, PaySheet, TemplateSheet } from "./components/FineSheets";
 import FineAutomationCard from "./components/FineAutomationCard";
 import FineInbox from "./components/FineInbox";
+import ImportTemplatesSheet from "./components/ImportTemplatesSheet";
 import { VoiceFinesModal } from "./VoiceFinesModal";
 
 type Tab = "mine" | "holdet" | "kassen";
@@ -49,6 +50,7 @@ export default function BoderPage() {
   const [payOpen, setPayOpen] = useState(false);
   const [templateSheet, setTemplateSheet] = useState<{ template: FineTemplate | null } | null>(null);
   const [collectionOpen, setCollectionOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [voiceOpen, setVoiceOpen] = useState(false);
   const [memberSheet, setMemberSheet] = useState<{ userId: string; fines: FineItem[] | null } | null>(null);
   const [deleteFine, setDeleteFine] = useState<FineItem | null>(null);
@@ -163,6 +165,7 @@ export default function BoderPage() {
           onAssignTemplate={(templateId) => setAssign({ templateId })}
           onEditTemplate={(template) => setTemplateSheet({ template })}
           onNewTemplate={() => setTemplateSheet({ template: null })}
+          onImportTemplates={() => setImportOpen(true)}
         />
       ) : (
         <KassenTab
@@ -178,6 +181,7 @@ export default function BoderPage() {
           onCollection={() => setCollectionOpen(true)}
           onEditTemplate={(template) => setTemplateSheet({ template })}
           onNewTemplate={() => setTemplateSheet({ template: null })}
+          onImportTemplates={() => setImportOpen(true)}
           onSavedMobilePay={(value) => data.setData((prev) => ({ ...prev, mobilePayBox: value }))}
           pushError={(message) => pushToast(message, "error")}
         />
@@ -220,6 +224,12 @@ export default function BoderPage() {
         template={templateSheet?.template ?? null}
         canManage={canManage}
         onSaved={data.refresh}
+      />
+      <ImportTemplatesSheet
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        teamId={teamId}
+        onImported={data.refresh}
       />
       <CollectionSheet
         open={collectionOpen}
@@ -409,7 +419,8 @@ function HoldetTab({
   onOpenMember,
   onAssignTemplate,
   onEditTemplate,
-  onNewTemplate
+  onNewTemplate,
+  onImportTemplates
 }: {
   debtors: Array<{ userId: string; name: string; total: number }>;
   recent: FineItem[];
@@ -421,6 +432,7 @@ function HoldetTab({
   onAssignTemplate: (templateId: string) => void;
   onEditTemplate: (template: FineTemplate) => void;
   onNewTemplate: () => void;
+  onImportTemplates: () => void;
 }) {
   const [query, setQuery] = useState("");
   const [showAllCatalog, setShowAllCatalog] = useState(false);
@@ -491,15 +503,27 @@ function HoldetTab({
         title="Bødekataloget"
         action={
           !readOnly ? (
-            <button type="button" onClick={onNewTemplate} className="inline-flex items-center gap-1 text-sm font-semibold text-moss">
-              <Icon name="plus" className="h-4 w-4" />
-              {canManage ? "Ny" : "Foreslå ny"}
-            </button>
+            <span className="flex items-center gap-4">
+              {canManage && templates.length > 0 ? (
+                <button type="button" onClick={onImportTemplates} className="inline-flex items-center gap-1 text-sm font-semibold text-moss">
+                  <Icon name="share" className="h-4 w-4" />
+                  Importér
+                </button>
+              ) : null}
+              <button type="button" onClick={onNewTemplate} className="inline-flex items-center gap-1 text-sm font-semibold text-moss">
+                <Icon name="plus" className="h-4 w-4" />
+                {canManage ? "Ny" : "Foreslå ny"}
+              </button>
+            </span>
           ) : null
         }
       >
-        <SearchInput value={query} onChange={setQuery} placeholder="Søg i kataloget" />
-        {catalog.length === 0 ? (
+        {templates.length === 0 && canManage && !readOnly ? (
+          <ImportGuideCard onImport={onImportTemplates} />
+        ) : (
+          <SearchInput value={query} onChange={setQuery} placeholder="Søg i kataloget" />
+        )}
+        {templates.length === 0 && canManage && !readOnly ? null : catalog.length === 0 ? (
           <p className="px-1 text-sm text-ink/55">{query ? "Ingen bøder matcher." : "Kataloget er tomt."}</p>
         ) : (
           <ListGroup>
@@ -555,6 +579,20 @@ function HoldetTab({
   );
 }
 
+function ImportGuideCard({ onImport }: { onImport: () => void }) {
+  return (
+    <div className="rounded-[1.375rem] border border-line bg-surface p-4">
+      <p className="font-semibold text-ink">Kom hurtigt i gang</p>
+      <p className="mt-1 text-sm text-ink/60">
+        Har I bøder i Teambox eller et andet system? Få en sprogmodel til at lave et Excel-ark ud fra dem, og importér det her.
+      </p>
+      <Button className="mt-3" icon="share" onClick={onImport}>
+        Importér fra Excel
+      </Button>
+    </div>
+  );
+}
+
 /* ================= Kassen ================= */
 
 function KassenTab({
@@ -570,6 +608,7 @@ function KassenTab({
   onCollection,
   onEditTemplate,
   onNewTemplate,
+  onImportTemplates,
   onSavedMobilePay,
   pushError
 }: {
@@ -585,6 +624,7 @@ function KassenTab({
   onCollection: () => void;
   onEditTemplate: (template: FineTemplate) => void;
   onNewTemplate: () => void;
+  onImportTemplates: () => void;
   onSavedMobilePay: (value: string) => void;
   pushError: (message: string) => void;
 }) {
@@ -656,6 +696,7 @@ function KassenTab({
           ) : null
         }
       >
+        {data.templates.length === 0 && !readOnly ? <ImportGuideCard onImport={onImportTemplates} /> : null}
         <ListGroup>
           {data.templates
             .filter((t) => !t.status || t.status === "APPROVED")
