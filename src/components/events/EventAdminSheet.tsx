@@ -33,7 +33,10 @@ export function EventAdminSheet({
   const [kind, setKind] = useState<EventKind>(event.kind);
   const [meeting, setMeeting] = useState("");
   const [deadline, setDeadline] = useState("");
-  const [saving, setSaving] = useState<"kind" | "meta" | "cancel" | null>(null);
+  const [title, setTitle] = useState("");
+  const [start, setStart] = useState("");
+  const [location, setLocation] = useState("");
+  const [saving, setSaving] = useState<"kind" | "meta" | "details" | "resync" | "cancel" | null>(null);
   const [confirmCancel, setConfirmCancel] = useState(false);
 
   const canceled = Boolean(event.canceledAt);
@@ -46,7 +49,53 @@ export function EventAdminSheet({
       toDateTimeLocalValue(event.meetingTime ?? new Date(new Date(event.date).getTime() - 60 * 60 * 1000))
     );
     setDeadline(toDateTimeLocalValue(event.signupDeadline));
+    setTitle(event.title);
+    setStart(toDateTimeLocalValue(event.date));
+    setLocation(event.location);
   }, [open, event]);
+
+  async function resumeSync() {
+    setSaving("resync");
+    try {
+      await patchEvent(event.id, { manualOverride: false });
+      onUpdated({ manualOverride: false });
+      pushToast("Begivenheden følger DBU igen ved næste synkronisering", "success");
+    } catch (err) {
+      pushToast(err instanceof Error ? err.message : "Kunne ikke gemme", "error");
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  async function saveDetails() {
+    const startDate = start ? new Date(start) : null;
+    if (!title.trim()) {
+      pushToast("Titel må ikke være tom", "error");
+      return;
+    }
+    if (!startDate || Number.isNaN(startDate.getTime())) {
+      pushToast("Ugyldigt tidspunkt", "error");
+      return;
+    }
+    setSaving("details");
+    try {
+      const data = await patchEvent(event.id, {
+        title: title.trim(),
+        date: startDate.toISOString(),
+        location: location.trim()
+      });
+      onUpdated({
+        title: data.event?.title ?? title.trim(),
+        date: data.event?.date ?? startDate.toISOString(),
+        location: data.event?.location ?? location.trim()
+      });
+      pushToast("Ændringer gemt – holdet får besked", "success");
+    } catch (err) {
+      pushToast(err instanceof Error ? err.message : "Kunne ikke gemme", "error");
+    } finally {
+      setSaving(null);
+    }
+  }
 
   async function saveKind(next: EventKind) {
     setKind(next);
@@ -129,6 +178,38 @@ export function EventAdminSheet({
                   </button>
                 ))}
               </div>
+            </div>
+          ) : null}
+
+          {!canceled ? (
+            <div className="space-y-3">
+              <Field label="Titel" htmlFor="event-title">
+                <input id="event-title" value={title} maxLength={120} onChange={(e) => setTitle(e.target.value)} className={inputClass} />
+              </Field>
+              <Field
+                label="Start"
+                htmlFor="event-start"
+                hint={
+                  event.source === "ICAL"
+                    ? event.manualOverride
+                      ? "Rettet manuelt – følger ikke længere ændringer fra DBU."
+                      : "Importeret fra DBU og opdateres automatisk. Retter du her, vinder din rettelse."
+                    : undefined
+                }
+              >
+                <input id="event-start" type="datetime-local" value={start} onChange={(e) => setStart(e.target.value)} className={inputClass} />
+              </Field>
+              <Field label="Sted" htmlFor="event-location">
+                <input id="event-location" value={location} maxLength={200} onChange={(e) => setLocation(e.target.value)} className={inputClass} />
+              </Field>
+              <Button block variant="secondary" loading={saving === "details"} onClick={saveDetails}>
+                Gem ændringer
+              </Button>
+              {event.source === "ICAL" && event.manualOverride ? (
+                <Button block variant="ghost" loading={saving === "resync"} onClick={resumeSync}>
+                  Følg DBU igen
+                </Button>
+              ) : null}
             </div>
           ) : null}
 

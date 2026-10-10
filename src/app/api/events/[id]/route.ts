@@ -5,8 +5,15 @@ import { authOptions } from "@/lib/auth";
 import { EVENT_MANAGER_ROLES } from "@/lib/apiAuth";
 import { prisma } from "@/lib/prisma";
 import { ensureEventSeasonOpen } from "@/lib/seasons";
+import { createNotifications } from "@/lib/notifications";
+import { formatDateTimeCopenhagen } from "@/lib/format";
 
 const updateSchema = z.object({
+  title: z.string().trim().min(1, "Titel må ikke være tom").max(120).optional(),
+  date: z.string().datetime().optional(),
+  location: z.string().trim().max(200).optional(),
+  /** Kun `false`: lad næste DBU-sync overskrive titel, dato og sted igen */
+  manualOverride: z.literal(false).optional(),
   meetingTime: z.string().datetime().nullable().optional(),
   signupDeadline: z.string().datetime().optional(),
   thingCarrierId: z.string().min(1).nullable().optional(),
@@ -44,6 +51,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
       date: true,
       location: true,
       source: true,
+      manualOverride: true,
       kind: true,
       meetingTime: true,
       signupDeadline: true,
@@ -99,12 +107,16 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     select: {
       id: true,
       teamId: true,
+      title: true,
       date: true,
+      location: true,
       source: true,
       kind: true,
+      meetingTime: true,
       signupDeadline: true,
       thingCarrierId: true,
-      beerCarrierId: true
+      beerCarrierId: true,
+      canceledAt: true
     }
   });
   if (!event) {
@@ -114,6 +126,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   const wantsMatchMetaUpdate = body.meetingTime !== undefined || body.signupDeadline !== undefined;
   const wantsDutyUpdate = body.thingCarrierId !== undefined || body.beerCarrierId !== undefined;
   const wantsKindUpdate = body.kind !== undefined;
+  const wantsOverrideReset = body.manualOverride === false;
+  const wantsDetailsUpdate = body.title !== undefined || body.date !== undefined || body.location !== undefined;
   const wantsMatchScoreUpdate = body.matchHomeGoals !== undefined || body.matchAwayGoals !== undefined;
   const wantsPlayerStatsUpdate = body.matchPlayerStats !== undefined;
 
@@ -136,6 +150,17 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     if (!matchMetaRoles.has(membership.role)) {
       return NextResponse.json({ error: "Ikke adgang" }, { status: 403 });
     }
+  }
+
+  if ((wantsDetailsUpdate || wantsOverrideReset) && !isEventManager) {
+    return NextResponse.json({ error: "Kun trænere/admin kan rette titel, dato og sted" }, { status: 403 });
+  }
+
+  const newDate = body.date ? new Date(body.date) : undefined;
+  const effectiveDate = newDate ?? event.date;
+
+  if (wantsDetailsUpdate && event.canceledAt) {
+    return NextResponse.json({ error: "Genåbn begivenheden, før den kan rettes" }, { status: 400 });
   }
 
   if (wantsKindUpdate || wantsMatchScoreUpdate || wantsPlayerStatsUpdate) {
@@ -166,7 +191,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         ? null
         : new Date(body.meetingTime);
 
-  if (newMeetingTime && newMeetingTime.getTime() > event.date.getTime()) {
+  if (newMeetingTime && newMeetingTime.getTime() > effectiveDate.getTime()) {
     return NextResponse.json(
       { error: "Mødetid skal være før kampstart" },
       { status: 400 }
@@ -211,6 +236,17 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     }
   }
 
+  // Flyttes starten til før en allerede sat mødetid, giver mødetiden ikke længere mening.
+  if (newDate && newMeetingTime === undefined && event.meetingTime && event.meetingTime.getTime() > newDate.getTime()) {
+    return NextResponse.json({ error: "Mødetid ligger efter den nye starttid – ret mødetiden samtidig" }, { status: 400 });
+  }
+
+  const detailsChanged = {
+    title: body.title !== undefined && body.title !== event.title,
+    date: newDate !== undefined && newDate.getTime() !== event.date.getTime(),
+    location: body.location !== undefined && body.location !== event.location
+  };
+
   const clearingMatchData = body.kind === "TRAINING";
 
   const updated = await prisma.$transaction(async (tx) => {
@@ -245,6 +281,15 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     return tx.event.update({
       where: { id: event.id },
       data: {
+        ...(body.title !== undefined ? { title: body.title } : {}),
+        ...(newDate ? { date: newDate } : {}),
+        ...(body.location !== undefined ? { location: body.location } : {}),
+        // Rettelser af importerede kampe må ikke blive overskrevet af næste import.
+        ...(detailsChanged.title || detailsChanged.date || detailsChanged.location
+          ? { manualOverride: true }
+          : wantsOverrideReset
+            ? { manualOverride: false }
+            : {}),
         ...(newDeadline ? { signupDeadline: newDeadline } : {}),
         ...(newMeetingTime !== undefined ? { meetingTime: newMeetingTime } : {}),
         ...(body.thingCarrierId !== undefined ? { thingCarrierId: body.thingCarrierId } : {}),
@@ -262,8 +307,12 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       },
       select: {
         id: true,
+        teamId: true,
+        title: true,
         date: true,
+        location: true,
         source: true,
+        manualOverride: true,
         kind: true,
         meetingTime: true,
         signupDeadline: true,
@@ -287,8 +336,13 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     });
   });
 
-  const formattedDate = updated.date.toLocaleString("da-DK");
+  const formattedDate = formatDateTimeCopenhagen(updated.date);
   const changes: string[] = [];
+  const onlyOverrideReset =
+    wantsOverrideReset && !(detailsChanged.title || detailsChanged.date || detailsChanged.location);
+  if (detailsChanged.title) changes.push("titel");
+  if (detailsChanged.date) changes.push("dato/tidspunkt");
+  if (detailsChanged.location) changes.push("sted");
   if (wantsMatchMetaUpdate) changes.push("kampdetaljer");
   if (wantsDutyUpdate) changes.push("opgaver");
   if (wantsKindUpdate) changes.push("type");
@@ -298,15 +352,44 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       eventId: updated.id,
       actorId: session.user.id,
       type: "SIGNUP",
-      message: `${changes.join(" og ") || "Begivenhed"} opdateret (${formattedDate})`
+      message: onlyOverrideReset
+        ? "Følger DBU igen – næste synkronisering kan opdatere titel, dato og sted"
+        : `${changes.join(" og ") || "Begivenhed"} opdateret (${formattedDate})`
     }
   });
+
+  if (detailsChanged.date || detailsChanged.location || detailsChanged.title) {
+    const members = await prisma.membership.findMany({
+      where: { teamId: updated.teamId, status: "ACTIVE", userId: { not: session.user.id } },
+      select: { userId: true }
+    });
+    const what = [
+      detailsChanged.date ? "tidspunkt" : null,
+      detailsChanged.location ? "sted" : null,
+      detailsChanged.title ? "titel" : null
+    ]
+      .filter(Boolean)
+      .join(" og ");
+    await createNotifications(
+      members.map((member) => ({
+        userId: member.userId,
+        teamId: updated.teamId,
+        type: "EVENT" as const,
+        title: "Begivenhed ændret",
+        body: `${updated.title}: ${what} er ændret (${formattedDate})`,
+        link: `/dashboard/kalender/${updated.id}`
+      }))
+    );
+  }
 
   return NextResponse.json({
     event: {
       id: updated.id,
+      title: updated.title,
+      location: updated.location,
       date: updated.date,
       source: updated.source,
+      manualOverride: updated.manualOverride,
       kind: updated.kind,
       meetingTime: updated.meetingTime,
       signupDeadline: updated.signupDeadline,

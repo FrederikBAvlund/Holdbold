@@ -7,12 +7,14 @@ import { useDashboardTeam } from "@/components/DashboardTeamProvider";
 import { useToast } from "@/components/ToastProvider";
 import Icon from "@/components/ui/Icon";
 import Button from "@/components/ui/Button";
+import { ConfirmSheet } from "@/components/ui/Sheet";
 import { Card, EmptyState, Field, ListGroup, PageHeader, Section, inputClass } from "@/components/ui/primitives";
 import TeamOpenAiCard from "@/components/team/TeamOpenAiCard";
 import { SeasonCloseCard } from "@/components/SeasonSettingsCard";
 import { clearMeClientCache } from "@/lib/meClientCache";
 import { DEFAULT_THEME_ID, THEME_PRESETS } from "@/lib/themePresets";
 import { formatRelativePast } from "@/lib/format";
+import { slugify } from "@/lib/superAdmin";
 
 type Feed = { id: string; name: string; url: string; lastImportedAt?: string | null };
 
@@ -38,6 +40,10 @@ export default function TeamSettingsPage() {
 
       <Section title="Holdets udseende">
         <TeamTheme teamId={teamId} onSaved={() => pushToast("Holdets farver er opdateret", "success")} />
+      </Section>
+
+      <Section title="Holdkode">
+        {teamId ? <TeamSlugCard key={teamId} teamId={teamId} currentSlug={team?.slug ?? ""} /> : null}
       </Section>
 
       <Section title="Kampprogram">
@@ -182,6 +188,81 @@ function TeamTheme({ teamId, onSaved }: { teamId: string; onSaved: () => void })
   );
 }
 
+/* ---------- Holdkode ---------- */
+
+function TeamSlugCard({ teamId, currentSlug }: { teamId: string; currentSlug: string }) {
+  const { pushToast } = useToast();
+  const { refreshDashboardTeam } = useDashboardTeam();
+  const [slug, setSlug] = useState(currentSlug);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => setSlug(currentSlug), [currentSlug]);
+
+  const normalized = slugify(slug);
+  const changed = normalized !== "" && normalized !== currentSlug;
+
+  async function save(event: React.FormEvent) {
+    event.preventDefault();
+    if (!changed) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/team/${teamId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slug })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setError(data.error ?? "Kunne ikke gemme holdkoden");
+        return;
+      }
+      clearMeClientCache();
+      await refreshDashboardTeam();
+      setSlug(data.team?.slug ?? slug);
+      pushToast("Holdkoden er opdateret", "success");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Card>
+      <form onSubmit={save} className="space-y-3">
+        <Field
+          label="Holdkode"
+          htmlFor="team-slug"
+          hint="Bruges til at oprette sig og tilmelde sig holdet. Gamle invitationslinks med den tidligere kode holder op med at virke."
+        >
+          <input
+            id="team-slug"
+            value={slug}
+            onChange={(event) => {
+              setSlug(event.target.value);
+              setError(null);
+            }}
+            className={inputClass}
+            maxLength={40}
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+          />
+        </Field>
+        {changed && normalized ? (
+          <p className="text-xs text-ink/55">
+            Gemmes som <strong className="text-ink">{normalized}</strong>
+          </p>
+        ) : null}
+        {error ? <p className="text-sm text-danger">{error}</p> : null}
+        <Button type="submit" loading={saving} disabled={!changed}>
+          Gem holdkode
+        </Button>
+      </form>
+    </Card>
+  );
+}
+
 /* ---------- Kalender-import ---------- */
 
 function CalendarImport({ teamId }: { teamId: string }) {
@@ -190,6 +271,9 @@ function CalendarImport({ teamId }: { teamId: string }) {
   const [url, setUrl] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState<"ical" | "xlsx" | null>(null);
+  const [refreshingId, setRefreshingId] = useState<string | null>(null);
+  const [feedToDelete, setFeedToDelete] = useState<Feed | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   async function loadFeeds() {
     if (!teamId) return;
@@ -237,6 +321,44 @@ function CalendarImport({ teamId }: { teamId: string }) {
     }
   }
 
+  async function refreshFeed(feed: Feed) {
+    setRefreshingId(feed.id);
+    try {
+      const response = await fetch("/api/ical/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ teamId, url: feed.url, name: feed.name })
+      });
+      const data = await parse(response);
+      if (!response.ok) {
+        pushToast(data.error ?? `Importen fejlede (${response.status})`, "error");
+        return;
+      }
+      pushToast(`${data.created ?? 0} nye og ${data.updated ?? 0} opdaterede begivenheder`, "success");
+      await loadFeeds();
+    } finally {
+      setRefreshingId(null);
+    }
+  }
+
+  async function deleteFeed() {
+    if (!feedToDelete) return;
+    setDeleting(true);
+    try {
+      const response = await fetch(`/api/ical/import?feedId=${encodeURIComponent(feedToDelete.id)}`, { method: "DELETE" });
+      if (!response.ok) {
+        const data = await parse(response);
+        pushToast(data.error ?? "Kunne ikke slette importen", "error");
+        return;
+      }
+      setFeeds((prev) => (prev ?? []).filter((feed) => feed.id !== feedToDelete.id));
+      setFeedToDelete(null);
+      pushToast("Importen er fjernet", "success");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   async function importXlsx(event: React.FormEvent) {
     event.preventDefault();
     if (!teamId || !file) return;
@@ -265,7 +387,7 @@ function CalendarImport({ teamId }: { teamId: string }) {
         <Field
           label="Link til kampprogram (iCal)"
           htmlFor="ical-url"
-          hint="Fx fra DBU. Importer igen senere for at hente nye og ændrede kampe."
+          hint="Fx fra DBU. Linket hentes automatisk igen, så flyttede kampe opdateres. Retter du en kamp selv, bliver din rettelse stående."
         >
           <input
             id="ical-url"
@@ -326,11 +448,34 @@ function CalendarImport({ teamId }: { teamId: string }) {
                 <p className="mt-0.5 text-xs text-ink/45">
                   Sidst hentet {feed.lastImportedAt ? formatRelativePast(feed.lastImportedAt) : "aldrig"}
                 </p>
+                <div className="mt-2 flex gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    loading={refreshingId === feed.id}
+                    onClick={() => refreshFeed(feed)}
+                  >
+                    Hent nu
+                  </Button>
+                  <Button type="button" size="sm" variant="ghost" icon="x" onClick={() => setFeedToDelete(feed)}>
+                    Fjern
+                  </Button>
+                </div>
               </li>
             ))}
           </ul>
         )}
       </div>
+      <ConfirmSheet
+        open={feedToDelete !== null}
+        onClose={() => setFeedToDelete(null)}
+        onConfirm={deleteFeed}
+        loading={deleting}
+        title="Fjern import?"
+        description="Importen forsvinder fra listen, og linket hentes ikke længere automatisk. Kampene bliver liggende i kalenderen."
+        confirmLabel="Ja, fjern"
+      />
     </Card>
   );
 }

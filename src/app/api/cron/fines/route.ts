@@ -4,6 +4,8 @@ import { processDueFineCollections } from "@/lib/fineCollections";
 import { processMissedSignupFines } from "@/lib/autoFines";
 import { processUpcomingSignupDeadlineReminders } from "@/lib/deadlineReminders";
 import { processEventDutyReminders } from "@/lib/eventDutyReminders";
+import { syncDueFeeds } from "@/lib/icalFeed";
+import { ensureTeamSeriesEvents } from "@/lib/seriesEvents";
 
 export const dynamic = "force-dynamic";
 
@@ -32,7 +34,12 @@ export async function GET(request: Request) {
     collectionSuggestionsCreated: 0,
     missedSignupSuggestionsCreated: 0,
     signupDeadlineRemindersSent: 0,
-    eventDutyRemindersSent: 0
+    eventDutyRemindersSent: 0,
+    seriesEventsCreated: 0,
+    icalFeedsSynced: 0,
+    icalFeedsFailed: 0,
+    icalEventsCreated: 0,
+    icalEventsUpdated: 0
   };
 
   for (const team of teams) {
@@ -57,6 +64,9 @@ export async function GET(request: Request) {
     });
     result.collectionSuggestionsCreated += Math.max(0, afterCollectionCount - beforeCollectionCount);
 
+    // Oprettes før påmindelser og bøder, så nye gentagelser også bliver dækket.
+    result.seriesEventsCreated += await ensureTeamSeriesEvents(team.id);
+
     const missedResult = await processMissedSignupFines(team.id);
     result.missedSignupSuggestionsCreated += missedResult.created;
 
@@ -66,6 +76,13 @@ export async function GET(request: Request) {
     const dutyReminderResult = await processEventDutyReminders(team.id);
     result.eventDutyRemindersSent += dutyReminderResult.notificationsCreated;
   }
+
+  // DBU-feeds hentes igen, så flyttede kampe opdateres automatisk.
+  const feedResult = await syncDueFeeds();
+  result.icalFeedsSynced = feedResult.feeds;
+  result.icalFeedsFailed = feedResult.failed;
+  result.icalEventsCreated = feedResult.created;
+  result.icalEventsUpdated = feedResult.updated;
 
   return NextResponse.json({
     ok: true,

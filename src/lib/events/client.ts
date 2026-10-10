@@ -37,6 +37,8 @@ export type EventDetail = {
   date: string;
   location: string;
   source: string;
+  /** true når titel/dato/sted er rettet manuelt og ikke længere følger DBU */
+  manualOverride?: boolean;
   kind: EventKind;
   meetingTime: string | null;
   signupDeadline: string | null;
