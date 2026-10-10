@@ -26,4 +26,9 @@ describe("slugify", () => {
   it("handles danish letters and symbols", () => {
     expect(slugify("Brønshøj Ældste Å!")).toBe("broenshoej-aeldste-aa");
   });
+
+  it("keeps underscores", () => {
+    expect(slugify("bk_skjold")).toBe("bk_skjold");
+    expect(slugify("_bk_skjold_")).toBe("bk_skjold");
+  });
 });
