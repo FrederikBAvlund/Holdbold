@@ -12,7 +12,7 @@ import { ConfirmSheet } from "@/components/ui/Sheet";
 import { Card, EmptyState, Field, ListGroup, PageHeader, Section, Stepper, inputClass } from "@/components/ui/primitives";
 import { eventHref, type EventKind } from "@/lib/events/client";
 import { buildRecurrenceSummary, deadlineLabel, type Recurrence } from "@/lib/events/eventUtils";
-import { EVENT_MANAGER_ROLES } from "@/lib/roleLabels";
+import { EVENT_MANAGER_ROLES, hasAnyRole, isAdminRoles } from "@/lib/roles";
 
 type Series = {
   id: string;
@@ -47,7 +47,7 @@ export default function NewEventPage() {
   const router = useRouter();
   const { pushToast } = useToast();
   const { teamId, actingMember, membersLoading } = useDashboardTeam();
-  const canManage = EVENT_MANAGER_ROLES.includes(actingMember?.role ?? "");
+  const canManage = hasAnyRole(actingMember?.roles, EVENT_MANAGER_ROLES);
 
   const [kind, setKind] = useState<EventKind>("TRAINING");
   const [title, setTitle] = useState("");
@@ -146,7 +146,7 @@ export default function NewEventPage() {
       </div>
 
       <form onSubmit={submit} className="space-y-6">
-        <Section title="Hvad">
+        <Section title="Hvad" anchor="event-form">
           <div className="grid grid-cols-2 gap-2">
             {(["TRAINING", "MATCH"] as const).map((option) => (
               <button
@@ -200,7 +200,7 @@ export default function NewEventPage() {
                 required
               />
             </Field>
-            <div className="space-y-2">
+            <div className="space-y-2" data-guide="event-recurrence">
               <p className="text-sm font-semibold text-ink/80">Gentagelse</p>
               <div className="flex flex-wrap gap-2">
                 {RECURRENCES.map((option) => (
@@ -266,7 +266,7 @@ export default function NewEventPage() {
         </Button>
       </form>
 
-      {series && series.length > 0 ? <SeriesList series={series} onChange={setSeries} isAdmin={actingMember?.role === "ADMIN"} /> : null}
+      {series && series.length > 0 ? <SeriesList series={series} onChange={setSeries} isAdmin={isAdminRoles(actingMember?.roles)} /> : null}
     </div>
   );
 }

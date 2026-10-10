@@ -16,7 +16,7 @@ function request(type = "audio/webm", content = "audio") {
 }
 beforeEach(() => {
   vi.mocked(getTeamOpenAiKey).mockResolvedValue("sk-secret");
-  vi.mocked(requireActiveTeamMemberWithRoles).mockResolvedValue({ ok: true, role: "ADMIN" });
+  vi.mocked(requireActiveTeamMemberWithRoles).mockResolvedValue({ ok: true, roles: ["ADMIN"] });
 });
 afterEach(() => { vi.resetAllMocks(); vi.unstubAllGlobals(); });
 

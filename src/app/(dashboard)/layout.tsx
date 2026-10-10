@@ -1,4 +1,5 @@
 import DashboardNav from "@/components/DashboardNav";
+import GuideSpotlight from "@/components/guide/GuideSpotlight";
 import DashboardTeamProvider, {
   type DashboardMembership
 } from "@/components/DashboardTeamProvider";
@@ -30,6 +31,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         initialPendingMemberships={initialPendingMemberships}
       >
         <PendingAccessGuard />
+        <GuideSpotlight />
         <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-4 px-3 sm:px-5 lg:flex-row lg:gap-7 lg:px-6">
           <DashboardNav
             serverUserName={session.user?.name ?? null}

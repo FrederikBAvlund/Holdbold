@@ -22,7 +22,7 @@ export type DashboardMembership = NonNullable<MePayload["memberships"]>[number];
 
 export type DashboardTeamMember = {
   id: string;
-  role: string;
+  roles: string[];
   status: string;
   user: {
     id: string;

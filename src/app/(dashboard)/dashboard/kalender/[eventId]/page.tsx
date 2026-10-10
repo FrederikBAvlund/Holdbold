@@ -34,7 +34,8 @@ import {
   type SignupStatus
 } from "@/lib/events/client";
 import { formatCountdown, formatDayLabel, formatTime } from "@/lib/format";
-import { EVENT_MANAGER_ROLES, FINE_MANAGER_ROLES, roleLabel } from "@/lib/roleLabels";
+import { rolesLabel } from "@/lib/roleLabels";
+import { EVENT_MANAGER_ROLES, FINE_MANAGER_ROLES, hasAnyRole } from "@/lib/roles";
 
 type Tab = "IN" | "OUT" | "UNKNOWN";
 type DutyField = "thingCarrierId" | "beerCarrierId";
@@ -65,9 +66,8 @@ export default function EventPage() {
   const [logs, setLogs] = useState<SignupLog[] | null>(null);
   const [eventLogs, setEventLogs] = useState<EventLog[] | null>(null);
 
-  const role = actingMember?.role ?? "";
-  const canManageEvents = EVENT_MANAGER_ROLES.includes(role);
-  const canEditOthers = FINE_MANAGER_ROLES.includes(role);
+  const canManageEvents = hasAnyRole(actingMember?.roles, EVENT_MANAGER_ROLES);
+  const canEditOthers = hasAnyRole(actingMember?.roles, FINE_MANAGER_ROLES);
 
   // Serie-forekomster findes først som rigtig begivenhed, når de åbnes.
   useEffect(() => {
@@ -232,6 +232,7 @@ export default function EventPage() {
               type="button"
               onClick={() => setAdminOpen(true)}
               aria-label="Administrér begivenhed"
+              data-guide="event-admin"
               className={cn(
                 "-mr-1 -mt-1 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition active:scale-95",
                 canceled ? "bg-ink/[0.06] text-ink" : "bg-on-primary/15 hover:bg-on-primary/25"
@@ -326,7 +327,7 @@ export default function EventPage() {
       </Section>
 
       {/* Hvem kommer */}
-      <Section title="Holdet">
+      <Section title="Holdet" anchor="event-signups">
         <SegmentedControl<Tab>
           value={tab}
           onChange={(next) => {
@@ -358,7 +359,7 @@ export default function EventPage() {
                     {member.user.id === userId ? <span className="ml-1.5 text-ink/45">(dig)</span> : null}
                   </>
                 }
-                subtitle={signup?.status === "OUT" && signup.reason ? `“${signup.reason}”` : roleLabel(member.role)}
+                subtitle={signup?.status === "OUT" && signup.reason ? `“${signup.reason}”` : rolesLabel(member.roles)}
                 trailing={
                   event.thingCarrierId === member.user.id || event.beerCarrierId === member.user.id ? (
                     <span className="flex gap-1 text-ink/50">
@@ -386,7 +387,7 @@ export default function EventPage() {
       </Section>
 
       {/* Opgaver */}
-      <Section title="Opgaver">
+      <Section title="Opgaver" anchor="duty-wheel">
         <ListGroup>
           <DutyRow
             icon="bag"
@@ -422,14 +423,16 @@ export default function EventPage() {
       ) : null}
 
       {isMatch && !canceled ? (
-        <MotmSection
-          eventId={event.id}
-          eventTitle={event.title}
-          members={members}
-          canManage={canEditOthers}
-          userId={userId}
-          comingUserIds={groups.coming.map(({ member }) => member.user.id)}
-        />
+        <div data-guide="motm-poll">
+          <MotmSection
+            eventId={event.id}
+            eventTitle={event.title}
+            members={members}
+            canManage={canEditOthers}
+            userId={userId}
+            comingUserIds={groups.coming.map(({ member }) => member.user.id)}
+          />
+        </div>
       ) : null}
 
       {canEditOthers && !canceled && logs && signups ? (

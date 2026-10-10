@@ -3,32 +3,24 @@ import { getServerSession } from "next-auth";
 import type { Role } from "@prisma/client";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { hasAnyRole, SIGNUP_VIEWER_ROLES } from "@/lib/roles";
 import { isSuperAdminEmail } from "@/lib/superAdmin";
 
 const unauthorized = () => NextResponse.json({ error: "Ikke logget ind" }, { status: 401 });
 const forbidden = () => NextResponse.json({ error: "Ikke adgang" }, { status: 403 });
 
-/** Trænere/admin kan oprette begivenheder og gentagelser */
-export const EVENT_MANAGER_ROLES: readonly Role[] = ["ADMIN", "TRAENER", "BOEDEKASSEFORMAND"];
-
-/** Kun admin og bødekasseformand må åbne eller nulstille MOTM-afstemninger */
-export const MOTM_MANAGER_ROLES: readonly Role[] = ["ADMIN", "BOEDEKASSEFORMAND"];
-
-/** Kun admin og bødekasse kan køre visse automations-endpoints manuelt */
-export const FINE_AUTOMATION_ROLES: readonly Role[] = ["ADMIN", "BOEDEKASSEFORMAND"];
-
-/** Admin og bødekasseformand styrer bødekassen */
-export const FINE_MANAGER_ROLES: readonly Role[] = ["ADMIN", "BOEDEKASSEFORMAND"];
-
-/** Bødekassen (og admin) godkender fravær */
-export const ABSENCE_MANAGER_ROLES: readonly Role[] = ["ADMIN", "BOEDEKASSEFORMAND"];
-
-/** Roller der må se andre spilleres tilmeldingsstatus */
-export const SIGNUP_VIEWER_ROLES: readonly Role[] = ["ADMIN", "BOEDEKASSEFORMAND", "TRAENER"];
+export {
+  ABSENCE_MANAGER_ROLES,
+  EVENT_MANAGER_ROLES,
+  FINE_AUTOMATION_ROLES,
+  FINE_MANAGER_ROLES,
+  MOTM_MANAGER_ROLES,
+  SIGNUP_VIEWER_ROLES
+} from "@/lib/roles";
 
 /** Spillere må kun se egen tilmelding; ledere må se alles */
-export function canViewSignupOf(actorId: string, actorRole: Role, targetUserId: string): boolean {
-  return actorId === targetUserId || SIGNUP_VIEWER_ROLES.includes(actorRole);
+export function canViewSignupOf(actorId: string, actorRoles: readonly Role[], targetUserId: string): boolean {
+  return actorId === targetUserId || hasAnyRole(actorRoles, SIGNUP_VIEWER_ROLES);
 }
 
 export async function requireSession(): Promise<
@@ -44,25 +36,25 @@ export async function requireSession(): Promise<
 export async function requireActiveTeamMember(
   userId: string,
   teamId: string
-): Promise<{ ok: true; role: Role } | { ok: false; response: NextResponse }> {
+): Promise<{ ok: true; roles: Role[] } | { ok: false; response: NextResponse }> {
   const membership = await prisma.membership.findFirst({
     where: { teamId, userId, status: "ACTIVE" },
-    select: { role: true }
+    select: { roles: true }
   });
   if (!membership) {
     return { ok: false, response: forbidden() };
   }
-  return { ok: true, role: membership.role };
+  return { ok: true, roles: membership.roles };
 }
 
 export async function requireActiveTeamMemberWithRoles(
   userId: string,
   teamId: string,
   allowedRoles: readonly Role[]
-): Promise<{ ok: true; role: Role } | { ok: false; response: NextResponse }> {
+): Promise<{ ok: true; roles: Role[] } | { ok: false; response: NextResponse }> {
   const member = await requireActiveTeamMember(userId, teamId);
   if (!member.ok) return member;
-  if (!allowedRoles.includes(member.role)) {
+  if (!hasAnyRole(member.roles, allowedRoles)) {
     return { ok: false, response: forbidden() };
   }
   return member;

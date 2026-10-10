@@ -12,8 +12,8 @@ export async function POST(_request: Request, { params }: { params: { id: string
 
   await prisma.membership.upsert({
     where: { userId_teamId: { userId: auth.userId, teamId: team.id } },
-    create: { userId: auth.userId, teamId: team.id, role: "ADMIN", status: "ACTIVE" },
-    update: { role: "ADMIN", status: "ACTIVE" }
+    create: { userId: auth.userId, teamId: team.id, roles: ["ADMIN"], status: "ACTIVE" },
+    update: { roles: ["ADMIN"], status: "ACTIVE" }
   });
   return NextResponse.json({ ok: true });
 }

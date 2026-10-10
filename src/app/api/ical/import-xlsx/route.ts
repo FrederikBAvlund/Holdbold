@@ -6,6 +6,7 @@ import { createNotifications } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 import { applyActiveAbsencesToEvent } from "@/lib/absences";
 import { getActiveSeason } from "@/lib/seasons";
+import { isAdminRoles } from "@/lib/roles";
 
 type Row = Record<string, unknown>;
 
@@ -75,9 +76,9 @@ function sameOrNull(value: string) {
 async function requireAdminForTeam(teamId: string, userId: string) {
   const membership = await prisma.membership.findFirst({
     where: { teamId, userId, status: "ACTIVE" },
-    select: { role: true }
+    select: { roles: true }
   });
-  return membership?.role === "ADMIN";
+  return isAdminRoles(membership?.roles);
 }
 
 export async function POST(request: Request) {

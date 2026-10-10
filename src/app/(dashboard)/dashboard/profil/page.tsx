@@ -11,6 +11,7 @@ import { invalidateDashboardTeam, useDashboardTeam } from "@/components/Dashboar
 import CalendarFeedSettings from "@/components/CalendarFeedSettings";
 import PushSettings from "@/components/PushSettings";
 import { SetupGuideBanner, SetupGuideRow } from "@/components/SetupGuide";
+import GuideRow from "@/components/guide/GuideRow";
 import { SeasonViewerCard } from "@/components/SeasonSettingsCard";
 import Avatar from "@/components/ui/Avatar";
 import Button from "@/components/ui/Button";
@@ -18,11 +19,12 @@ import Icon, { type IconName } from "@/components/ui/Icon";
 import Sheet from "@/components/ui/Sheet";
 import { Card, Chip, Field, ListGroup, ListRow, Section, Skeleton, inputClass } from "@/components/ui/primitives";
 import { clearMeClientCache } from "@/lib/meClientCache";
-import { roleLabel } from "@/lib/roleLabels";
+import { rolesLabel } from "@/lib/roleLabels";
+import { FINE_MANAGER_ROLES, hasAnyRole, isAdminRoles } from "@/lib/roles";
 import { DEFAULT_THEME_ID, THEME_PRESETS } from "@/lib/themePresets";
 
 type Membership = {
-  role: string;
+  roles: string[];
   status?: string;
   team: { id: string; name: string; slug: string };
 };
@@ -361,9 +363,8 @@ export default function ProfilPage() {
     memberships.find((item) => item.team.id === teamId) ??
     pendingMemberships.find((item) => item.team.id === teamId) ??
     memberships[0];
-  const isAdmin = membership?.role === "ADMIN" && membership.status !== "PENDING";
-  const canManageFines =
-    (membership?.role === "ADMIN" || membership?.role === "BOEDEKASSEFORMAND") && membership.status !== "PENDING";
+  const isAdmin = isAdminRoles(membership?.roles) && membership.status !== "PENDING";
+  const canManageFines = hasAnyRole(membership?.roles, FINE_MANAGER_ROLES) && membership.status !== "PENDING";
   const displayName = name || session.user.name || "Dig";
   const selectedPreset = PRESETS.some((item) => item.id === active) ? active : DEFAULT_THEME_ID;
 
@@ -374,6 +375,7 @@ export default function ProfilPage() {
         <div className="relative flex flex-col items-center text-center">
           <label
             htmlFor="profile-avatar"
+            data-guide="avatar"
             aria-label={image ? "Skift profilbillede" : "Tilføj profilbillede"}
             className={cn(
               "group relative block h-28 w-28 cursor-pointer rounded-full ring-4 ring-on-primary/30 transition active:scale-95",
@@ -408,7 +410,7 @@ export default function ProfilPage() {
             <p className="mt-3 inline-flex items-center gap-2 rounded-full bg-on-primary/15 px-3.5 py-1.5 text-sm font-semibold">
               {membership.team.name}
               <span className="opacity-60">·</span>
-              {membership.status === "PENDING" ? "Afventer" : roleLabel(membership.role)}
+              {membership.status === "PENDING" ? "Afventer" : rolesLabel(membership.roles)}
             </p>
           ) : null}
         </div>
@@ -430,6 +432,14 @@ export default function ProfilPage() {
       ) : null}
 
       <SetupGuideBanner />
+
+      {waiting ? null : (
+        <Section title="Guide">
+          <ListGroup>
+            <GuideRow />
+          </ListGroup>
+        </Section>
+      )}
 
       <Section title="Konto">
         <ListGroup>
@@ -458,7 +468,7 @@ export default function ProfilPage() {
         </ListGroup>
       </Section>
 
-      <Section title="Notifikationer">
+      <Section title="Notifikationer" anchor="push-settings">
         <ListGroup>
           <PushSettings />
           <SetupGuideRow />
@@ -467,7 +477,7 @@ export default function ProfilPage() {
       </Section>
 
       {waiting ? null : (
-        <Section title="Kalender">
+        <Section title="Kalender" anchor="calendar-feed">
           <ListGroup>
             <CalendarFeedSettings />
           </ListGroup>

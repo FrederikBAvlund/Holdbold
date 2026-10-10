@@ -16,6 +16,12 @@ enum Role {
   BOEDEKASSEFORMAND
 }
 
+enum GuideStepStatus {
+  SEEN
+  DONE
+  SKIPPED
+}
+
 enum MembershipStatus {
   PENDING
   ACTIVE
@@ -140,6 +146,7 @@ model User {
   wonMatchMotmEvents Event[] @relation("EventMatchMotmWinner")
   absences Absence[] @relation("AbsenceUser")
   decidedAbsences Absence[] @relation("AbsenceDecider")
+  guideProgress GuideProgress[]
 }
 
 model Team {
@@ -163,6 +170,7 @@ model Team {
   absences    Absence[]
   openAiCredential TeamOpenAiCredential?
   teamRequests TeamRequest[]
+  guideProgress GuideProgress[]
 }
 
 // Separate from Team so ordinary team queries never include credential material.
@@ -191,15 +199,21 @@ model Membership {
   id        String   @id @default(cuid())
   userId    String
   teamId    String
-  role      Role
+  /// Et medlem kan have flere roller (fx Spiller + Træner). Rettigheder gælder, hvis én af rollerne giver dem.
+  roles     Role[]   @default([SPILLER])
   status    MembershipStatus @default(ACTIVE)
+  /// Rollerne brugeren sidst fik guide til. Tom: har aldrig fået guiden. Mangler en af `roles`, er brugeren forfremmet.
+  guideRoles Role[]  @default([])
+  /// Sat når brugeren har valgt "Spring hele guiden over" på holdet
+  guideDismissedAt DateTime?
+  /// Sat når brugeren har sagt ja til guiden (fra velkomsten, "Nyt"-kortet eller Profil)
+  guideStartedAt DateTime?
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   team Team @relation(fields: [teamId], references: [id])
 
   @@unique([userId, teamId])
-  @@index([teamId, role])
   @@index([teamId, status])
   @@index([userId, status])
 }
@@ -661,4 +675,21 @@ model TeamRequest {
 
   @@index([status, createdAt])
   @@index([userId])
+}
+
+/// Hvad den enkelte bruger har set, klaret eller sprunget over i guiden – pr. hold.
+model GuideProgress {
+  id        String          @id @default(cuid())
+  userId    String
+  teamId    String
+  stepId    String
+  status    GuideStepStatus
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, teamId, stepId])
+  @@index([teamId])
 }

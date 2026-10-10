@@ -15,13 +15,14 @@ import { clearMeClientCache } from "@/lib/meClientCache";
 import { DEFAULT_THEME_ID, THEME_PRESETS } from "@/lib/themePresets";
 import { formatRelativePast } from "@/lib/format";
 import { slugify } from "@/lib/superAdmin";
+import { isAdminRoles } from "@/lib/roles";
 
 type Feed = { id: string; name: string; url: string; lastImportedAt?: string | null };
 
 export default function TeamSettingsPage() {
   const { pushToast } = useToast();
   const { teamId, memberships, actingMember, membersLoading } = useDashboardTeam();
-  const isAdmin = actingMember?.role === "ADMIN";
+  const isAdmin = isAdminRoles(actingMember?.roles);
   const team = memberships.find((membership) => membership.team?.id === teamId)?.team;
 
   if (!isAdmin && !membersLoading && actingMember) {
@@ -38,7 +39,7 @@ export default function TeamSettingsPage() {
       <BackLink />
       <PageHeader title="Holdindstillinger" subtitle={team?.name ?? undefined} />
 
-      <Section title="Holdets udseende">
+      <Section title="Holdets udseende" anchor="team-theme">
         <TeamTheme teamId={teamId} onSaved={() => pushToast("Holdets farver er opdateret", "success")} />
       </Section>
 
@@ -46,11 +47,11 @@ export default function TeamSettingsPage() {
         {teamId ? <TeamSlugCard key={teamId} teamId={teamId} currentSlug={team?.slug ?? ""} /> : null}
       </Section>
 
-      <Section title="Kampprogram">
+      <Section title="Kampprogram" anchor="calendar-import">
         <CalendarImport teamId={teamId} />
       </Section>
 
-      <Section title="Sæson">
+      <Section title="Sæson" anchor="season">
         <SeasonCloseCard teamId={teamId} />
       </Section>
 

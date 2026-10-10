@@ -4,6 +4,8 @@ import { createNotifications } from "@/lib/notifications";
 import { notificationRef } from "@/lib/notificationRefs";
 import { prisma } from "@/lib/prisma";
 import { requireActiveTeamMember, requireSession } from "@/lib/apiAuth";
+import { FINE_MANAGER_ROLES, hasAnyRole } from "@/lib/roles";
+import { PUBLIC_USER_SELECT } from "@/lib/publicUser";
 
 const listSchema = z.object({
   teamId: z.string().min(1)
@@ -31,9 +33,9 @@ export async function GET(request: Request) {
   const templates = await prisma.fineTemplate.findMany({
     where: { teamId: parsed.teamId },
     include: {
-      createdBy: true,
-      approvedBy: true,
-      rejectedBy: true
+      createdBy: { select: PUBLIC_USER_SELECT },
+      approvedBy: { select: PUBLIC_USER_SELECT },
+      rejectedBy: { select: PUBLIC_USER_SELECT }
     },
     orderBy: { createdAt: "desc" }
   });
@@ -52,7 +54,7 @@ export async function POST(request: Request) {
   if (!membership.ok) return membership.response;
 
   const status: "APPROVED" | "PENDING" =
-    membership.role === "BOEDEKASSEFORMAND" || membership.role === "ADMIN" ? "APPROVED" : "PENDING";
+    hasAnyRole(membership.roles, FINE_MANAGER_ROLES) ? "APPROVED" : "PENDING";
 
   const template = await prisma.fineTemplate.create({
     data: {
@@ -68,7 +70,7 @@ export async function POST(request: Request) {
 
   if (status === "PENDING") {
     const managers = await prisma.membership.findMany({
-      where: { teamId: body.teamId, role: { in: ["ADMIN", "BOEDEKASSEFORMAND"] } },
+      where: { teamId: body.teamId, roles: { hasSome: ["ADMIN", "BOEDEKASSEFORMAND"] } },
       select: { userId: true }
     });
     const notifications = managers.map((manager) => ({

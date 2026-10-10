@@ -12,13 +12,15 @@ import {
   isPostDeadlineWithdrawal,
   isSameCalendarDayAsEvent,
   resolveAutomationTemplate,
-  roleExcludedFromFineAutomation
+  rolesExcludedFromFineAutomation
 } from "./fineAutomation";
 
-describe("roleExcludedFromFineAutomation", () => {
-  it("returns true when role is listed", () => {
-    expect(roleExcludedFromFineAutomation("SOME", ["SOME"])).toBe(true);
-    expect(roleExcludedFromFineAutomation("SPILLER", ["SOME"])).toBe(false);
+describe("rolesExcludedFromFineAutomation", () => {
+  it("returns true when one of the member's roles is listed", () => {
+    expect(rolesExcludedFromFineAutomation(["SOME"], ["SOME"])).toBe(true);
+    expect(rolesExcludedFromFineAutomation(["SPILLER", "SOME"], ["SOME"])).toBe(true);
+    expect(rolesExcludedFromFineAutomation(["SPILLER"], ["SOME"])).toBe(false);
+    expect(rolesExcludedFromFineAutomation(["SPILLER", "TRAENER"], ["SOME"])).toBe(false);
   });
 });
 

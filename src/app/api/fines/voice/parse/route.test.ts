@@ -23,7 +23,7 @@ const request = () => new Request("http://localhost", {
 describe("voice parsing team key", () => {
   beforeEach(() => {
     vi.mocked(getTeamOpenAiKey).mockResolvedValue("sk-team-b-secret");
-    vi.mocked(requireActiveTeamMemberWithRoles).mockResolvedValue({ ok: true, role: "ADMIN" });
+    vi.mocked(requireActiveTeamMemberWithRoles).mockResolvedValue({ ok: true, roles: ["ADMIN"] });
   });
   afterEach(() => { vi.resetAllMocks(); vi.unstubAllGlobals(); });
 

@@ -59,7 +59,7 @@ export async function POST(request: Request) {
   }
 
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
-  await prisma.membership.create({ data: { userId, teamId: team.id, role: "SPILLER", status: "PENDING" } });
+  await prisma.membership.create({ data: { userId, teamId: team.id, roles: ["SPILLER"], status: "PENDING" } });
   await notifyAdminsOfPendingMember({ teamId: team.id, userId, name: user?.name ?? session.user.name ?? "En bruger" });
 
   return NextResponse.json({ ok: true, team: { id: team.id, name: team.name } }, { status: 201 });

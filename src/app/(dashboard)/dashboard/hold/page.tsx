@@ -11,7 +11,8 @@ import Avatar from "@/components/ui/Avatar";
 import Button from "@/components/ui/Button";
 import Sheet from "@/components/ui/Sheet";
 import { Chip, ListGroup, ListRow, PageHeader, Section, Skeleton, inputClass } from "@/components/ui/primitives";
-import { roleLabel } from "@/lib/roleLabels";
+import { roleLabel, rolesLabel } from "@/lib/roleLabels";
+import { isAdminRoles, primaryRole, ROLE_PRIORITY } from "@/lib/roles";
 import { firstName } from "@/lib/format";
 import {
   LEADERBOARD_CATEGORY_LABELS_DA,
@@ -20,8 +21,6 @@ import {
   type LeaderboardTop
 } from "@/lib/leaderboardsShared";
 import { LEADERBOARD_GROUPS, LEADERBOARD_SHORT } from "@/lib/leaderboardDisplay";
-
-const ROLE_ORDER = ["ADMIN", "TRAENER", "BOEDEKASSEFORMAND", "SOME", "SPILLER"];
 
 export default function HoldPage() {
   const { pushToast } = useToast();
@@ -32,7 +31,7 @@ export default function HoldPage() {
   const [rows, setRows] = useState<LeaderboardRow[] | null>(null);
 
   const team = memberships.find((membership) => membership.team?.id === teamId)?.team;
-  const isAdmin = actingMember?.role === "ADMIN";
+  const isAdmin = isAdminRoles(actingMember?.roles);
   const active = members.filter((member) => member.status === "ACTIVE");
   const [pending, setPending] = useState<DashboardTeamMember[]>([]);
   const [decidingId, setDecidingId] = useState<string | null>(null);
@@ -64,7 +63,7 @@ export default function HoldPage() {
       const response = await fetch(`/api/team-members/${member.id}`, {
         method: approve ? "PATCH" : "DELETE",
         headers: approve ? { "Content-Type": "application/json" } : undefined,
-        body: approve ? JSON.stringify({ status: "ACTIVE", role: member.role }) : undefined
+        body: approve ? JSON.stringify({ status: "ACTIVE" }) : undefined
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
@@ -108,10 +107,11 @@ export default function HoldPage() {
   const grouped = useMemo(() => {
     const q = query.trim().toLowerCase();
     const filtered = active.filter((member) => !q || (member.user.name ?? "").toLowerCase().includes(q));
-    return ROLE_ORDER.map((role) => ({
+    // Hvert medlem står én gang – under sin vigtigste rolle
+    return ROLE_PRIORITY.map((role) => ({
       role,
       items: filtered
-        .filter((member) => member.role === role)
+        .filter((member) => primaryRole(member.roles) === role)
         .sort((a, b) => (a.user.name ?? "").localeCompare(b.user.name ?? "", "da"))
     })).filter((group) => group.items.length > 0);
   }, [active, query]);
@@ -136,13 +136,14 @@ export default function HoldPage() {
     <div className="space-y-7 pb-6">
       <PageHeader
         title={team?.name ?? "Holdet"}
-        subtitle={`${active.length} spillere og ledere · Du er ${roleLabel(actingMember?.role).toLowerCase()}`}
+        subtitle={`${active.length} spillere og ledere · Du er ${rolesLabel(actingMember?.roles).toLowerCase()}`}
       />
 
       <div className="grid gap-2 sm:grid-cols-2">
         <button
           type="button"
           onClick={shareInvite}
+          data-guide="team-code"
           className="hero-surface flex min-h-[4.5rem] items-center gap-3 rounded-[1.375rem] px-4 text-left transition active:scale-[0.99]"
         >
           <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-on-primary/15">
@@ -216,7 +217,7 @@ export default function HoldPage() {
         </Section>
       ) : null}
 
-      <Section title="Truppen">
+      <Section title="Truppen" anchor="member-list">
         <div className="relative">
           <Icon name="search" className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-ink/40" />
           <input

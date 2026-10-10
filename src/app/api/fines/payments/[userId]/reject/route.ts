@@ -4,6 +4,7 @@ import { z } from "zod";
 import { authOptions } from "@/lib/auth";
 import { notificationRef, resolveBulkFineProposalNotifications, resolveNotifications } from "@/lib/notificationRefs";
 import { prisma } from "@/lib/prisma";
+import { isAdminRoles } from "@/lib/roles";
 
 const bodySchema = z.object({
   teamId: z.string().min(1)
@@ -20,9 +21,9 @@ export async function POST(request: Request, { params }: { params: { userId: str
 
   const membership = await prisma.membership.findFirst({
     where: { teamId: body.teamId, userId: session.user.id, status: "ACTIVE" },
-    select: { role: true }
+    select: { roles: true }
   });
-  if (!membership || membership.role !== "ADMIN") {
+  if (!membership || !isAdminRoles(membership.roles)) {
     return NextResponse.json({ error: "Kun admin kan afvise betaling" }, { status: 403 });
   }
 

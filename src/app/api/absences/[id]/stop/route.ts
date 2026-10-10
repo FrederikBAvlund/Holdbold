@@ -4,6 +4,7 @@ import { createNotifications } from "@/lib/notifications";
 import { notificationRef, resolveNotifications } from "@/lib/notificationRefs";
 import { releaseAbsenceSignups } from "@/lib/absences";
 import { ABSENCE_MANAGER_ROLES, requireActiveTeamMember, requireSession } from "@/lib/apiAuth";
+import { hasAnyRole } from "@/lib/roles";
 
 /** Trækker en afventende anmodning tilbage eller stopper et godkendt fravær før tid. */
 export async function POST(_request: Request, { params }: { params: { id: string } }) {
@@ -15,7 +16,7 @@ export async function POST(_request: Request, { params }: { params: { id: string
 
   const member = await requireActiveTeamMember(session.userId, absence.teamId);
   if (!member.ok) return member.response;
-  if (absence.userId !== session.userId && !ABSENCE_MANAGER_ROLES.includes(member.role)) {
+  if (absence.userId !== session.userId && !hasAnyRole(member.roles, ABSENCE_MANAGER_ROLES)) {
     return NextResponse.json({ error: "Ikke adgang" }, { status: 403 });
   }
 
@@ -42,7 +43,7 @@ export async function POST(_request: Request, { params }: { params: { id: string
     const [user, managers] = await Promise.all([
       prisma.user.findUnique({ where: { id: absence.userId }, select: { name: true } }),
       prisma.membership.findMany({
-        where: { teamId: absence.teamId, status: "ACTIVE", role: { in: [...ABSENCE_MANAGER_ROLES] } },
+        where: { teamId: absence.teamId, status: "ACTIVE", roles: { hasSome: [...ABSENCE_MANAGER_ROLES] } },
         select: { userId: true }
       })
     ]);

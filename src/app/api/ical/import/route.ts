@@ -4,6 +4,7 @@ import { z } from "zod";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { feedNameFromUrl, fetchIcsText, importFeedEvents, normalizeIcalUrl, parseIcsEvents } from "@/lib/icalFeed";
+import { isAdminRoles } from "@/lib/roles";
 
 const bodySchema = z.object({
   teamId: z.string().min(1),
@@ -21,9 +22,9 @@ const querySchema = z.object({
 async function requireAdminForTeam(teamId: string, userId: string) {
   const membership = await prisma.membership.findFirst({
     where: { teamId, userId, status: "ACTIVE" },
-    select: { role: true }
+    select: { roles: true }
   });
-  return membership?.role === "ADMIN";
+  return isAdminRoles(membership?.roles);
 }
 
 export async function GET(request: Request) {

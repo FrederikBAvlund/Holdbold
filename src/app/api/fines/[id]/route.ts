@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { ensureFineSeasonOpen } from "@/lib/seasons";
+import { FINE_MANAGER_ROLES, hasAnyRole } from "@/lib/roles";
 
 const deletableStatuses = new Set(["UNPAID", "PAID_PENDING", "AFVIST"]);
 
@@ -25,9 +26,9 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
 
   const membership = await prisma.membership.findFirst({
     where: { teamId: fine.teamId, userId: session.user.id, status: "ACTIVE" },
-    select: { role: true }
+    select: { roles: true }
   });
-  if (!membership || !["ADMIN", "BOEDEKASSEFORMAND"].includes(membership.role)) {
+  if (!membership || !hasAnyRole(membership.roles, FINE_MANAGER_ROLES)) {
     return NextResponse.json({ error: "Kun admin/bødekasseformand kan slette bøder" }, { status: 403 });
   }
 

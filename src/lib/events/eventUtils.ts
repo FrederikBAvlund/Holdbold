@@ -17,7 +17,7 @@ export type EventLog = {
   actor?: { name: string | null; image?: string | null } | null;
 };
 
-type MemberLike = { role: string; user: { id: string } };
+type MemberLike = { roles: readonly string[]; user: { id: string } };
 
 /** Logs forventes sorteret nyeste først (som API'et returnerer dem). */
 export function computeLateGroups<M extends MemberLike>(params: {
@@ -41,7 +41,8 @@ export function computeLateGroups<M extends MemberLike>(params: {
   const now = params.now ?? Date.now();
 
   for (const member of members) {
-    if (member.role === "SOME") continue;
+    // SoMe-folk spiller ikke og skal ikke med i frist-oversigten
+    if (member.roles.includes("SOME")) continue;
     const status = statusByUser.get(member.user.id);
     const latest = latestLogByUser.get(member.user.id);
     const latestAt = latest ? new Date(latest.createdAt).getTime() : null;

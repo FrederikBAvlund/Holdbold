@@ -8,7 +8,8 @@ import { useDashboardTeam } from "@/components/DashboardTeamProvider";
 import Icon, { type IconName } from "@/components/ui/Icon";
 import Avatar, { AvatarStack } from "@/components/ui/Avatar";
 import { Card, EmptyState, KindTag, Section, SectionLink, Skeleton } from "@/components/ui/primitives";
-import { SetupGuideBanner } from "@/components/SetupGuide";
+import GuideHome from "@/components/guide/GuideHome";
+import { refreshGuide } from "@/components/guide/guideClient";
 import EventCard from "@/components/events/EventCard";
 import RsvpControl from "@/components/events/RsvpControl";
 import {
@@ -21,7 +22,7 @@ import {
   type SignupStatus
 } from "@/lib/events/client";
 import { firstName, formatCountdown, formatDayLabel, formatKr, formatTime } from "@/lib/format";
-import { FINE_MANAGER_ROLES } from "@/lib/roleLabels";
+import { FINE_MANAGER_ROLES, hasAnyRole, isAdminRoles } from "@/lib/roles";
 import { LEADERBOARD_CATEGORIES, type LeaderboardCategory, type LeaderboardTop } from "@/lib/leaderboardsShared";
 import { LEADERBOARD_SHORT } from "@/lib/leaderboardDisplay";
 
@@ -48,8 +49,8 @@ export default function HomePage() {
   const [proposedFines, setProposedFines] = useState(0);
 
   const teamName = memberships.find((membership) => membership.team?.id === teamId)?.team?.name ?? "";
-  const canManageFines = FINE_MANAGER_ROLES.includes(actingMember?.role ?? "");
-  const isAdmin = actingMember?.role === "ADMIN";
+  const canManageFines = hasAnyRole(actingMember?.roles, FINE_MANAGER_ROLES);
+  const isAdmin = isAdminRoles(actingMember?.roles);
 
   const loadEvents = useCallback(async () => {
     if (!teamId || !userId) return;
@@ -145,6 +146,7 @@ export default function HomePage() {
     if (originalId === nextEvent?.id) {
       fetchEventSignups(realId).then(setNextSignups).catch(() => undefined);
     }
+    refreshGuide();
   }
 
   const actionItems: Array<{ icon: IconName; title: string; subtitle: string; href: string; tone: string }> = [];
@@ -197,7 +199,7 @@ export default function HomePage() {
         </h1>
       </header>
 
-      <SetupGuideBanner />
+      <GuideHome />
 
       {/* Næste begivenhed */}
       <section aria-label="Næste begivenhed">

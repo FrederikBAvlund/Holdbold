@@ -57,6 +57,7 @@ export default function EventCard({
 
   return (
     <article
+      data-guide="event-card"
       className={cn(
         "relative rounded-[1.375rem] border border-line bg-surface p-3.5 shadow-[var(--shadow-sm)] transition hover:border-ink/20",
         canceled && "opacity-70"

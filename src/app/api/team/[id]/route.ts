@@ -2,9 +2,11 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
+import { FINE_MANAGER_ROLES } from "@/lib/apiAuth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { checkSlugAvailable, SLUG_ERROR_MESSAGES } from "@/lib/reservedSlugs";
+import { hasAnyRole, isAdminRoles } from "@/lib/roles";
 
 const themeConfigSchema = z
   .object({
@@ -69,16 +71,23 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     return NextResponse.json({ error: "Ikke logget ind" }, { status: 401 });
   }
 
-  const membership = await prisma.membership.findFirst({
-    where: { teamId: params.id, userId: session.user.id, status: "ACTIVE" },
-    select: { role: true }
-  });
-  if (!membership || membership.role !== "ADMIN") {
-    return NextResponse.json({ error: "Kun admin kan opdatere holdindstillinger" }, { status: 403 });
-  }
-
   const json = await request.json();
   const body = updateSchema.parse(json);
+
+  const membership = await prisma.membership.findFirst({
+    where: { teamId: params.id, userId: session.user.id, status: "ACTIVE" },
+    select: { roles: true }
+  });
+  // Bødekasseformanden må selv sætte MobilePay Box, men ikke resten af holdindstillingerne
+  const onlyMobilePay =
+    body.mobilePayBox !== undefined &&
+    body.themePreset === undefined &&
+    body.themeConfig === undefined &&
+    body.slug === undefined;
+  const allowed = membership && (isAdminRoles(membership.roles) || (onlyMobilePay && hasAnyRole(membership.roles, FINE_MANAGER_ROLES)));
+  if (!allowed) {
+    return NextResponse.json({ error: "Kun admin kan opdatere holdindstillinger" }, { status: 403 });
+  }
   const themeConfigValue =
     body.themeConfig === undefined
       ? undefined

@@ -3,15 +3,17 @@ import { getServerSession } from "next-auth";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { authOptions } from "@/lib/auth";
-import { notifyMembershipActivated } from "@/lib/membershipNotify";
+import { guideRolesAfterRoleChange } from "@/lib/guide/state";
+import { notifyMembershipActivated, notifyRolesGained } from "@/lib/membershipNotify";
 import { notificationRef, resolveNotifications } from "@/lib/notificationRefs";
 import { prisma } from "@/lib/prisma";
+import { isAdminRoles, normalizeRoles, roles } from "@/lib/roles";
 
 const updateSchema = z.object({
-  role: z.enum(["ADMIN", "TRAENER", "SPILLER", "SOME", "BOEDEKASSEFORMAND"]).optional(),
+  roles: z.array(z.enum(roles)).min(1, "Vælg mindst én rolle").optional(),
   status: z.enum(["PENDING", "ACTIVE"]).optional()
-}).refine((value) => value.role || value.status, {
-  message: "role eller status er påkrævet"
+}).refine((value) => value.roles || value.status, {
+  message: "roles eller status er påkrævet"
 });
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
@@ -20,8 +22,11 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     return NextResponse.json({ error: "Ikke logget ind" }, { status: 401 });
   }
 
-  const json = await request.json();
-  const body = updateSchema.parse(json);
+  const parsed = updateSchema.safeParse(await request.json().catch(() => null));
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Ugyldigt input" }, { status: 400 });
+  }
+  const body = parsed.data;
 
   const membership = await prisma.membership.findUnique({
     where: { id: params.id }
@@ -34,17 +39,43 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   const acting = await prisma.membership.findFirst({
     where: { userId: session.user.id, teamId: membership.teamId, status: "ACTIVE" }
   });
-  if (acting?.role !== "ADMIN") {
+  if (!isAdminRoles(acting?.roles)) {
     return NextResponse.json({ error: "Ikke adgang" }, { status: 403 });
+  }
+
+  const nextRoles = body.roles ? normalizeRoles(body.roles) : null;
+
+  // Holdet må aldrig stå uden admin
+  if (nextRoles && isAdminRoles(membership.roles) && !isAdminRoles(nextRoles) && membership.status === "ACTIVE") {
+    const otherAdmins = await prisma.membership.count({
+      where: { teamId: membership.teamId, status: "ACTIVE", roles: { has: "ADMIN" }, id: { not: membership.id } }
+    });
+    if (otherAdmins === 0) {
+      return NextResponse.json({ error: "Holdet skal have mindst én admin" }, { status: 409 });
+    }
   }
 
   const updated = await prisma.membership.update({
     where: { id: params.id },
     data: {
-      ...(body.role ? { role: body.role } : {}),
+      ...(nextRoles ? { roles: nextRoles, guideRoles: guideRolesAfterRoleChange(membership.guideRoles, nextRoles) } : {}),
       ...(body.status ? { status: body.status } : {})
     }
   });
+
+  if (nextRoles && membership.status === "ACTIVE") {
+    try {
+      await notifyRolesGained({
+        userId: membership.userId,
+        teamId: membership.teamId,
+        previousRoles: membership.roles,
+        roles: nextRoles
+      });
+    } catch (error) {
+      // Rolleskiftet er gemt – en fejlet besked må ikke få det til at se ud, som om det fejlede
+      console.error("Kunne ikke give besked om ny rolle", error);
+    }
+  }
 
   if (membership.status === "PENDING" && updated.status === "ACTIVE") {
     await resolveNotifications([notificationRef.membership(membership.teamId, membership.userId)]);
@@ -71,7 +102,7 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
   const acting = await prisma.membership.findFirst({
     where: { userId: session.user.id, teamId: membership.teamId, status: "ACTIVE" }
   });
-  if (acting?.role !== "ADMIN") {
+  if (!isAdminRoles(acting?.roles)) {
     return NextResponse.json({ error: "Ikke adgang" }, { status: 403 });
   }
 

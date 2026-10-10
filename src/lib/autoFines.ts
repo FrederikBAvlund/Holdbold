@@ -6,7 +6,7 @@ import {
   isPostDeadlineWithdrawal,
   isSameCalendarDayAsEvent,
   resolveAutomationTemplate,
-  roleExcludedFromFineAutomation
+  rolesExcludedFromFineAutomation
 } from "@/lib/fineAutomation";
 
 export async function processMissedSignupFines(teamId: string) {
@@ -17,10 +17,10 @@ export async function processMissedSignupFines(teamId: string) {
   const [players, managers, dueEvents] = await Promise.all([
     prisma.membership.findMany({
       where: { teamId, status: "ACTIVE" },
-      select: { userId: true, role: true, createdAt: true, user: { select: { name: true } } }
+      select: { userId: true, roles: true, createdAt: true, user: { select: { name: true } } }
     }),
     prisma.membership.findMany({
-      where: { teamId, status: "ACTIVE", role: { in: ["ADMIN", "BOEDEKASSEFORMAND"] } },
+      where: { teamId, status: "ACTIVE", roles: { hasSome: ["ADMIN", "BOEDEKASSEFORMAND"] } },
       select: { userId: true }
     }),
     prisma.event.findMany({
@@ -152,7 +152,7 @@ export async function processMissedSignupFines(teamId: string) {
       if (existingUserIds.has(userId)) continue;
       if (!missedResolved) continue;
       const member = playerById.get(userId);
-      if (!member || roleExcludedFromFineAutomation(member.role, missedResolved.excludedRoles)) continue;
+      if (!member || rolesExcludedFromFineAutomation(member.roles, missedResolved.excludedRoles)) continue;
       rows.push({
         userId,
         templateId: missedResolved.template.id,
@@ -167,7 +167,7 @@ export async function processMissedSignupFines(teamId: string) {
       if (existingUserIds.has(userId)) continue;
       if (!statusResolved) continue;
       const member = playerById.get(userId);
-      if (!member || roleExcludedFromFineAutomation(member.role, statusResolved.excludedRoles)) continue;
+      if (!member || rolesExcludedFromFineAutomation(member.roles, statusResolved.excludedRoles)) continue;
       rows.push({
         userId,
         templateId: statusResolved.template.id,
@@ -182,7 +182,7 @@ export async function processMissedSignupFines(teamId: string) {
       if (existingUserIds.has(userId)) continue;
       if (!sameDayResolved) continue;
       const member = playerById.get(userId);
-      if (!member || roleExcludedFromFineAutomation(member.role, sameDayResolved.excludedRoles)) continue;
+      if (!member || rolesExcludedFromFineAutomation(member.roles, sameDayResolved.excludedRoles)) continue;
       rows.push({
         userId,
         templateId: sameDayResolved.template.id,

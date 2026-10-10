@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/primitives";
 import FineRow, { FineAmount } from "@/components/fines/FineRow";
 import { formatDayTime, formatKr, formatRelativePast } from "@/lib/format";
-import { FINE_MANAGER_ROLES } from "@/lib/roleLabels";
+import { FINE_MANAGER_ROLES, hasAnyRole, isAdminRoles } from "@/lib/roles";
 import { categoryLabel } from "./boderConstants";
 import type { FineItem, FineTemplate } from "./boderTypes";
 import { rankDebtors, summarizeFines } from "./boderUtils";
@@ -39,8 +39,8 @@ export default function BoderPage() {
   const searchParams = useSearchParams();
   const { pushToast } = useToast();
   const { teamId, userId, members, actingMember, seasonQuery, isReadOnlySeason } = useDashboardTeam();
-  const canManage = FINE_MANAGER_ROLES.includes(actingMember?.role ?? "");
-  const isAdmin = actingMember?.role === "ADMIN";
+  const canManage = hasAnyRole(actingMember?.roles, FINE_MANAGER_ROLES);
+  const isAdmin = isAdminRoles(actingMember?.roles);
 
   const data = useFineData({ teamId, userId, seasonQuery, canManage, isAdmin });
   const { run, busyKey } = useFineActions(data.refresh);
@@ -343,7 +343,7 @@ function MineTab({
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-guide="my-fines">
       <section className="hero-surface rounded-[1.75rem] p-5">
         <p className="text-xs font-bold uppercase tracking-[0.16em] text-on-primary/75">
           {totals.unpaid > 0 ? "Du skylder" : totals.pending > 0 ? "Betalingen er på vej" : "Din saldo"}
@@ -659,9 +659,24 @@ function KassenTab({
 }) {
   const router = useRouter();
   const pendingTemplates = data.templates.filter((t) => t.status === "PENDING");
-  const actions: Array<{ icon: IconName | "mic"; label: string; hint: string; onClick: () => void; hero?: boolean; locked?: boolean }> = [
+  const actions: Array<{
+    icon: IconName | "mic";
+    label: string;
+    hint: string;
+    onClick: () => void;
+    hero?: boolean;
+    locked?: boolean;
+    guide: string;
+  }> = [
     voiceEnabled
-      ? { icon: "mic", label: "Indtal bøder", hint: "Hold knappen nede og rems dem op – så laves forslagene", onClick: onVoice, hero: true }
+      ? {
+          icon: "mic",
+          label: "Indtal bøder",
+          hint: "Hold knappen nede og rems dem op – så laves forslagene",
+          onClick: onVoice,
+          hero: true,
+          guide: "voice-fines"
+        }
       : {
           icon: "mic",
           label: "Indtal bøder",
@@ -669,10 +684,11 @@ function KassenTab({
             ? "Låst – tilknyt en OpenAI API-nøgle under Holdindstillinger for at bruge funktionen"
             : "Låst – en admin skal tilknytte en OpenAI API-nøgle under Holdindstillinger",
           onClick: () => (isAdmin ? router.push("/dashboard/hold/indstillinger") : undefined),
-          locked: true
+          locked: true,
+          guide: "voice-fines"
         },
-    { icon: "receipt", label: "Giv bøde", hint: "Én eller flere spillere", onClick: onAssign },
-    { icon: "hourglass", label: "Indsamling", hint: "Bøde ved for sen betaling", onClick: onCollection }
+    { icon: "receipt", label: "Giv bøde", hint: "Én eller flere spillere", onClick: onAssign, guide: "assign-fine" },
+    { icon: "hourglass", label: "Indsamling", hint: "Bøde ved for sen betaling", onClick: onCollection, guide: "fine-collection" }
   ];
 
   return (
@@ -684,6 +700,7 @@ function KassenTab({
               key={action.label}
               type="button"
               onClick={action.onClick}
+              data-guide={action.guide}
               aria-disabled={action.locked || undefined}
               className={cn(
                 "flex min-h-[5.5rem] flex-col justify-between gap-2 rounded-[1.375rem] p-4 text-left transition active:scale-[0.98]",
@@ -734,6 +751,7 @@ function KassenTab({
       ) : null}
 
       <Section
+        anchor="fine-templates"
         title="Kataloget"
         action={
           !readOnly ? (
@@ -765,17 +783,17 @@ function KassenTab({
         <p className="px-1 text-sm text-ink/50">Hele kataloget findes under fanen Holdet.</p>
       </Section>
 
-      <Section title="MobilePay">
+      <Section title="MobilePay" anchor="mobilepay-box">
         <MobilePayCard
           teamId={teamId}
           value={data.mobilePayBox}
-          editable={isAdmin && !readOnly}
+          editable={!readOnly}
           onSaved={onSavedMobilePay}
           pushError={pushError}
         />
       </Section>
 
-      <Section title="Automatiske bøder">
+      <Section title="Automatiske bøder" anchor="fine-automation">
         <FineAutomationCard teamId={teamId} />
       </Section>
     </div>

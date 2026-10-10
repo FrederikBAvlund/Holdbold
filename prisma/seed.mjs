@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { applyDevPersonas, assertLocalDatabase, DEV_PERSONAS } from "./dev-personas.mjs";
 
 const prisma = new PrismaClient();
 
@@ -100,6 +101,10 @@ function templateKey(input) {
 }
 
 async function main() {
+  // Testbrugere med svagt kodeord: afvis en ikke-lokal database, inden der røres ved noget
+  const devPassword = process.env.SEED_DEV_PASSWORD;
+  if (devPassword) assertLocalDatabase();
+
   const teamSlug = process.env.SEED_TEAM_SLUG ?? "hold-1";
   const teamName = process.env.SEED_TEAM_NAME ?? "Hold 1";
 
@@ -141,8 +146,8 @@ async function main() {
 
     await prisma.membership.upsert({
       where: { userId_teamId: { userId: user.id, teamId: team.id } },
-      create: { userId: user.id, teamId: team.id, role: "ADMIN", status: "ACTIVE" },
-      update: { role: "ADMIN", status: "ACTIVE" }
+      create: { userId: user.id, teamId: team.id, roles: ["ADMIN"], status: "ACTIVE" },
+      update: { roles: ["ADMIN"], status: "ACTIVE" }
     });
   }
 
@@ -161,8 +166,8 @@ async function main() {
 
     await prisma.membership.upsert({
       where: { userId_teamId: { userId: user.id, teamId: team.id } },
-      create: { userId: user.id, teamId: team.id, role: "SPILLER", status: "ACTIVE" },
-      update: { role: "SPILLER", status: "ACTIVE" }
+      create: { userId: user.id, teamId: team.id, roles: ["SPILLER"], status: "ACTIVE" },
+      update: { roles: ["SPILLER"], status: "ACTIVE" }
     });
   }
 
@@ -184,8 +189,8 @@ async function main() {
 
       await prisma.membership.upsert({
         where: { userId_teamId: { userId: user.id, teamId: team.id } },
-        create: { userId: user.id, teamId: team.id, role: "SPILLER", status: "ACTIVE" },
-        update: { role: "SPILLER", status: "ACTIVE" }
+        create: { userId: user.id, teamId: team.id, roles: ["SPILLER"], status: "ACTIVE" },
+        update: { roles: ["SPILLER"], status: "ACTIVE" }
       });
     }
   }
@@ -205,10 +210,17 @@ async function main() {
 
       await prisma.membership.upsert({
         where: { userId_teamId: { userId: user.id, teamId: team.id } },
-        create: { userId: user.id, teamId: team.id, role: "BOEDEKASSEFORMAND", status: "ACTIVE" },
-        update: { role: "BOEDEKASSEFORMAND", status: "ACTIVE" }
+        create: { userId: user.id, teamId: team.id, roles: ["BOEDEKASSEFORMAND"], status: "ACTIVE" },
+        update: { roles: ["BOEDEKASSEFORMAND"], status: "ACTIVE" }
       });
     }
+  }
+
+  if (devPassword) {
+    const ids = await applyDevPersonas(prisma, { teamId: team.id, password: devPassword });
+    adminUserId ??= ids.get("admin@holdbold.local") ?? null;
+    console.log(`Testbrugere klar (kodeord: ${devPassword}):`);
+    for (const persona of DEV_PERSONAS) console.log(`  ${persona.email.padEnd(28)} ${persona.note ?? ""}`);
   }
 
   const existingTemplates = await prisma.fineTemplate.findMany({

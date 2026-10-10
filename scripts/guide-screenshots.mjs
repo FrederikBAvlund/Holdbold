@@ -6,7 +6,7 @@ import sharp from "sharp";
 
 const baseURL = process.env.BASE_URL ?? "http://localhost:3000";
 const identifier = process.env.GUIDE_EMAIL ?? "spiller@holdbold.local";
-const password = process.env.GUIDE_PASSWORD ?? "Test1234!";
+const password = process.env.GUIDE_PASSWORD ?? process.env.SEED_DEV_PASSWORD ?? "Test1234!";
 const executablePath = process.env.CHROMIUM_PATH ?? "/opt/pw-browsers/chromium";
 const outDir = new URL("../public/guide/", import.meta.url).pathname;
 mkdirSync(outDir, { recursive: true });
