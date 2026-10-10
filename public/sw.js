@@ -1,9 +1,9 @@
-const CACHE_NAME = "holdbold-pwa-v3";
+const CACHE_NAME = "holdbold-pwa-v4";
 const OFFLINE_FALLBACK_URL = "/offline";
 const PRECACHE_URLS = [
   OFFLINE_FALLBACK_URL,
-  "/icon",
-  "/apple-icon",
+  "/icon?v=2",
+  "/apple-icon?v=2",
   "/manifest.webmanifest"
 ];
 
@@ -78,8 +78,8 @@ self.addEventListener("push", (event) => {
   const title = payload.title || "Holdbold";
   const body = payload.body || "";
   const url = payload.url || "/dashboard/notifikationer";
-  const icon = payload.icon || "/icon";
-  const badge = payload.badge || "/icon";
+  const icon = payload.icon || "/icon?v=2";
+  const badge = payload.badge || "/icon?v=2";
 
   event.waitUntil(
     self.registration.showNotification(title, {

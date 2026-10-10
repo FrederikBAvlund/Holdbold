@@ -1,10 +1,9 @@
 import { ImageResponse } from "next/og";
-import { brandIconSvgMaskable, resolveThemeId } from "../brand-icon-svg";
+import { brandIconSvg, resolveThemeId } from "../brand-icon-svg";
 
-// Android beskærer "maskable" ikoner til cirkel/squircle – motivet ligger derfor inden for safe-zonen.
 export function GET(request: Request) {
   const theme = resolveThemeId(new URL(request.url).searchParams.get("theme"));
-  const svgDataUri = `data:image/svg+xml;utf8,${encodeURIComponent(brandIconSvgMaskable(theme))}`;
+  const svgDataUri = `data:image/svg+xml;utf8,${encodeURIComponent(brandIconSvg(theme))}`;
   return new ImageResponse(
     (
       <div style={{ width: "100%", height: "100%", display: "flex" }}>
