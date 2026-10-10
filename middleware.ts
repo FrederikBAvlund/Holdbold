@@ -10,7 +10,11 @@ const PUBLIC_PATHS = new Set([
   "/nulstil-password",
   "/offline",
   "/privatliv",
-  "/slet-data"
+  "/slet-data",
+  // App-ikoner skal kunne hentes uden login (favicon på login-siden, "Føj til hjemmeskærm").
+  "/icon",
+  "/apple-icon",
+  "/maskable-icon"
 ]);
 
 export async function middleware(request: NextRequest) {

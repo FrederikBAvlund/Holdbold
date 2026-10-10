@@ -1,4 +1,4 @@
-const CACHE_NAME = "holdbold-pwa-v2";
+const CACHE_NAME = "holdbold-pwa-v3";
 const OFFLINE_FALLBACK_URL = "/offline";
 const PRECACHE_URLS = [
   OFFLINE_FALLBACK_URL,
