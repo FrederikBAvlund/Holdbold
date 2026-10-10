@@ -28,6 +28,6 @@ COPY --chown=node:node deploy/start-app.sh ./deploy/start-app.sh
 RUN mkdir -p /data/profile-images && chown node:node /data/profile-images
 USER node
 EXPOSE 3000
-HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=3 CMD node -e "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 CMD node -e "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 ENTRYPOINT ["sh", "/app/deploy/start-app.sh"]
 CMD ["npm", "start", "--", "--hostname", "0.0.0.0"]
