@@ -39,6 +39,7 @@ GitHub Actions (`.github/workflows/ci.yml`) koerer paa hver PR: `prisma validate
 2 * * * * . /root/.holdbold-cron-env && /usr/bin/curl -fsS -H "Authorization: Bearer $CRON_SECRET" https://www.holdbold.dk/api/cron/fines >> /var/log/holdbold-cron.log 2>&1
 ```
 
+  Samme job opretter også kommende gentagne begivenheder (120 dage frem) og henter gemte DBU-iCal-feeds igen (højst hver 3. time), så flyttede kampe opdateres automatisk.
   Læg `CRON_SECRET=...` i `/root/.holdbold-cron-env` (`chmod 600`), så nøglen ikke står i `crontab -l`.
 
 ## Rollemodel (MVP)

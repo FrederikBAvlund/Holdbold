@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { createNotifications } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 import { applyActiveAbsencesToEvent } from "@/lib/absences";
 import { requireActiveTeamMember, requireSession } from "@/lib/apiAuth";
@@ -68,25 +67,6 @@ export async function POST(request: Request) {
 
   await applyActiveAbsencesToEvent(event);
 
-  const members = await prisma.membership.findMany({
-    where: { teamId: body.teamId, status: "ACTIVE" },
-    select: { userId: true }
-  });
-
-  const notifications = members
-    .filter((m) => m.userId !== createdById)
-    .map((m) => ({
-      userId: m.userId,
-      teamId: body.teamId,
-      type: "EVENT" as const,
-      title: `Ny begivenhed: ${event.title}`,
-      body: `${new Date(event.date).toLocaleString("da-DK")} · ${event.location}`,
-      link: "/dashboard/kalender"
-    }));
-
-  if (notifications.length > 0) {
-    await createNotifications(notifications);
-  }
-
+  // Gentagne begivenheder giver ingen "ny begivenhed"-notifikation – kun enkeltoprettede gør.
   return NextResponse.json({ event });
 }

@@ -4,6 +4,7 @@ import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { slugify } from "@/lib/superAdmin";
 
 const themeConfigSchema = z
   .object({
@@ -23,7 +24,8 @@ const themeConfigSchema = z
 const updateSchema = z.object({
   themePreset: z.string().min(1).optional(),
   themeConfig: themeConfigSchema.nullable().optional(),
-  mobilePayBox: z.string().trim().min(1).max(200).optional().nullable()
+  mobilePayBox: z.string().trim().min(1).max(200).optional().nullable(),
+  slug: z.string().trim().min(1).max(40).optional()
 });
 
 export async function GET(_request: Request, { params }: { params: { id: string } }) {
@@ -74,7 +76,30 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         ? Prisma.JsonNull
       : (body.themeConfig as Prisma.InputJsonValue);
   const mobilePayBox = body.mobilePayBox === undefined ? undefined : body.mobilePayBox;
+
+  let slug: string | undefined;
+  if (body.slug !== undefined) {
+    slug = slugify(body.slug);
+    if (slug.length < 2) {
+      return NextResponse.json(
+        { error: "Holdkode skal have mindst 2 tegn (bogstaver og tal)", fieldErrors: { slug: "For kort" } },
+        { status: 400 }
+      );
+    }
+    const taken = await prisma.team.findFirst({
+      where: { slug, id: { not: params.id } },
+      select: { id: true }
+    });
+    if (taken) {
+      return NextResponse.json(
+        { error: "Holdkoden er allerede i brug", fieldErrors: { slug: "Holdkoden er allerede i brug" } },
+        { status: 409 }
+      );
+    }
+  }
+
   const updateData = {
+    ...(slug !== undefined ? { slug } : {}),
     ...(body.themePreset ? { themePreset: body.themePreset } : {}),
     ...(themeConfigValue !== undefined ? { themeConfig: themeConfigValue } : {}),
     ...(mobilePayBox !== undefined ? { mobilePayBox } : {})
@@ -87,6 +112,13 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     });
     return NextResponse.json({ team });
   } catch (error) {
+    // To admins kan ramme samme kode samtidig – den unikke indeks afgør det.
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      return NextResponse.json(
+        { error: "Holdkoden er allerede i brug", fieldErrors: { slug: "Holdkoden er allerede i brug" } },
+        { status: 409 }
+      );
+    }
     const message = error instanceof Error ? error.message : "";
     const isTeamThemeSchemaMismatch =
       message.includes("Unknown argument `mobilePayBox`") ||

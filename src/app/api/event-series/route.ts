@@ -3,6 +3,7 @@ import { z } from "zod";
 import { EVENT_MANAGER_ROLES, requireActiveTeamMember, requireSession } from "@/lib/apiAuth";
 import { prisma } from "@/lib/prisma";
 import { getActiveSeason } from "@/lib/seasons";
+import { ensureSeriesEvents } from "@/lib/seriesEvents";
 
 const listSchema = z.object({
   teamId: z.string().min(1)
@@ -69,6 +70,9 @@ export async function POST(request: Request) {
       ...(body.kind ? { kind: body.kind } : {})
     }
   });
+
+  // Begivenhederne oprettes med det samme (uden notifikation), så de også får påmindelser og bøder.
+  await ensureSeriesEvents(series.id);
 
   return NextResponse.json({ series });
 }

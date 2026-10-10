@@ -6,11 +6,14 @@ import { EVENT_MANAGER_ROLES } from "@/lib/apiAuth";
 import { prisma } from "@/lib/prisma";
 import { ensureEventSeasonOpen } from "@/lib/seasons";
 import { createNotifications } from "@/lib/notifications";
+import { formatDateTimeCopenhagen } from "@/lib/format";
 
 const updateSchema = z.object({
   title: z.string().trim().min(1, "Titel må ikke være tom").max(120).optional(),
   date: z.string().datetime().optional(),
   location: z.string().trim().max(200).optional(),
+  /** Kun `false`: lad næste DBU-sync overskrive titel, dato og sted igen */
+  manualOverride: z.literal(false).optional(),
   meetingTime: z.string().datetime().nullable().optional(),
   signupDeadline: z.string().datetime().optional(),
   thingCarrierId: z.string().min(1).nullable().optional(),
@@ -48,6 +51,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
       date: true,
       location: true,
       source: true,
+      manualOverride: true,
       kind: true,
       meetingTime: true,
       signupDeadline: true,
@@ -122,6 +126,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   const wantsMatchMetaUpdate = body.meetingTime !== undefined || body.signupDeadline !== undefined;
   const wantsDutyUpdate = body.thingCarrierId !== undefined || body.beerCarrierId !== undefined;
   const wantsKindUpdate = body.kind !== undefined;
+  const wantsOverrideReset = body.manualOverride === false;
   const wantsDetailsUpdate = body.title !== undefined || body.date !== undefined || body.location !== undefined;
   const wantsMatchScoreUpdate = body.matchHomeGoals !== undefined || body.matchAwayGoals !== undefined;
   const wantsPlayerStatsUpdate = body.matchPlayerStats !== undefined;
@@ -147,7 +152,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     }
   }
 
-  if (wantsDetailsUpdate && !isEventManager) {
+  if ((wantsDetailsUpdate || wantsOverrideReset) && !isEventManager) {
     return NextResponse.json({ error: "Kun trænere/admin kan rette titel, dato og sted" }, { status: 403 });
   }
 
@@ -280,7 +285,11 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         ...(newDate ? { date: newDate } : {}),
         ...(body.location !== undefined ? { location: body.location } : {}),
         // Rettelser af importerede kampe må ikke blive overskrevet af næste import.
-        ...(detailsChanged.title || detailsChanged.date || detailsChanged.location ? { manualOverride: true } : {}),
+        ...(detailsChanged.title || detailsChanged.date || detailsChanged.location
+          ? { manualOverride: true }
+          : wantsOverrideReset
+            ? { manualOverride: false }
+            : {}),
         ...(newDeadline ? { signupDeadline: newDeadline } : {}),
         ...(newMeetingTime !== undefined ? { meetingTime: newMeetingTime } : {}),
         ...(body.thingCarrierId !== undefined ? { thingCarrierId: body.thingCarrierId } : {}),
@@ -303,6 +312,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         date: true,
         location: true,
         source: true,
+        manualOverride: true,
         kind: true,
         meetingTime: true,
         signupDeadline: true,
@@ -326,8 +336,10 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     });
   });
 
-  const formattedDate = updated.date.toLocaleString("da-DK");
+  const formattedDate = formatDateTimeCopenhagen(updated.date);
   const changes: string[] = [];
+  const onlyOverrideReset =
+    wantsOverrideReset && !(detailsChanged.title || detailsChanged.date || detailsChanged.location);
   if (detailsChanged.title) changes.push("titel");
   if (detailsChanged.date) changes.push("dato/tidspunkt");
   if (detailsChanged.location) changes.push("sted");
@@ -340,7 +352,9 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       eventId: updated.id,
       actorId: session.user.id,
       type: "SIGNUP",
-      message: `${changes.join(" og ") || "Begivenhed"} opdateret (${formattedDate})`
+      message: onlyOverrideReset
+        ? "Følger DBU igen – næste synkronisering kan opdatere titel, dato og sted"
+        : `${changes.join(" og ") || "Begivenhed"} opdateret (${formattedDate})`
     }
   });
 
@@ -375,6 +389,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       location: updated.location,
       date: updated.date,
       source: updated.source,
+      manualOverride: updated.manualOverride,
       kind: updated.kind,
       meetingTime: updated.meetingTime,
       signupDeadline: updated.signupDeadline,

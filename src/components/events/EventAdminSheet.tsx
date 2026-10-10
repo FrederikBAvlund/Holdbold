@@ -36,7 +36,7 @@ export function EventAdminSheet({
   const [title, setTitle] = useState("");
   const [start, setStart] = useState("");
   const [location, setLocation] = useState("");
-  const [saving, setSaving] = useState<"kind" | "meta" | "details" | "cancel" | null>(null);
+  const [saving, setSaving] = useState<"kind" | "meta" | "details" | "resync" | "cancel" | null>(null);
   const [confirmCancel, setConfirmCancel] = useState(false);
 
   const canceled = Boolean(event.canceledAt);
@@ -53,6 +53,19 @@ export function EventAdminSheet({
     setStart(toDateTimeLocalValue(event.date));
     setLocation(event.location);
   }, [open, event]);
+
+  async function resumeSync() {
+    setSaving("resync");
+    try {
+      await patchEvent(event.id, { manualOverride: false });
+      onUpdated({ manualOverride: false });
+      pushToast("Begivenheden følger DBU igen ved næste synkronisering", "success");
+    } catch (err) {
+      pushToast(err instanceof Error ? err.message : "Kunne ikke gemme", "error");
+    } finally {
+      setSaving(null);
+    }
+  }
 
   async function saveDetails() {
     const startDate = start ? new Date(start) : null;
@@ -178,7 +191,9 @@ export function EventAdminSheet({
                 htmlFor="event-start"
                 hint={
                   event.source === "ICAL"
-                    ? "Importeret begivenhed: dine rettelser bliver stående, næste gang kalenderen importeres."
+                    ? event.manualOverride
+                      ? "Rettet manuelt – følger ikke længere ændringer fra DBU."
+                      : "Importeret fra DBU og opdateres automatisk. Retter du her, vinder din rettelse."
                     : undefined
                 }
               >
@@ -190,6 +205,11 @@ export function EventAdminSheet({
               <Button block variant="secondary" loading={saving === "details"} onClick={saveDetails}>
                 Gem ændringer
               </Button>
+              {event.source === "ICAL" && event.manualOverride ? (
+                <Button block variant="ghost" loading={saving === "resync"} onClick={resumeSync}>
+                  Følg DBU igen
+                </Button>
+              ) : null}
             </div>
           ) : null}
 

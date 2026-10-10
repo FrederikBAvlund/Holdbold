@@ -5,6 +5,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { resolveSeason } from "@/lib/seasons";
 import { canViewSignupOf } from "@/lib/apiAuth";
+import { nextOccurrence } from "@/lib/seriesEvents";
 
 const querySchema = z.object({
   teamId: z.string().min(1),
@@ -13,39 +14,6 @@ const querySchema = z.object({
   userId: z.string().optional(),
   seasonId: z.string().optional()
 });
-
-function addDays(date: Date, days: number) {
-  const d = new Date(date);
-  d.setDate(d.getDate() + days);
-  return d;
-}
-
-function addMonths(date: Date, months: number) {
-  const d = new Date(date);
-  d.setMonth(d.getMonth() + months);
-  return d;
-}
-
-function addYears(date: Date, years: number) {
-  const d = new Date(date);
-  d.setFullYear(d.getFullYear() + years);
-  return d;
-}
-
-function nextOccurrence(date: Date, recurrence: string, interval: number) {
-  switch (recurrence) {
-    case "DAILY":
-      return addDays(date, interval);
-    case "WEEKLY":
-      return addDays(date, interval * 7);
-    case "MONTHLY":
-      return addMonths(date, interval);
-    case "YEARLY":
-      return addYears(date, interval);
-    default:
-      return addDays(date, interval);
-  }
-}
 
 export async function GET(request: Request) {
   const session = await getServerSession(authOptions);

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { seasonClosedResponse } from "@/lib/seasons";
+import { ensureSeriesEvents, removeSeriesEventsAfter } from "@/lib/seriesEvents";
 import { EVENT_MANAGER_ROLES, requireActiveTeamMemberWithRoles, requireSession } from "@/lib/apiAuth";
 
 const updateSchema = z.object({
@@ -40,7 +41,15 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     }
   });
 
-  return NextResponse.json({ series });
+  // Stoppes serien, fjernes de begivenheder, der ligger efter slutdatoen. Fjernes slutdatoen, fyldes der op igen.
+  let removedEvents = 0;
+  if (body.endDate) {
+    removedEvents = await removeSeriesEventsAfter(params.id, new Date(body.endDate));
+  } else if (body.endDate === null) {
+    await ensureSeriesEvents(params.id);
+  }
+
+  return NextResponse.json({ series, removedEvents });
 }
 
 export async function DELETE(_request: Request, { params }: { params: { id: string } }) {
@@ -63,19 +72,8 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
 
   const now = new Date();
   // Fremtidige begivenheder uden bøder fjernes helt; afholdte begivenheder bevares.
-  const futureEvents = await prisma.event.findMany({
-    where: { seriesId: params.id, date: { gt: now }, fines: { none: {} } },
-    select: { id: true }
-  });
-  const eventIds = futureEvents.map((event) => event.id);
+  const removedEvents = await removeSeriesEventsAfter(params.id, now);
+  await prisma.eventSeries.update({ where: { id: params.id }, data: { endDate: now } });
 
-  await prisma.$transaction([
-    prisma.signupLog.deleteMany({ where: { eventId: { in: eventIds } } }),
-    prisma.signup.deleteMany({ where: { eventId: { in: eventIds } } }),
-    prisma.eventLog.deleteMany({ where: { eventId: { in: eventIds } } }),
-    prisma.event.deleteMany({ where: { id: { in: eventIds } } }),
-    prisma.eventSeries.update({ where: { id: params.id }, data: { endDate: now } })
-  ]);
-
-  return NextResponse.json({ ok: true, removedEvents: eventIds.length });
+  return NextResponse.json({ ok: true, removedEvents });
 }

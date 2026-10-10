@@ -85,3 +85,14 @@ export function formatKr(amount: number) {
 export function firstName(name: string | null | undefined) {
   return (name ?? "").trim().split(/\s+/)[0] ?? "";
 }
+
+/** Dato og klokkeslæt i dansk tid – også når koden kører på en server i UTC. */
+export function formatDateTimeCopenhagen(value: string | Date) {
+  return toDate(value).toLocaleString(TZ_LOCALE, {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Europe/Copenhagen"
+  });
+}
