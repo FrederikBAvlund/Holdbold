@@ -11,7 +11,7 @@ import { Card, EmptyState, Field, ListGroup, PageHeader, Section, inputClass } f
 import TeamOpenAiCard from "@/components/team/TeamOpenAiCard";
 import { SeasonCloseCard } from "@/components/SeasonSettingsCard";
 import { clearMeClientCache } from "@/lib/meClientCache";
-import { THEME_PRESETS } from "@/lib/themePresets";
+import { DEFAULT_THEME_ID, THEME_PRESETS } from "@/lib/themePresets";
 import { formatRelativePast } from "@/lib/format";
 
 type Feed = { id: string; name: string; url: string; lastImportedAt?: string | null };
@@ -110,8 +110,8 @@ function TeamTheme({ teamId, onSaved }: { teamId: string; onSaved: () => void })
     let alive = true;
     fetch(`/api/team/${teamId}`, { cache: "no-store" })
       .then((response) => (response.ok ? response.json() : null))
-      .then((data) => alive && setCurrent(data?.team?.themePreset ?? "atlantic"))
-      .catch(() => alive && setCurrent("atlantic"));
+      .then((data) => alive && setCurrent(data?.team?.themePreset ?? DEFAULT_THEME_ID))
+      .catch(() => alive && setCurrent(DEFAULT_THEME_ID));
     return () => {
       alive = false;
     };

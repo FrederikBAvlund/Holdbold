@@ -12,17 +12,17 @@
 :root {
   color-scheme: light dark;
 
-  /* Brand-input (overstyres af temaer / tilpasset tema) */
-  --color-ink: #08213a;
-  --color-clay: #7dc4ff;
-  --color-moss: #0b84d8;
-  --color-ember: #0ea5a3;
-  --color-fog: #f4fbff;
-  --color-button: #0b84d8;
+  /* Brand-input (overstyres af temaer / tilpasset tema). Standard = Graphite (mørkt). */
+  --color-ink: #1c2128;
+  --color-clay: #8b949e;
+  --color-moss: #2f81f7;
+  --color-ember: #3fb950;
+  --color-fog: #e6edf3;
+  --color-button: #2f6feb;
   --color-button-text: #ffffff;
-  --gradient-start: #eaf7ff;
-  --gradient-mid: #bfe6ff;
-  --gradient-end: #8cd0ff;
+  --gradient-start: #1c2128;
+  --gradient-mid: #161b22;
+  --gradient-end: #0d1117;
 
   /* Semantiske tokens – lys */
   --ink: var(--color-ink);
@@ -64,6 +64,10 @@
 }
 
 @media (prefers-color-scheme: dark) {
+  .status-scrim {
+    display: none;
+  }
+
   :root {
     --ink: color-mix(in srgb, var(--color-fog) 88%, #ffffff);
     --bg: color-mix(in srgb, var(--color-ink) 55%, #05070b);
@@ -91,9 +95,19 @@
 }
 
 /*
-  Mørke temaer: altid mørke, uanset systemets indstilling.
+  Mørke temaer (og standardtemaet Graphite uden data-theme): altid mørke, uanset systemets indstilling.
   Samme afledte tokens som mørk tilstand ovenfor, så de skal holdes ens.
 */
+:root:not([data-theme]) .status-scrim,
+:root[data-theme="graphite"] .status-scrim,
+:root[data-theme="obsidian"] .status-scrim,
+:root[data-theme="nightfall"] .status-scrim,
+:root[data-theme="embers"] .status-scrim,
+:root[data-theme="blackgold"] .status-scrim {
+  display: none;
+}
+
+:root:not([data-theme]),
 :root[data-theme="graphite"],
 :root[data-theme="obsidian"],
 :root[data-theme="nightfall"],
@@ -153,6 +167,21 @@ main {
   min-height: 100vh;
   min-height: 100dvh;
   position: relative;
+}
+
+/*
+  Statuslinjen er gennemsigtig med hvid tekst (black-translucent). På lyse temaer
+  lægger vi en svag skygge i toppen, så uret kan læses. Højden er 0 uden for installeret app.
+*/
+.status-scrim {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  height: env(safe-area-inset-top, 0px);
+  pointer-events: none;
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--color-ink) 62%, transparent), transparent);
 }
 
 h1,
@@ -402,6 +431,20 @@ button {
 }
 
 /* Temaer – kun rå brand-farver; resten afledes i :root */
+/* Atlantic: det oprindelige lyse blå tema */
+:root[data-theme="atlantic"] {
+  --color-ink: #08213a;
+  --color-clay: #7dc4ff;
+  --color-moss: #0b84d8;
+  --color-ember: #0ea5a3;
+  --color-fog: #f4fbff;
+  --color-button: #0b84d8;
+  --color-button-text: #ffffff;
+  --gradient-start: #eaf7ff;
+  --gradient-mid: #bfe6ff;
+  --gradient-end: #8cd0ff;
+}
+
 :root[data-theme="forest"] {
   --color-ink: #0f271d;
   --color-clay: #99d9b8;

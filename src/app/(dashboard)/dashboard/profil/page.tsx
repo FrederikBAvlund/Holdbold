@@ -18,7 +18,7 @@ import Sheet from "@/components/ui/Sheet";
 import { Card, Chip, Field, ListGroup, ListRow, Section, Skeleton, inputClass } from "@/components/ui/primitives";
 import { clearMeClientCache } from "@/lib/meClientCache";
 import { roleLabel } from "@/lib/roleLabels";
-import { THEME_PRESETS } from "@/lib/themePresets";
+import { DEFAULT_THEME_ID, THEME_PRESETS } from "@/lib/themePresets";
 
 type Membership = {
   role: string;
@@ -96,7 +96,7 @@ export default function ProfilPage() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
-  const [active, setActive] = useState("atlantic");
+  const [active, setActive] = useState<string>(DEFAULT_THEME_ID);
   const [hasUserTheme, setHasUserTheme] = useState(false);
   const [customTheme, setCustomThemeState] = useState<CustomTheme>(DEFAULT_CUSTOM);
   const [customOpen, setCustomOpen] = useState(false);
@@ -148,7 +148,7 @@ export default function ProfilPage() {
           const teamResponse = await fetch(`/api/team/${resolvedTeamId}`);
           if (teamResponse.ok && alive) {
             const teamData = await teamResponse.json();
-            applyTheme(teamData.team?.themePreset ?? "atlantic", teamData.team?.themeConfig);
+            applyTheme(teamData.team?.themePreset ?? DEFAULT_THEME_ID, teamData.team?.themeConfig);
           }
         }
       }
@@ -239,7 +239,7 @@ export default function ProfilPage() {
       const teamResponse = await fetch(`/api/team/${teamId}`);
       if (!teamResponse.ok) return;
       const data = await teamResponse.json();
-      applyTheme(data.team?.themePreset ?? "atlantic", data.team?.themeConfig);
+      applyTheme(data.team?.themePreset ?? DEFAULT_THEME_ID, data.team?.themeConfig);
       pushToast("Du bruger nu holdets farver", "success");
     } finally {
       setThemeBusy(null);
@@ -347,7 +347,7 @@ export default function ProfilPage() {
   const canManageFines =
     (membership?.role === "ADMIN" || membership?.role === "BOEDEKASSEFORMAND") && membership.status !== "PENDING";
   const displayName = name || session.user.name || "Dig";
-  const selectedPreset = PRESETS.some((item) => item.id === active) ? active : "atlantic";
+  const selectedPreset = PRESETS.some((item) => item.id === active) ? active : DEFAULT_THEME_ID;
 
   return (
     <div className="space-y-7 pb-8 pt-1">

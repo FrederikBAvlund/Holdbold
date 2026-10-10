@@ -45,9 +45,9 @@ export default function ThemeColorMeta() {
   useEffect(() => {
     function sync() {
       try {
-        applyThemeColor(resolveBackgroundHex() || readCssVar("--color-moss") || "#f4f6fa");
+        applyThemeColor(resolveBackgroundHex() || readCssVar("--color-moss") || "#121519");
       } catch {
-        applyThemeColor("#f4f6fa");
+        applyThemeColor("#121519");
       }
     }
 
