@@ -9,6 +9,7 @@ import { getStoredTeamId, setStoredTeamId } from "@/components/appState";
 import { useToast } from "@/components/ToastProvider";
 import { invalidateDashboardTeam } from "@/components/DashboardTeamProvider";
 import PushSettings from "@/components/PushSettings";
+import { SetupGuideBanner, SetupGuideRow } from "@/components/SetupGuide";
 import { SeasonViewerCard } from "@/components/SeasonSettingsCard";
 import Avatar from "@/components/ui/Avatar";
 import Button from "@/components/ui/Button";
@@ -410,6 +411,8 @@ export default function ProfilPage() {
         </Card>
       ) : null}
 
+      <SetupGuideBanner />
+
       <Section title="Konto">
         <ListGroup>
           <ListRow
@@ -440,6 +443,7 @@ export default function ProfilPage() {
       <Section title="Notifikationer">
         <ListGroup>
           <PushSettings />
+          <SetupGuideRow />
           <LinkRow href="/dashboard/notifikationer" icon="bell" title="Se alle notifikationer" subtitle="Dit seneste overblik" />
         </ListGroup>
       </Section>

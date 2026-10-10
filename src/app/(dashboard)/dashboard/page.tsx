@@ -8,6 +8,7 @@ import { useDashboardTeam } from "@/components/DashboardTeamProvider";
 import Icon, { type IconName } from "@/components/ui/Icon";
 import Avatar, { AvatarStack } from "@/components/ui/Avatar";
 import { Card, EmptyState, KindTag, Section, SectionLink, Skeleton } from "@/components/ui/primitives";
+import { SetupGuideBanner } from "@/components/SetupGuide";
 import EventCard from "@/components/events/EventCard";
 import RsvpControl from "@/components/events/RsvpControl";
 import {
@@ -195,6 +196,8 @@ export default function HomePage() {
           {name ? `, ${name}` : ""}
         </h1>
       </header>
+
+      <SetupGuideBanner />
 
       {/* Næste begivenhed */}
       <section aria-label="Næste begivenhed">
