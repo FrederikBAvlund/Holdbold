@@ -6,6 +6,7 @@ import { useSession } from "next-auth/react";
 import { useDashboardTeam } from "@/components/DashboardTeamProvider";
 import { useToast } from "@/components/ToastProvider";
 import Button from "@/components/ui/Button";
+import { ConfirmSheet } from "@/components/ui/Sheet";
 import { Chip, ListGroup, ListRow, PageHeader, Section, Skeleton, inputClass } from "@/components/ui/primitives";
 
 type AdminTeam = {
@@ -15,6 +16,8 @@ type AdminTeam = {
   createdAt: string;
   activeMembers: number;
   isMember: boolean;
+  /** Alle andre medlemmer end dig selv (også afventende) */
+  otherMembers: number;
 };
 
 export default function AdminPage() {
@@ -27,6 +30,8 @@ export default function AdminPage() {
   const [slug, setSlug] = useState("");
   const [creating, setCreating] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [teamToDelete, setTeamToDelete] = useState<AdminTeam | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(async () => {
     const response = await fetch("/api/admin/teams", { cache: "no-store" });
@@ -97,6 +102,25 @@ export default function AdminPage() {
     }
   }
 
+  async function deleteTeam() {
+    if (!teamToDelete) return;
+    setDeleting(true);
+    try {
+      const response = await fetch(`/api/admin/teams/${teamToDelete.id}`, { method: "DELETE" });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        pushToast(typeof data.error === "string" ? data.error : "Kunne ikke slette holdet", "error");
+        return;
+      }
+      pushToast(`${teamToDelete.name} er slettet`, "success");
+      setTeamToDelete(null);
+      await refreshDashboardTeam();
+      await load();
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   if (!allowed) return null;
 
   return (
@@ -148,15 +172,22 @@ export default function AdminPage() {
                 title={team.name}
                 subtitle={`${team.slug} · ${team.activeMembers} aktive medlemmer`}
                 trailing={
-                  team.isMember ? (
-                    <Button size="sm" variant={team.id === teamId ? "secondary" : "primary"} onClick={() => openTeam(team.id)}>
-                      {team.id === teamId ? "Aktivt" : "Åbn"}
-                    </Button>
-                  ) : (
-                    <Button size="sm" variant="secondary" loading={busyId === team.id} onClick={() => joinTeam(team.id)}>
-                      Tilføj mig som admin
-                    </Button>
-                  )
+                  <div className="flex items-center gap-2">
+                    {team.otherMembers === 0 ? (
+                      <Button size="sm" variant="secondary" onClick={() => setTeamToDelete(team)}>
+                        Slet
+                      </Button>
+                    ) : null}
+                    {team.isMember ? (
+                      <Button size="sm" variant={team.id === teamId ? "secondary" : "primary"} onClick={() => openTeam(team.id)}>
+                        {team.id === teamId ? "Aktivt" : "Åbn"}
+                      </Button>
+                    ) : (
+                      <Button size="sm" variant="secondary" loading={busyId === team.id} onClick={() => joinTeam(team.id)}>
+                        Tilføj mig som admin
+                      </Button>
+                    )}
+                  </div>
                 }
               />
             ))}
@@ -164,6 +195,18 @@ export default function AdminPage() {
           </ListGroup>
         )}
       </Section>
+      <p className="text-xs text-ink/55">
+        Et hold kan kun slettes, når der ingen spillere er på det. Åbn holdet under Hold for at fjerne spillere enkeltvis.
+      </p>
+      <ConfirmSheet
+        open={teamToDelete !== null}
+        onClose={() => setTeamToDelete(null)}
+        onConfirm={deleteTeam}
+        loading={deleting}
+        title={`Slet ${teamToDelete?.name ?? "holdet"}?`}
+        description="Holdet slettes permanent inkl. begivenheder, bøder og skabeloner. Det kan ikke fortrydes."
+        confirmLabel="Slet hold"
+      />
       <Chip tone="neutral">{teams?.length ?? 0} hold i alt</Chip>
     </div>
   );

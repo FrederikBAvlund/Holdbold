@@ -26,6 +26,12 @@ export async function GET() {
     })
   ]);
   const mineIds = new Set(mine.map((m) => m.teamId));
+  const others = await prisma.membership.groupBy({
+    by: ["teamId"],
+    where: { userId: { not: auth.userId } },
+    _count: { _all: true }
+  });
+  const otherCounts = new Map(others.map((row) => [row.teamId, row._count._all]));
 
   return NextResponse.json({
     teams: teams.map((team) => ({
@@ -34,7 +40,8 @@ export async function GET() {
       slug: team.slug,
       createdAt: team.createdAt,
       activeMembers: team._count.memberships,
-      isMember: mineIds.has(team.id)
+      isMember: mineIds.has(team.id),
+      otherMembers: otherCounts.get(team.id) ?? 0
     }))
   });
 }
