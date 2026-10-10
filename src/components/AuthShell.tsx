@@ -1,4 +1,4 @@
-import Image from "next/image";
+import BrandMark from "@/components/ui/BrandMark";
 import type { ReactNode } from "react";
 
 export default function AuthShell({
@@ -15,7 +15,7 @@ export default function AuthShell({
       <div className="w-full max-w-md animate-rise">
         <a href="/" className="mb-8 inline-flex items-center" aria-label="Holdbold forside">
           <span className="inline-flex items-center gap-2.5">
-            <Image src="/brand/holdbold-mark-ball.svg" alt="" width={40} height={40} className="h-9 w-9" priority />
+            <BrandMark className="h-9 w-9" />
             <span className="font-display text-2xl font-extrabold uppercase tracking-tight text-ink">Holdbold</span>
           </span>
         </a>
