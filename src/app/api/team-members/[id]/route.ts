@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { authOptions } from "@/lib/auth";
+import { guideRoleAfterRoleChange } from "@/lib/guide/state";
 import { notifyMembershipActivated } from "@/lib/membershipNotify";
 import { notificationRef, resolveNotifications } from "@/lib/notificationRefs";
 import { prisma } from "@/lib/prisma";
@@ -41,7 +42,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   const updated = await prisma.membership.update({
     where: { id: params.id },
     data: {
-      ...(body.role ? { role: body.role } : {}),
+      ...(body.role ? { role: body.role, guideRole: guideRoleAfterRoleChange(membership.guideRole, body.role) } : {}),
       ...(body.status ? { status: body.status } : {})
     }
   });
