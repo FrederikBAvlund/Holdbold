@@ -59,7 +59,7 @@ export const viewport: Viewport = {
 };
 
 // Sætter det gemte tema, før første tegning, så standardtemaet (mørkt) ikke blinker før et lyst valg.
-const themeBootScript = `try{var t=localStorage.getItem("holdbold-theme");if(${JSON.stringify(THEME_PRESETS.map((preset) => preset.id))}.indexOf(t)>-1)document.documentElement.dataset.theme=t}catch(e){}`;
+const themeBootScript = `try{var t=localStorage.getItem("holdbold-theme");if(${JSON.stringify(THEME_PRESETS.map((preset) => preset.id))}.indexOf(t)>-1){document.documentElement.dataset.theme=t;var q=function(s,a){var l=document.querySelector(s);if(l)l.setAttribute("href",l.getAttribute("href").split("&theme=")[0].split("?theme=")[0]+a+t)};q('link[rel="manifest"]',"?theme=");document.querySelectorAll('link[rel="icon"],link[rel="shortcut icon"],link[rel="apple-touch-icon"]').forEach(function(l){l.setAttribute("href",l.getAttribute("href").split("&theme=")[0]+"&theme="+t)})}}catch(e){}`;
 
 export default async function RootLayout({
   children
