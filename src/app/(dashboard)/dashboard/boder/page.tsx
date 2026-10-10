@@ -315,7 +315,7 @@ function MineTab({
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-guide="my-fines">
       <section className="hero-surface rounded-[1.75rem] p-5">
         <p className="text-xs font-bold uppercase tracking-[0.16em] text-on-primary/75">
           {totals.unpaid > 0 ? "Du skylder" : totals.pending > 0 ? "Betalingen er på vej" : "Din saldo"}
@@ -626,10 +626,24 @@ function KassenTab({
   pushError: (message: string) => void;
 }) {
   const pendingTemplates = data.templates.filter((t) => t.status === "PENDING");
-  const actions: Array<{ icon: IconName | "mic"; label: string; hint: string; onClick: () => void; hero?: boolean }> = [
-    { icon: "mic", label: "Indtal bøder", hint: "Hold knappen nede og rems dem op – så laves forslagene", onClick: onVoice, hero: true },
-    { icon: "receipt", label: "Giv bøde", hint: "Én eller flere spillere", onClick: onAssign },
-    { icon: "hourglass", label: "Indsamling", hint: "Bøde ved for sen betaling", onClick: onCollection }
+  const actions: Array<{
+    icon: IconName | "mic";
+    label: string;
+    hint: string;
+    onClick: () => void;
+    hero?: boolean;
+    guide: string;
+  }> = [
+    {
+      icon: "mic",
+      label: "Indtal bøder",
+      hint: "Hold knappen nede og rems dem op – så laves forslagene",
+      onClick: onVoice,
+      hero: true,
+      guide: "voice-fines"
+    },
+    { icon: "receipt", label: "Giv bøde", hint: "Én eller flere spillere", onClick: onAssign, guide: "assign-fine" },
+    { icon: "hourglass", label: "Indsamling", hint: "Bøde ved for sen betaling", onClick: onCollection, guide: "fine-collection" }
   ];
 
   return (
@@ -641,6 +655,7 @@ function KassenTab({
               key={action.label}
               type="button"
               onClick={action.onClick}
+              data-guide={action.guide}
               className={cn(
                 "flex min-h-[5.5rem] flex-col justify-between gap-2 rounded-[1.375rem] p-4 text-left transition active:scale-[0.98]",
                 action.hero ? "hero-surface col-span-2" : "border border-line bg-surface hover:border-ink/20"
@@ -683,6 +698,7 @@ function KassenTab({
       ) : null}
 
       <Section
+        anchor="fine-templates"
         title="Kataloget"
         action={
           !readOnly ? (
@@ -714,7 +730,7 @@ function KassenTab({
         <p className="px-1 text-sm text-ink/50">Hele kataloget findes under fanen Holdet.</p>
       </Section>
 
-      <Section title="MobilePay">
+      <Section title="MobilePay" anchor="mobilepay-box">
         <MobilePayCard
           teamId={teamId}
           value={data.mobilePayBox}
@@ -724,7 +740,7 @@ function KassenTab({
         />
       </Section>
 
-      <Section title="Automatiske bøder">
+      <Section title="Automatiske bøder" anchor="fine-automation">
         <FineAutomationCard teamId={teamId} />
       </Section>
     </div>

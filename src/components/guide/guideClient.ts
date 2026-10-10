@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useReducer } from "react";
+import { useCallback, useEffect, useReducer, useState } from "react";
 import type { GuideState, GuideStepState } from "@/lib/guide/state";
 
 export type GuideStepAction = "seen" | "done" | "skip" | "reset";
@@ -94,4 +94,49 @@ export function useGuide(teamId: string) {
   );
 
   return { state: teamId ? states.get(teamId) ?? null : null, act };
+}
+
+/* ---------- Spotlight: det trin, guiden lige nu peger på i appen ---------- */
+
+const SPOTLIGHT_KEY = "holdbold-guide-spotlight";
+const SPOTLIGHT_EVENT = "holdbold-guide-spotlight";
+
+function readSpotlight(): string | null {
+  try {
+    return window.sessionStorage.getItem(SPOTLIGHT_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function writeSpotlight(stepId: string | null) {
+  try {
+    if (stepId) window.sessionStorage.setItem(SPOTLIGHT_KEY, stepId);
+    else window.sessionStorage.removeItem(SPOTLIGHT_KEY);
+  } catch {
+    // Privat browsing – spotlightet virker stadig, indtil siden genindlæses
+  }
+  window.dispatchEvent(new CustomEvent(SPOTLIGHT_EVENT, { detail: stepId }));
+}
+
+/** Peg på trinet inde i appen. Overlever sideskift, så guiden kan føre brugeren flere niveauer ind. */
+export function startSpotlight(stepId: string) {
+  writeSpotlight(stepId);
+}
+
+export function stopSpotlight() {
+  writeSpotlight(null);
+}
+
+export function useSpotlight() {
+  const [stepId, setStepId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setStepId(readSpotlight());
+    const onChange = (event: Event) => setStepId((event as CustomEvent<string | null>).detail ?? null);
+    window.addEventListener(SPOTLIGHT_EVENT, onChange);
+    return () => window.removeEventListener(SPOTLIGHT_EVENT, onChange);
+  }, []);
+
+  return stepId;
 }

@@ -232,6 +232,7 @@ export default function EventPage() {
               type="button"
               onClick={() => setAdminOpen(true)}
               aria-label="Administrér begivenhed"
+              data-guide="event-admin"
               className={cn(
                 "-mr-1 -mt-1 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition active:scale-95",
                 canceled ? "bg-ink/[0.06] text-ink" : "bg-on-primary/15 hover:bg-on-primary/25"
@@ -326,7 +327,7 @@ export default function EventPage() {
       </Section>
 
       {/* Hvem kommer */}
-      <Section title="Holdet">
+      <Section title="Holdet" anchor="event-signups">
         <SegmentedControl<Tab>
           value={tab}
           onChange={(next) => {
@@ -386,7 +387,7 @@ export default function EventPage() {
       </Section>
 
       {/* Opgaver */}
-      <Section title="Opgaver">
+      <Section title="Opgaver" anchor="duty-wheel">
         <ListGroup>
           <DutyRow
             icon="bag"
@@ -422,14 +423,16 @@ export default function EventPage() {
       ) : null}
 
       {isMatch && !canceled ? (
-        <MotmSection
-          eventId={event.id}
-          eventTitle={event.title}
-          members={members}
-          canManage={canEditOthers}
-          userId={userId}
-          comingUserIds={groups.coming.map(({ member }) => member.user.id)}
-        />
+        <div data-guide="motm-poll">
+          <MotmSection
+            eventId={event.id}
+            eventTitle={event.title}
+            members={members}
+            canManage={canEditOthers}
+            userId={userId}
+            comingUserIds={groups.coming.map(({ member }) => member.user.id)}
+          />
+        </div>
       ) : null}
 
       {canEditOthers && !canceled && logs && signups ? (

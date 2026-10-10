@@ -8,7 +8,7 @@ import Icon from "@/components/ui/Icon";
 import { capabilities } from "@/lib/guide/capabilities";
 import type { GuideStepState } from "@/lib/guide/state";
 import { CAPABILITY_META } from "@/components/guide/guideMeta";
-import { refreshGuide, type GuideAction } from "@/components/guide/guideClient";
+import { refreshGuide, startSpotlight, type GuideAction } from "@/components/guide/guideClient";
 
 /** Push og hjemmeskærm har sin egen guide, som åbnes direkte i stedet for at sende brugeren videre. */
 const PUSH_STEP_ID = "basis.push";
@@ -62,7 +62,8 @@ function StepRow({
   const rowClass = "flex min-h-[4rem] min-w-0 flex-1 items-center gap-3 py-3 pl-4 pr-2 text-left transition hover:bg-ink/[0.03] active:bg-ink/[0.06]";
 
   function open() {
-    if (step.kind === "info") void act("seen", step.id);
+    // Guiden følger med ind i appen og peger på det rigtige sted
+    if (step.anchor && step.status !== "done") startSpotlight(step.id);
     onNavigate?.();
   }
 

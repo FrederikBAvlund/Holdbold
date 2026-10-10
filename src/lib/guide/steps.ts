@@ -35,6 +35,11 @@ export type GuideFacts = {
  */
 export type GuideStepKind = "setup" | "skill" | "info";
 
+export type GuideEntry = { anchor: string; hint: string };
+
+const OPEN_EVENT: GuideEntry = { anchor: "event-card", hint: "Tryk på en begivenhed for at åbne den." };
+const OPEN_MATCH: GuideEntry = { anchor: "event-card", hint: "Åbn en kamp – afstemningen ligger længere nede." };
+
 export type GuideStep = {
   id: string;
   capability: Capability;
@@ -44,6 +49,8 @@ export type GuideStep = {
   href: string;
   /** `data-guide`-ankeret på siden, som markeres */
   anchor?: string;
+  /** Ligger ankeret et niveau længere inde (fx på en begivenhed), peger guiden først her */
+  entry?: GuideEntry;
   /** Trinet vises kun, når det giver mening for holdet */
   isRelevant?: (facts: GuideFacts) => boolean;
   /** Afledt af data. Mangler den, er trinet klaret, når brugeren har set det. */
@@ -137,9 +144,10 @@ export const GUIDE_STEPS: readonly GuideStep[] = [
     capability: "events",
     kind: "info",
     title: "Se hvem der kommer",
-    description: "Åbn en begivenhed for at se tilmeldinger og afbud – og hvem der ikke har svaret endnu.",
+    description: "Se tilmeldinger og afbud på hver begivenhed – og hvem der ikke har svaret endnu.",
     href: "/dashboard/kalender",
-    anchor: "event-signups"
+    anchor: "event-signups",
+    entry: OPEN_EVENT
   },
   {
     id: "events.cancel",
@@ -148,7 +156,8 @@ export const GUIDE_STEPS: readonly GuideStep[] = [
     title: "Aflys eller genåbn",
     description: "Bliver en træning aflyst, så aflys den i appen. Alle tilmeldte får besked.",
     href: "/dashboard/kalender",
-    anchor: "event-admin"
+    anchor: "event-admin",
+    entry: OPEN_EVENT
   },
   {
     id: "events.duty-wheel",
@@ -157,7 +166,8 @@ export const GUIDE_STEPS: readonly GuideStep[] = [
     title: "Ting- og ølhjulet",
     description: "Lad hjulet vælge, hvem der tager bolde og øl med til næste kamp.",
     href: "/dashboard/kalender",
-    anchor: "duty-wheel"
+    anchor: "duty-wheel",
+    entry: OPEN_EVENT
   },
 
   // Bødekassen (bødekasseformand, admin)
@@ -236,7 +246,7 @@ export const GUIDE_STEPS: readonly GuideStep[] = [
     capability: "fines",
     kind: "skill",
     title: "Start en indsamling",
-    description: "Opkræv et fast beløb fra alle med en frist – fx til holdfesten. Appen rykker selv.",
+    description: "Sæt en frist for at betale bøderne. Er de ikke betalt til tiden, kommer der automatisk en ekstra bøde.",
     href: "/dashboard/boder?fane=kassen",
     anchor: "fine-collection",
     isDone: (f) => f.user.createdCollection
@@ -261,6 +271,7 @@ export const GUIDE_STEPS: readonly GuideStep[] = [
     description: "Åbn afstemningen om kampens spiller efter kampen, og afslør vinderen.",
     href: "/dashboard/kalender",
     anchor: "motm-poll",
+    entry: OPEN_MATCH,
     isDone: (f) => f.user.createdMotmPoll
   },
 

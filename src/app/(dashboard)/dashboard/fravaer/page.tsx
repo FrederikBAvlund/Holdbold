@@ -160,7 +160,7 @@ export default function FravaerPage() {
         subtitle="Meld dig fra over længere tid. Når fraværet er godkendt, bliver du automatisk meldt fra alle begivenheder i perioden."
       />
 
-      <Section title="Meld fravær">
+      <Section title="Meld fravær" anchor="report-absence">
         <Card>
           <form className="space-y-4" onSubmit={submit}>
             <div className="grid gap-4 sm:grid-cols-2">
@@ -185,7 +185,7 @@ export default function FravaerPage() {
       </Section>
 
       {canManage && pending.length > 0 ? (
-        <Section title={`Afventer godkendelse (${pending.length})`}>
+        <Section title={`Afventer godkendelse (${pending.length})`} anchor="absence-requests">
           <ListGroup>
             {pending.map((a) => (
               <div key={a.id} className="space-y-3 px-4 py-3.5">

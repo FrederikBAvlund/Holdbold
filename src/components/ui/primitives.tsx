@@ -20,15 +20,18 @@ export function Section({
   title,
   action,
   children,
-  className
+  className,
+  anchor
 }: {
   title: ReactNode;
   action?: ReactNode;
   children: ReactNode;
   className?: string;
+  /** `data-guide`-anker, som guiden kan pege på */
+  anchor?: string;
 }) {
   return (
-    <section className={cn("space-y-3", className)}>
+    <section className={cn("space-y-3", className)} data-guide={anchor}>
       <div className="flex items-end justify-between gap-3 px-1">
         <h2 className="font-display text-[1.375rem] font-bold uppercase leading-none tracking-wide text-ink">{title}</h2>
         {action}

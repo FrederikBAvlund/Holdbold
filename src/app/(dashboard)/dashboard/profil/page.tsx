@@ -375,6 +375,7 @@ export default function ProfilPage() {
         <div className="relative flex flex-col items-center text-center">
           <label
             htmlFor="profile-avatar"
+            data-guide="avatar"
             aria-label={image ? "Skift profilbillede" : "Tilføj profilbillede"}
             className={cn(
               "group relative block h-28 w-28 cursor-pointer rounded-full ring-4 ring-on-primary/30 transition active:scale-95",
@@ -467,7 +468,7 @@ export default function ProfilPage() {
         </ListGroup>
       </Section>
 
-      <Section title="Notifikationer">
+      <Section title="Notifikationer" anchor="push-settings">
         <ListGroup>
           <PushSettings />
           <SetupGuideRow />
@@ -476,7 +477,7 @@ export default function ProfilPage() {
       </Section>
 
       {waiting ? null : (
-        <Section title="Kalender">
+        <Section title="Kalender" anchor="calendar-feed">
           <ListGroup>
             <CalendarFeedSettings />
           </ListGroup>
