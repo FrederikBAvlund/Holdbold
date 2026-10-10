@@ -4,6 +4,7 @@ import { z } from "zod";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { resolveProfileImageUrl } from "@/lib/profileImages";
+import { PUBLIC_USER_SELECT } from "@/lib/publicUser";
 
 const listSchema = z.object({
   teamId: z.string().min(1),
@@ -43,7 +44,7 @@ export async function GET(request: Request) {
       teamId: parsed.teamId,
       ...(canIncludePending ? {} : { status: "ACTIVE" })
     },
-    include: { user: true },
+    include: { user: { select: PUBLIC_USER_SELECT } },
     orderBy: [{ status: "asc" }, { createdAt: "asc" }]
   });
 

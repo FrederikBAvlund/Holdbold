@@ -6,6 +6,7 @@ import { createNotifications } from "@/lib/notifications";
 import { notificationRef } from "@/lib/notificationRefs";
 import { prisma } from "@/lib/prisma";
 import { getActiveSeason, resolveSeason, seasonClosedResponse } from "@/lib/seasons";
+import { PUBLIC_USER_SELECT } from "@/lib/publicUser";
 
 const FINE_STATUSES = [
   "UNPAID",
@@ -127,9 +128,9 @@ export async function GET(request: Request) {
           : {})
     },
     include: {
-      user: true,
-      createdBy: true,
-      approvedBy: true,
+      user: { select: PUBLIC_USER_SELECT },
+      createdBy: { select: PUBLIC_USER_SELECT },
+      approvedBy: { select: PUBLIC_USER_SELECT },
       template: true,
       event: { select: { id: true, title: true, date: true } }
     },
