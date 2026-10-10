@@ -20,15 +20,15 @@ Regler for AI-agenter (og mennesker) der arbejder i Holdbold-projektet.
 - Start databasen: `npm run db:up`
 - Opsaetning (migrationer + seed): `npm run dev:setup`
 - Nulstil: `npm run db:reset`
-- Lokal `DATABASE_URL`/`DIRECT_URL` er `postgresql://user:password@localhost:5432/holdbold` (se `.env.example`).
+- Lokal `DATABASE_URL`/`DIRECT_URL` er `postgresql://user:password@localhost:5432/holdbold` (se `apps/api/.env.example`).
 
 ## Checks foer push
 
 Koer de samme trin som CI:
 
 ```bash
-npx prisma validate
-npx prisma migrate deploy
+npm run prisma:validate
+npm run prisma:migrate:deploy
 npm run typecheck
 npm test
 npm run build

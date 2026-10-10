@@ -1,0 +1,65 @@
+{
+  "name": "@holdbold/api",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "postinstall": "prisma generate",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:studio": "prisma studio",
+    "prisma:seed": "prisma db seed",
+    "db:up": "docker compose -f ../../docker-compose.yml up -d --wait db",
+    "db:reset": "prisma migrate reset --force",
+    "dev:setup": "npm run db:up && prisma generate && prisma migrate deploy && prisma db seed",
+    "prisma:validate": "prisma validate",
+    "prisma:migrate:deploy": "prisma migrate deploy"
+  },
+  "prisma": {
+    "seed": "node prisma/seed.mjs"
+  },
+  "dependencies": {
+    "@fontsource/barlow": "^5.3.0",
+    "@fontsource/barlow-condensed": "^5.2.5",
+    "@next-auth/prisma-adapter": "1.0.7",
+    "@prisma/client": "6.10.0",
+    "@radix-ui/react-popover": "1.1.4",
+    "@types/web-push": "3.6.4",
+    "bcryptjs": "3.0.3",
+    "clsx": "2.1.1",
+    "cmdk": "1.0.0",
+    "next": "14.2.35",
+    "next-auth": "4.24.7",
+    "node-ical": "0.25.1",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "tailwind-merge": "2.6.0",
+    "tailwindcss": "3.4.17",
+    "web-push": "3.6.7",
+    "xlsx": "0.18.5",
+    "zod": "4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "25.2.1",
+    "@types/react": "19.2.13",
+    "@types/react-dom": "19.2.3",
+    "autoprefixer": "10.4.24",
+    "eslint": "9.39.2",
+    "eslint-config-next": "16.1.6",
+    "postcss": "8.5.6",
+    "prisma": "6.10.0",
+    "tailwindcss": "3.4.17",
+    "typescript": "5.9.3",
+    "vitest": "3.2.4"
+  }
+}

@@ -2,6 +2,15 @@
 
 Mobilvenlig webapp til holdkalender, tilmelding og boedekasse.
 
+## Projektstruktur (monorepo)
+
+- `apps/api` – Next.js-backend og nuværende web (Prisma, `/api/*`, `prisma/`, `.env.example`).
+- `apps/mobile` – kommer: Expo-app (iOS, Android, web) der erstatter web-UI'et.
+- `packages/shared` – kommer: delt TypeScript-logik og API-klient.
+
+Alle scripts nedenfor køres fra roden og videresendes til `apps/api`.
+Vercel: sæt **Root Directory** til `apps/api`.
+
 ## Kom hurtigt i gang
 
 1. Installer dependencies
@@ -12,7 +21,7 @@ Mobilvenlig webapp til holdkalender, tilmelding og boedekasse.
 ```bash
 nvm use            # Node 22 (.nvmrc)
 npm install
-cp .env.example .env
+cp apps/api/.env.example apps/api/.env
 npm run dev:setup  # starter Postgres i Docker, koerer migrationer og seed
 npm run dev
 ```

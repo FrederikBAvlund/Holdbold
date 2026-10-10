@@ -39,8 +39,8 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - run: npx prisma validate
-      - run: npx prisma migrate deploy
+      - run: npm run prisma:validate
+      - run: npm run prisma:migrate:deploy
       - run: npm run typecheck
       - run: npm test
       - run: npm run build

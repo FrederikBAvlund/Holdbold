@@ -9,3 +9,7 @@ ios/build/
 !.env.example
 tsconfig.tsbuildinfo
 public/uploads/
+apps/*/.next
+apps/*/.expo
+apps/*/dist
+apps/api/public/uploads/
