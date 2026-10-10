@@ -4,7 +4,7 @@ import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { authOptions } from "@/lib/auth";
 import { guideRolesAfterRoleChange } from "@/lib/guide/state";
-import { notifyMembershipActivated } from "@/lib/membershipNotify";
+import { notifyMembershipActivated, notifyRolesGained } from "@/lib/membershipNotify";
 import { notificationRef, resolveNotifications } from "@/lib/notificationRefs";
 import { prisma } from "@/lib/prisma";
 import { isAdminRoles, normalizeRoles, roles } from "@/lib/roles";
@@ -62,6 +62,20 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       ...(body.status ? { status: body.status } : {})
     }
   });
+
+  if (nextRoles && membership.status === "ACTIVE") {
+    try {
+      await notifyRolesGained({
+        userId: membership.userId,
+        teamId: membership.teamId,
+        previousRoles: membership.roles,
+        roles: nextRoles
+      });
+    } catch (error) {
+      // Rolleskiftet er gemt – en fejlet besked må ikke få det til at se ud, som om det fejlede
+      console.error("Kunne ikke give besked om ny rolle", error);
+    }
+  }
 
   if (membership.status === "PENDING" && updated.status === "ACTIVE") {
     await resolveNotifications([notificationRef.membership(membership.teamId, membership.userId)]);

@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getServerSession } from "next-auth";
 import { PATCH } from "./route";
+import { notifyRolesGained } from "@/lib/membershipNotify";
 import { prisma } from "@/lib/prisma";
 
 vi.mock("next-auth", () => ({ getServerSession: vi.fn() }));
 vi.mock("@/lib/auth", () => ({ authOptions: {} }));
-vi.mock("@/lib/membershipNotify", () => ({ notifyMembershipActivated: vi.fn() }));
+vi.mock("@/lib/membershipNotify", () => ({ notifyMembershipActivated: vi.fn(), notifyRolesGained: vi.fn() }));
 vi.mock("@/lib/notificationRefs", () => ({ notificationRef: { membership: vi.fn() }, resolveNotifications: vi.fn() }));
 vi.mock("@/lib/prisma", () => ({
   prisma: { membership: { findUnique: vi.fn(), findFirst: vi.fn(), update: vi.fn(), count: vi.fn() } }
@@ -42,6 +43,19 @@ describe("PATCH /api/team-members/[id]", () => {
       where: { id: "m2" },
       data: { roles: ["TRAENER", "BOEDEKASSEFORMAND", "SPILLER"], guideRoles: ["SPILLER"] }
     });
+    expect(notifyRolesGained).toHaveBeenCalledWith({
+      userId: "u2",
+      teamId: "t1",
+      previousRoles: ["SPILLER"],
+      roles: ["TRAENER", "BOEDEKASSEFORMAND", "SPILLER"]
+    });
+  });
+
+  it("gemmer rollen, selvom beskeden om den nye rolle fejler", async () => {
+    target(["SPILLER"]);
+    vi.mocked(notifyRolesGained).mockRejectedValue(new Error("push nede"));
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    expect((await patch({ roles: ["SPILLER", "TRAENER"] })).status).toBe(200);
   });
 
   it("kræver mindst én rolle", async () => {
