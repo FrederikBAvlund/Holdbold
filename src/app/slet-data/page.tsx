@@ -22,20 +22,30 @@ export default function SletDataPage() {
               fra den e-mailadresse, der er knyttet til din Holdbold-bruger, med emnet &quot;Slet mine data&quot;.
             </li>
             <li>Skriv dit navn og navnet på dit hold, så vi kan finde din bruger.</li>
-            <li>Vi bekræfter, at anmodningen kommer fra dig, og sletter derefter din bruger og de data, der hører til den.</li>
+            <li>Vi bekræfter, at anmodningen kommer fra dig, og sletter derefter din bruger og alle data, der hører til den.</li>
           </ol>
-          <p>Du kan også bede din holdadministrator om at fjerne dig fra holdet.</p>
+          <p>
+            Du kan også bede din holdadministrator om at fjerne dig fra holdet. Er du ikke medlem af andre hold,
+            slettes din bruger og alle dine data samtidig.
+          </p>
         </section>
 
         <section className="space-y-2 text-ink/80">
           <h2 className="text-xl font-semibold text-ink">Hvad bliver slettet</h2>
+          <p>Når din bruger slettes, bliver alt, der hører til den, slettet permanent:</p>
           <ul className="list-disc space-y-1 pl-5">
-            <li>Din brugerprofil: navn, e-mail og profilbillede</li>
-            <li>Dine medlemskaber, tilmeldinger og notifikationer</li>
+            <li>Din brugerprofil: navn, e-mail, profilbillede og adgangskode</li>
+            <li>Dine medlemskaber og roller</li>
+            <li>Dine tilmeldinger, afbud og den tilhørende historik</li>
+            <li>Dine bøder, inkl. betalte og afviste</li>
+            <li>Dit fravær, dine notifikationer og dine push-abonnementer</li>
+            <li>Afstemninger om kampens spiller, du har oprettet, dine stemmer og stemmer på dig samt dine kampstatistikker</li>
+            <li>Dit navn i begivenhedernes ændringslog, som erstattes af &quot;Slettet bruger&quot;</li>
           </ul>
           <p>
-            Data, som holdet har brug for til sin historik, fx bøder og afholdte begivenheder, kan blive gemt uden
-            kobling til dig, hvis det er sagligt nødvendigt.
+            Det, du har oprettet for holdet, fx begivenheder, serier og bødetyper, bliver ved med at eksistere, men
+            uden kobling til dig. Sletningen kan ikke fortrydes. Det kan påvirke holdets bødeoversigt og statistik, da
+            dine bøder ikke længere indgår.
           </p>
         </section>
 
