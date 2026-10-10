@@ -42,7 +42,8 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     title: "Holdbold",
-    statusBarStyle: "default"
+    // Appen tegnes helt op under statuslinjen (headeren tager højde for safe-area). iOS låser stilen ved installation.
+    statusBarStyle: "black-translucent"
   }
 };
 
@@ -66,6 +67,7 @@ export default async function RootLayout({
   return (
     <html lang="da" className={`${display.variable} ${sans.variable}`}>
       <body>
+        <div className="status-scrim" aria-hidden />
         <PwaRegister />
         <ThemeProvider />
         <ThemeColorMeta />

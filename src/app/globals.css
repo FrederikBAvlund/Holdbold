@@ -64,6 +64,10 @@
 }
 
 @media (prefers-color-scheme: dark) {
+  .status-scrim {
+    display: none;
+  }
+
   :root {
     --ink: color-mix(in srgb, var(--color-fog) 88%, #ffffff);
     --bg: color-mix(in srgb, var(--color-ink) 55%, #05070b);
@@ -94,6 +98,14 @@
   Mørke temaer: altid mørke, uanset systemets indstilling.
   Samme afledte tokens som mørk tilstand ovenfor, så de skal holdes ens.
 */
+:root[data-theme="graphite"] .status-scrim,
+:root[data-theme="obsidian"] .status-scrim,
+:root[data-theme="nightfall"] .status-scrim,
+:root[data-theme="embers"] .status-scrim,
+:root[data-theme="blackgold"] .status-scrim {
+  display: none;
+}
+
 :root[data-theme="graphite"],
 :root[data-theme="obsidian"],
 :root[data-theme="nightfall"],
@@ -153,6 +165,21 @@ main {
   min-height: 100vh;
   min-height: 100dvh;
   position: relative;
+}
+
+/*
+  Statuslinjen er gennemsigtig med hvid tekst (black-translucent). På lyse temaer
+  lægger vi en svag skygge i toppen, så uret kan læses. Højden er 0 uden for installeret app.
+*/
+.status-scrim {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  height: env(safe-area-inset-top, 0px);
+  pointer-events: none;
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--color-ink) 62%, transparent), transparent);
 }
 
 h1,
