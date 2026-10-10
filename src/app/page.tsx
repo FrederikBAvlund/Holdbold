@@ -1,4 +1,4 @@
-import Image from "next/image";
+import BrandMark from "@/components/ui/BrandMark";
 import { buttonClasses } from "@/components/ui/Button";
 import Icon, { type IconName } from "@/components/ui/Icon";
 
@@ -13,7 +13,7 @@ export default function Home() {
     <main className="mx-auto flex min-h-screen w-full max-w-3xl flex-col gap-6 px-4 pb-10 pt-[max(1.25rem,env(safe-area-inset-top,0px))] sm:px-8">
       <header className="flex items-center justify-between">
         <span className="inline-flex items-center gap-2.5">
-          <Image src="/brand/holdbold-mark-ball.svg" alt="" width={40} height={40} className="h-9 w-9" priority />
+          <BrandMark className="h-9 w-9" />
           <span className="font-display text-2xl font-extrabold uppercase tracking-tight text-ink">Holdbold</span>
         </span>
         <a href="/login" className={buttonClasses({ variant: "secondary", size: "sm" })}>

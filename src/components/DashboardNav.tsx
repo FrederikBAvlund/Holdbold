@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { cn } from "@/lib/utils";
 import Icon, { type IconName } from "@/components/ui/Icon";
+import BrandMark from "@/components/ui/BrandMark";
 import Avatar from "@/components/ui/Avatar";
 import Sheet from "@/components/ui/Sheet";
 import { CountBadge } from "@/components/ui/Button";
@@ -218,9 +219,7 @@ export default function DashboardNav({
       )}
       aria-label={canSwitchTeam ? `Aktivt hold: ${teamName}. Tryk for at skifte` : teamName}
     >
-      <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary text-on-primary">
-        <Icon name="ball" className="h-5 w-5" strokeWidth={2} />
-      </span>
+      <BrandMark className="h-9 w-9" />
       <span className="min-w-0 leading-none">
         <span className="block text-[0.625rem] font-bold uppercase tracking-[0.16em] text-ink/45">Holdbold</span>
         <span className="mt-0.5 flex items-center gap-1 font-display text-lg font-bold uppercase leading-none text-ink">
