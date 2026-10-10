@@ -158,16 +158,14 @@ export default function KalenderPage() {
             ]}
           />
 
-          {pastDays === 0 ? (
-            <button
-              type="button"
-              onClick={() => setPastDays(90)}
-              className="mx-auto flex items-center gap-1 text-sm font-semibold text-ink/55 hover:text-ink"
-            >
-              <Icon name="chevron-down" className="h-4 w-4 rotate-180" />
-              Vis tidligere
-            </button>
-          ) : null}
+          <button
+            type="button"
+            onClick={() => setPastDays(pastDays === 0 ? 90 : 0)}
+            className="mx-auto flex items-center gap-1 text-sm font-semibold text-ink/55 hover:text-ink"
+          >
+            <Icon name="chevron-down" className={pastDays === 0 ? "h-4 w-4 rotate-180" : "h-4 w-4"} />
+            {pastDays === 0 ? "Vis tidligere" : "Skjul tidligere"}
+          </button>
 
           {events === null ? (
             <div className="space-y-2">
