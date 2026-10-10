@@ -23,7 +23,7 @@ const themeConfigSchema = z
 const updateSchema = z.object({
   themePreset: z.string().min(1).optional(),
   themeConfig: themeConfigSchema.nullable().optional(),
-  mobilePayBox: z.string().trim().min(1).max(32).optional().nullable()
+  mobilePayBox: z.string().trim().min(1).max(200).optional().nullable()
 });
 
 export async function GET(_request: Request, { params }: { params: { id: string } }) {

@@ -50,6 +50,15 @@ export function PaySheet({
     }
   }
 
+  async function copyAmount() {
+    try {
+      await navigator.clipboard.writeText(String(amount));
+      pushToast(`Beløbet (${amount}) er kopieret – sæt det ind i MobilePay`, "success");
+    } catch {
+      // Kopiering er en bekvemmelighed; linket åbnes alligevel.
+    }
+  }
+
   async function markPaid() {
     setSaving(true);
     try {
@@ -84,12 +93,13 @@ export function PaySheet({
                 href={payLink.url}
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={payLink.prefilledAmount ? undefined : copyAmount}
                 className="mt-3 inline-flex w-full items-center justify-center rounded-2xl bg-primary px-4 py-3 font-semibold text-on-primary"
               >
                 Betal i MobilePay
               </a>
               {!payLink.prefilledAmount ? (
-                <p className="mt-2 text-sm text-ink/60">Husk at taste beløbet ind selv.</p>
+                <p className="mt-2 text-sm text-ink/60">Beløbet kopieres, når du trykker. Sæt det ind i MobilePay.</p>
               ) : null}
             </>
           )
