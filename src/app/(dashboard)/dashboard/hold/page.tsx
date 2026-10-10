@@ -119,7 +119,7 @@ export default function HoldPage() {
   async function shareInvite() {
     if (!team?.slug) return;
     const url = `${window.location.origin}/signup?slug=${encodeURIComponent(team.slug)}`;
-    const text = `Kom med på ${team.name ?? "holdet"} i Holdbold`;
+    const text = `Tilmeld dig ${team.name ?? "holdet"} i Holdbold`;
     try {
       if (navigator.share) {
         await navigator.share({ title: "Holdbold", text, url });
