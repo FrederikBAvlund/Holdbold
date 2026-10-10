@@ -111,4 +111,4 @@ Lydoptagelsen lagres ikke i databasen. Uploads må højst være 25 MB; hostingen
 
 ## Hetzner-deployment
 
-Brug [Coolify-guiden](deploy/COOLIFY.md) til automatisk deployment fra `main`, privat PostgreSQL og lokal cron. [Den manuelle guide](deploy/README.md) beskriver også dataflytning, billeder og rollback.
+Se [Coolify-opsætningen](deploy/COOLIFY.md) for deployment fra `main`, privat PostgreSQL, vedvarende profilbilleder og lokal cron.

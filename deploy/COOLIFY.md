@@ -1,119 +1,70 @@
-# Coolify på Hetzner — deployment fra main
+# Holdbold i Coolify
 
-Denne opsætning erstatter manuel overførsel af tar-filer. Appen bygges fra GitHub
-`main` med repositoryets Dockerfile. PostgreSQL er en separat database-resource
-på samme Coolify-server. Serverens FADL-cronjobs fortsætter uden for Coolify.
+Appen deployes fra GitHub `main` med repositoryets Dockerfile. PostgreSQL er en
+separat privat database-resource på samme Coolify-server/network. Serverinstallation,
+DNS og engangsdataflytning udføres separat; de er ikke en del af appens deployment.
 
-## 1. Installér Coolify
+## Application
 
-Serveren har Ubuntu 24.04, Docker, 2 CPU'er, 4 GB RAM og eksisterende Nginx.
-Tag backup af Nginx og root-crontab først. Serveren bruges kun til cronjobs,
-så Nginx kan stoppes/deaktiveres for at frigive 80/443 til Coolifys proxy.
-Afklar eventuelle lokale FADL-afhængigheder før stop. Slet ikke konfigurationen.
-
-Følg https://coolify.io/docs/start-with-self-hosted:
-
-```bash
-install -d -m 700 /root/holdbold-migration-backup
-cp -a /etc/nginx /root/holdbold-migration-backup/nginx
-crontab -l > /root/holdbold-migration-backup/crontab.txt
-systemctl disable --now nginx
-curl -fsSL https://cdn.coollabs.io/coolify/install.sh -o /root/install-coolify.sh
-bash /root/install-coolify.sh
-```
-
-Registrér administratoren straks. Begræns dashboardadgang med Hetzner-firewall
-eller brug SSH-tunnel til port 8000. Bevar SSH; åbn 80/443 til proxyen. Dashboardets
-realtime/terminal kan desuden kræve 6001/6002 jf. den aktuelle firewallguide.
-Back up `/data/coolify/source/.env` sikkert; den indeholder installationsnøgler.
-DNS for Holdbold ændres ikke i dette trin.
-
-## 2. Tilføj PostgreSQL
-
-Opret projekt `Holdbold`, environment `production`, og en PostgreSQL 16 database
-på localhost-serveren. Lad databasen være privat med vedvarende volume. Behold
-brugernavn/databasenavn `holdbold` og din nye adgangskode, hvis du vælger disse ved
-oprettelse. Brug den faktiske Internal URL, som Coolify viser, til både
-`DATABASE_URL` og `DIRECT_URL`; værtsnavnet er ikke nødvendigvis `db`.
-
-Sæt automatisk ekstern databasebackup op og afprøv restore inden offentlig drift.
-Billedlager og krypteringsnøgler skal også sikres; databasebackup indeholder ikke billeder.
-
-## 3. Opret app fra GitHub
-
-Forbind en GitHub App med adgang til Holdbold-repositoriet. Opret en Git-baseret
-Application på samme server/network som databasen:
-
-- Repository: `FrederikBAvlund/Holdbold`.
-- Branch: `main` (migrations-PR'en skal være merged først).
 - Build pack: **Dockerfile**, base directory `/`, Dockerfile `/Dockerfile`.
+- Branch: `main`, med GitHub App og automatisk deployment aktiveret.
 - Ports exposes: `3000`. Ingen offentlig host port mapping.
-- Dockerfile indeholder en healthcheck af `/api/health`, inklusive DB-forbindelse.
-- Auto deploy: aktivér Git-providerens push/merge-deployments og verificér webhook.
-- Start med en testadresse; brug først Holdbold-domænerne ved cutover.
+- Dockerfile indeholder readiness-check af `/api/health`, inklusive DB-forbindelse.
+- Brug et navngivet Persistent Storage-volume på `/data/profile-images`.
+  Appen kører som UID/GID 1000:1000 og skal have skriveadgang.
 
 Auto deploy fra push er ikke en CI-gate. Beskyt `main` med CI før merge. Direkte
 pushes kan starte deployment, før en samtidig CI-kørsel er færdig.
 
-## 4. Importér env og mount billeder
+## Environment Variables
 
-Importér filens indstillinger i appens Environment Variables i Coolify; ingen
-`.env.production`-fil skal ligge i repositoryet eller kopieres ind i imaget.
+Importér værdierne i Coolify. Private env-filer og nøgler skal ikke i Git eller
+imaget. `.env.example` dokumenterer variabelnavne uden produktionsværdier.
 
-- Erstat DB-URL'er med Coolifys interne URL.
-- Bevar login-secret, krypteringsnøgle, mail og Web Push-nøgler.
+- `DATABASE_URL` og `DIRECT_URL`: brug Coolifys faktiske interne PostgreSQL-URL.
+  Databasens hostname er ikke nødvendigvis `db`.
+- Bevar `NEXTAUTH_SECRET`, `TEAM_API_KEY_ENCRYPTION_KEY`, mail- og Web Push-nøgler.
+- `NEXTAUTH_URL`: behold det kanoniske domæne.
 - `NEXT_PUBLIC_WEB_PUSH_PUBLIC_KEY`: både build-time og runtime.
 - Hemmelige værdier og DB-URL'er: runtime, ikke build-time.
 - `LOCAL_PROFILE_UPLOAD_DIR=/data/profile-images`.
 - `RUN_DATABASE_MIGRATIONS=true`: migrations fra det nye image køres før appstart,
   også ved en genstart. Ingen seed/reset; fejl forhindrer appstart.
 - `DISABLE_HTTP_CRON=true`: det gamle offentlige endpoint svarer 404.
-- Udelad `CRON_SECRET`, `VERCEL`, øvrige Vercel-systemvariabler og gamle Supabase
-  databaseadresser. `POSTGRES_PASSWORD` sættes på DB-resource, ikke på appen.
-- Behold Supabase Storage-indstillinger midlertidigt til gamle billedreferencer.
+- Udelad `CRON_SECRET`, `VERCEL` og øvrige Vercel-systemvariabler.
+- `POSTGRES_PASSWORD` konfigureres på database-resource, ikke på appen.
+- Supabase Storage-indstillinger kan beholdes, indtil gamle billeder er flyttet.
 
-Tilføj et navngivet Persistent Storage-volume til `/data/profile-images`.
-Appen kører som UID/GID 1000:1000; kontrollér skriveadgang via Coolify Terminal
-før test-upload. Volumenet må ikke slettes ved redeployment og skal sikkerhedskopieres.
+Dockerfile-apps kan rulles ud med gammel og ny container overlappende. Migrationer
+skal være kompatible med begge versioner. En databaseændring rulles ikke automatisk
+tilbage med app-imaget. Coolifys pre-deploy-kommando kører i det tidligere image;
+brug derfor startup-scriptet til migrationer fra den nye version.
 
-Dockerfile-apps kan rulles ud med gammel og ny container overlappende. Migrations-
-ændringer skal derfor være kompatible med begge versioner. En databaseændring
-rulles ikke automatisk tilbage med app-imaget. Kontrollér migrationer før merge.
+## Scheduled Task
 
-## 5. Prøveflytning og endelig cutover
-
-Følg data-, billed- og rollback-trinene i README.md. Brug en isoleret prøvekopi
-uden automatiske mails/push/cron. Eksportér app-tabeller og Prisma-migrationshistorik,
-ikke hele Supabases systemskemaer. Kopiér Storage-filer og tilpas `User.image`.
-Tag write-pause og stop den gamle Holdbold-cron ved den endelige eksport.
-
-Behold samme kanoniske domæne/NEXTAUTH_URL. Flyt A/AAAA for apex/www til Hetzner
-og verificér HTTPS via Coolify. Bevar one.com-mail-records. Vercel må ikke modtage
-writes under DNS-overgangen, og nye Hetzner-writes skal med ved en rollback.
-
-## 6. Lokal cron i Coolify — EFTER cutover
-
-Tilføj Scheduled Task på appen:
+Aktivér først efter dataflytning, og stop den gamle Holdbold-cron først:
 
 - Command: `node dist/cron.cjs` (uden docker exec og uden HTTP-token).
 - Frequency: `2 * * * *`.
-- Timeout: fx 1800 sekunder, tilpasset jobbenes observerede varighed.
+- Timeout: fx 1800 sekunder, tilpasset observeret varighed.
 - Kun den aktive app; ingen preview/test-resources med aktive cronjobs.
 
 Scriptet tager en PostgreSQL-advisory lock, så overlappende lokale kørsler springes
-over. Jobbet udfører bøder, påmindelser, gentagne arrangementer og DBU-sync.
-Coolify gemmer kørselsstatus/output. Verificér på testdata inden aktivering, og
-opret fejlnotifikationer. Fjern kun den gamle Holdbold-linje fra root-crontab;
-behold FADL-jobbene.
+over. Det udfører bøder, påmindelser, gentagne arrangementer og DBU-sync.
+Coolify gemmer kørselsstatus og output. Test på isolerede data inden aktivering.
 
-## 7. Drift
+## Data og drift
 
-Verificér at en merge til main giver den korrekte commit i Coolify. Test også et
-redeploy: eksisterende database og billeder skal stadig være der. Overvåg RAM,
-disk, cron og backup, især under builds og FADL-kørsler. En ekstern build-server
-eller image-build i CI kan tilføjes, hvis builds presser de 4 GB RAM.
+Databasebackup indeholder ikke billeder. Sikkerhedskopiér både databasen og
+billedvolumenet eksternt, opbevar nødvendige krypteringsnøgler sikkert, og afprøv restore.
+Ved flytning fra Supabase skal Storage-filer kopieres og `User.image` omskrives
+til `/api/profile-images/FILENAME`. Ejeren og aktive medlemmer af samme hold har
+adgang. Kør aldrig seed/reset på eksisterende produktionsdata.
 
-Officielle referencer:
+Verificér at en merge til `main` deployer den korrekte commit. Test et redeploy:
+database og billeder skal stadig være der. Overvåg RAM, disk, cron og backup.
+
+Referencer:
 - https://coolify.io/docs/applications/builds/dockerfile
 - https://coolify.io/docs/applications/deployments/automatic-deployments
 - https://coolify.io/docs/core/automation/scheduled-tasks/create-a-task
