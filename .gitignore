@@ -9,3 +9,4 @@ ios/build/
 !.env.example
 tsconfig.tsbuildinfo
 public/uploads/
+dist/
