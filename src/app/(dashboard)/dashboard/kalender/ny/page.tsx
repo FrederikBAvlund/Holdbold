@@ -114,7 +114,7 @@ export default function NewEventPage() {
         pushToast(typeof data.error === "string" ? data.error : "Kunne ikke oprette", "error");
         return;
       }
-      pushToast(recurrence === "ONCE" ? "Begivenhed oprettet 🎉" : "Serie oprettet 🎉", "success");
+      pushToast(recurrence === "ONCE" ? "Begivenhed oprettet 🎉" : "Fast begivenhed oprettet 🎉", "success");
       if (recurrence === "ONCE" && data.event?.id) router.push(eventHref(data.event.id));
       else router.push("/dashboard/kalender");
     } finally {
@@ -228,7 +228,7 @@ export default function NewEventPage() {
                   </span>
                   <Stepper size="sm" value={interval} onChange={setIntervalValue} min={1} max={12} label="Interval" />
                 </div>
-                <Field label="Slutter (valgfri)" htmlFor="end" hint="Lad feltet stå tomt, hvis serien bare kører videre.">
+                <Field label="Slutter (valgfri)" htmlFor="end" hint="Lad feltet stå tomt, hvis den faste begivenhed bare kører videre.">
                   <input id="end" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className={inputClass} />
                 </Field>
               </>
@@ -262,7 +262,7 @@ export default function NewEventPage() {
         </Section>
 
         <Button type="submit" block size="lg" icon="check" loading={saving} disabled={!valid}>
-          {recurrence === "ONCE" ? "Opret begivenhed" : "Opret serie"}
+          {recurrence === "ONCE" ? "Opret begivenhed" : "Opret fast begivenhed"}
         </Button>
       </form>
 
@@ -283,12 +283,13 @@ function SeriesList({ series, onChange, isAdmin }: { series: Series[]; onChange:
     try {
       const response = await fetch(`/api/event-series/${item.id}`, { method: "DELETE" });
       const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(typeof data.error === "string" ? data.error : "Kunne ikke lukke serien");
-      onChange(series.map((entry) => (entry.id === item.id ? { ...entry, endDate: new Date().toISOString() } : entry)));
-      pushToast("Serien er lukket ned, og fremtidige begivenheder er fjernet", "success");
+      if (!response.ok) throw new Error(typeof data.error === "string" ? data.error : "Kunne ikke lukke den faste begivenhed");
+      // Lukkede faste begivenheder forsvinder fra overblikket.
+      onChange(series.filter((entry) => entry.id !== item.id));
+      pushToast("Den faste begivenhed er slettet, og fremtidige begivenheder er fjernet", "success");
       setClosing(null);
     } catch (err) {
-      pushToast(err instanceof Error ? err.message : "Kunne ikke lukke serien", "error");
+      pushToast(err instanceof Error ? err.message : "Kunne ikke lukke den faste begivenhed", "error");
     } finally {
       setCloseBusy(false);
     }
@@ -320,7 +321,7 @@ function SeriesList({ series, onChange, isAdmin }: { series: Series[]; onChange:
   }
 
   return (
-    <Section title="Faste serier">
+    <Section title="Faste begivenheder">
       <ListGroup>
         {series.map((item) => {
           const current = item.endDate ? item.endDate.slice(0, 10) : "";
@@ -357,7 +358,7 @@ function SeriesList({ series, onChange, isAdmin }: { series: Series[]; onChange:
               </div>
               {isAdmin ? (
                 <Button variant="danger" size="sm" icon="x" onClick={() => setClosing(item)}>
-                  Luk serien ned
+                  Slet fast begivenhed
                 </Button>
               ) : null}
             </div>
@@ -369,9 +370,9 @@ function SeriesList({ series, onChange, isAdmin }: { series: Series[]; onChange:
         onClose={() => setClosing(null)}
         onConfirm={() => closing && closeDown(closing)}
         loading={closeBusy}
-        title={`Luk "${closing?.title ?? ""}" ned?`}
-        description="Alle fremtidige begivenheder i serien fjernes (undtagen dem med bøder), og serien slutter i dag. Afholdte begivenheder bevares."
-        confirmLabel="Luk serien ned"
+        title={`Slet "${closing?.title ?? ""}"?`}
+        description="Alle fremtidige begivenheder fjernes (undtagen dem med bøder), og den faste begivenhed forsvinder fra overblikket. Afholdte begivenheder bevares."
+        confirmLabel="Slet fast begivenhed"
       />
     </Section>
   );

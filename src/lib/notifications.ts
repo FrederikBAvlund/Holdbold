@@ -9,6 +9,8 @@ type NotificationInput = {
   title: string;
   body?: string | null;
   link?: string | null;
+  /** Se notificationRef – bruges til automatisk at markere som læst, når sagen er afgjort */
+  refKey?: string | null;
 };
 
 let webPushConfigured = false;

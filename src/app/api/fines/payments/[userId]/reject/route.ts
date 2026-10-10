@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { z } from "zod";
 import { authOptions } from "@/lib/auth";
+import { notificationRef, resolveBulkFineProposalNotifications, resolveNotifications } from "@/lib/notificationRefs";
 import { prisma } from "@/lib/prisma";
 
 const bodySchema = z.object({
@@ -48,6 +49,8 @@ export async function POST(request: Request, { params }: { params: { userId: str
       markedPaidById: null
     }
   });
+
+  await resolveNotifications([notificationRef.payment(body.teamId, params.userId)]);
 
   await prisma.notification.create({
     data: {

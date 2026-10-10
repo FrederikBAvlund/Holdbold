@@ -51,6 +51,8 @@ type DashboardTeamContextValue = {
   membersLoading: boolean;
   membershipsLoading: boolean;
   refreshDashboardTeam: () => Promise<void>;
+  /** Fjerner et medlem fra den lokale liste med det samme (før serveren er genindlæst) */
+  removeMemberLocally: (membershipId: string) => void;
   seasons: DashboardSeason[];
   activeSeason: DashboardSeason | undefined;
   selectedSeason: DashboardSeason | undefined;
@@ -176,7 +178,11 @@ export default function DashboardTeamProvider({
         const response = await fetch(`/api/team-members?teamId=${teamId}`, { cache: "no-store" });
         const data = await response.json();
         if (cancelled) return;
-        setMembers((data.members ?? []) as DashboardTeamMember[]);
+        // Navne vises altid i alfabetisk rækkefølge, så alle vælgere er ens.
+        const sorted = ([...(data.members ?? [])] as DashboardTeamMember[]).sort((a, b) =>
+          (a.user.name ?? "").localeCompare(b.user.name ?? "", "da")
+        );
+        setMembers(sorted);
       } finally {
         if (!cancelled) setMembersLoading(false);
       }
@@ -241,6 +247,10 @@ export default function DashboardTeamProvider({
     setMembersReloadNonce((n) => n + 1);
   }, []);
 
+  const removeMemberLocally = useCallback((membershipId: string) => {
+    setMembers((prev) => prev.filter((member) => member.id !== membershipId));
+  }, []);
+
   const runInvalidate = useCallback(() => {
     void refreshDashboardTeam();
   }, [refreshDashboardTeam]);
@@ -268,6 +278,7 @@ export default function DashboardTeamProvider({
       membersLoading,
       membershipsLoading,
       refreshDashboardTeam,
+      removeMemberLocally,
       seasons,
       activeSeason,
       selectedSeason,
@@ -286,6 +297,7 @@ export default function DashboardTeamProvider({
       membersLoading,
       membershipsLoading,
       refreshDashboardTeam,
+      removeMemberLocally,
       seasons,
       activeSeason,
       selectedSeason,

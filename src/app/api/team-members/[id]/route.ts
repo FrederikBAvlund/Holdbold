@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { z } from "zod";
 import { authOptions } from "@/lib/auth";
 import { createNotifications } from "@/lib/notifications";
+import { notificationRef, resolveNotifications } from "@/lib/notificationRefs";
 import { prisma } from "@/lib/prisma";
 
 const updateSchema = z.object({
@@ -45,6 +46,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   });
 
   if (membership.status === "PENDING" && updated.status === "ACTIVE") {
+    await resolveNotifications([notificationRef.membership(membership.teamId, membership.userId)]);
     await createNotifications([
       {
         userId: membership.userId,
@@ -84,6 +86,7 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
   const userId = membership.userId;
 
   await prisma.membership.delete({ where: { id: params.id } });
+  await resolveNotifications([notificationRef.membership(membership.teamId, userId)]);
 
   const remainingMemberships = await prisma.membership.count({ where: { userId } });
   if (remainingMemberships > 0) {
@@ -105,6 +108,16 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
     });
   }
 
-  await prisma.user.delete({ where: { id: userId } });
+  // Medlemskabet er allerede fjernet. Hænger brugeren stadig sammen med andre data (notifikationer,
+  // fravær, afstemninger …), må det ikke vælte svaret – så ser klienten fejl, selvom spilleren er væk.
+  try {
+    await prisma.user.delete({ where: { id: userId } });
+  } catch {
+    return NextResponse.json({
+      removed: true,
+      userDeleted: false,
+      warning: "Brugeren har historik og kan ikke slettes helt."
+    });
+  }
   return NextResponse.json({ removed: true, userDeleted: true });
 }

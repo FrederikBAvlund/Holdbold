@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { z } from "zod";
 import { authOptions } from "@/lib/auth";
 import { createNotifications } from "@/lib/notifications";
+import { notificationRef } from "@/lib/notificationRefs";
 import { prisma } from "@/lib/prisma";
 
 const bodySchema = z.object({
@@ -70,7 +71,8 @@ export async function POST(request: Request) {
       type: "FINE" as const,
       title: "Betaling afventer godkendelse",
       body: `${payer?.name ?? "En spiller"} har markeret ${unpaidFines.length} bøder som betalt (${total} kr).`,
-      link: "/dashboard/boder"
+      link: "/dashboard/boder?fane=kassen",
+      refKey: notificationRef.payment(body.teamId, session.user.id)
     }));
 
   if (notifications.length > 0) {

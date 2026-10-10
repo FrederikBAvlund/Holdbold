@@ -12,7 +12,7 @@ import FineRow from "@/components/fines/FineRow";
 import { formatKr, formatRelativePast } from "@/lib/format";
 import { categoryOptions } from "../boderConstants";
 import type { FineItem, FineTemplate } from "../boderTypes";
-import { canDeleteFine, parseIntegerAmountInput, summarizeFines } from "../boderUtils";
+import { canDeleteFine, canSettleFine, parseIntegerAmountInput, summarizeFines } from "../boderUtils";
 
 /* ---------- Betal ---------- */
 
@@ -392,7 +392,9 @@ export function MemberFinesSheet({
   member,
   fines,
   canManage,
-  onDelete
+  onDelete,
+  onSettle,
+  settlingId
 }: {
   open: boolean;
   onClose: () => void;
@@ -400,6 +402,8 @@ export function MemberFinesSheet({
   fines: FineItem[] | null;
   canManage: boolean;
   onDelete: (fine: FineItem) => void;
+  onSettle: (fine: FineItem) => void;
+  settlingId: string | null;
 }) {
   const totals = summarizeFines(fines ?? []);
   return (
@@ -433,9 +437,23 @@ export function MemberFinesSheet({
               event={fine.event}
               actions={
                 canManage && canDeleteFine(fine.status) ? (
-                  <Button size="sm" variant="ghost" icon="x" onClick={() => onDelete(fine)}>
-                    Slet
-                  </Button>
+                  <>
+                    {canSettleFine(fine.status) ? (
+                      <Button
+                        size="sm"
+                        variant="success"
+                        icon="check"
+                        loading={settlingId === fine.id}
+                        disabled={settlingId !== null}
+                        onClick={() => onSettle(fine)}
+                      >
+                        Markér betalt
+                      </Button>
+                    ) : null}
+                    <Button size="sm" variant="ghost" icon="x" disabled={settlingId !== null} onClick={() => onDelete(fine)}>
+                      Slet
+                    </Button>
+                  </>
                 ) : undefined
               }
             />

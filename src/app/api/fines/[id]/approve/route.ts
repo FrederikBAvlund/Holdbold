@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { createNotifications } from "@/lib/notifications";
+import { notificationRef, resolveBulkFineProposalNotifications, resolveNotifications } from "@/lib/notificationRefs";
 import { prisma } from "@/lib/prisma";
 import { ensureFineSeasonOpen } from "@/lib/seasons";
 
@@ -41,6 +42,9 @@ export async function POST(_request: Request, { params }: { params: { id: string
       approvedById: session.user.id
     }
   });
+
+  await resolveNotifications([notificationRef.fine(fine.id)]);
+  await resolveBulkFineProposalNotifications(fineToApprove.teamId);
 
   const notificationTargets = new Set<string>();
   if (fineToApprove.userId !== session.user.id) notificationTargets.add(fineToApprove.userId);

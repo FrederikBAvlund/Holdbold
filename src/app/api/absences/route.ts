@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { createNotifications } from "@/lib/notifications";
+import { notificationRef } from "@/lib/notificationRefs";
 import {
   ABSENCE_MANAGER_ROLES,
   requireActiveTeamMember,
@@ -102,7 +103,8 @@ export async function POST(request: Request) {
         type: "GENERAL" as const,
         title: "Ny fraværsanmodning",
         body: `${user?.name ?? "En spiller"} · ${body.reason}`,
-        link: "/dashboard/fravaer"
+        link: "/dashboard/fravaer",
+        refKey: notificationRef.absence(absence.id)
       }))
   );
 

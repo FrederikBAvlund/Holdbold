@@ -41,6 +41,23 @@ export default function Home() {
         </div>
       </section>
 
+      <section className="rounded-[1.375rem] border border-line bg-surface p-5 shadow-[var(--shadow-sm)] sm:p-6">
+        <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-primary/12 text-moss">
+          <Icon name="users" />
+        </span>
+        <h2 className="mt-3 font-display text-2xl font-bold uppercase leading-tight text-ink">Vil du oprette dit eget hold?</h2>
+        <p className="mt-1 max-w-xl text-sm text-ink/65">
+          Skriv til os, så sætter vi jeres hold op i Holdbold. Har I allerede et hold, kan du i stedet bede din admin om et
+          invitationslink.
+        </p>
+        <a
+          href="mailto:kontakt@holdbold.dk?subject=Opret%20nyt%20hold%20i%20Holdbold"
+          className={buttonClasses({ variant: "primary", size: "md", className: "mt-4" })}
+        >
+          Kontakt kontakt@holdbold.dk
+        </a>
+      </section>
+
       <ul className="stagger grid gap-3 sm:grid-cols-3">
         {features.map((f) => (
           <li key={f.t} className="rounded-[1.375rem] border border-line bg-surface p-5 shadow-[var(--shadow-sm)]">

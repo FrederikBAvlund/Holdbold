@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { createNotifications } from "@/lib/notifications";
+import { notificationRef, resolveNotifications } from "@/lib/notificationRefs";
 import { releaseAbsenceSignups } from "@/lib/absences";
 import { ABSENCE_MANAGER_ROLES, requireActiveTeamMember, requireSession } from "@/lib/apiAuth";
 
@@ -33,6 +34,9 @@ export async function POST(_request: Request, { params }: { params: { id: string
   if (!stopped) {
     return NextResponse.json({ error: "Fraværet er allerede afsluttet eller afgjort" }, { status: 409 });
   }
+
+  // Trækkes en afventende anmodning tilbage, er der intet at tage stilling til længere.
+  await resolveNotifications([notificationRef.absence(absence.id)]);
 
   if (wasApproved) {
     const [user, managers] = await Promise.all([

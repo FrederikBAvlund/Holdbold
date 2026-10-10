@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { createNotifications } from "@/lib/notifications";
+import { notificationRef } from "@/lib/notificationRefs";
 
 /** Opretter en bruger med et afventende medlemskab efter bekræftet e-mail. Returnerer null, hvis e-mailen allerede findes. */
 export async function createUserFromSignup(input: { email: string; name: string; teamId: string }) {
@@ -34,7 +35,8 @@ export async function createUserFromSignup(input: { email: string; name: string;
         type: "GENERAL" as const,
         title: "Ny bruger afventer godkendelse",
         body: `${input.name} har oprettet sig med slug ${team?.slug ?? ""}`,
-        link: "/dashboard/indstillinger"
+        link: "/dashboard/hold",
+        refKey: notificationRef.membership(input.teamId, user.id)
       }))
     );
   }

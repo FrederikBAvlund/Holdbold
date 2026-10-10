@@ -32,7 +32,8 @@ export async function GET(request: Request) {
   if (!member.ok) return member.response;
 
   const series = await prisma.eventSeries.findMany({
-    where: { teamId: parsed.teamId },
+    // Lukkede faste begivenheder (slutdato passeret) vises ikke længere i overblikket.
+    where: { teamId: parsed.teamId, OR: [{ endDate: null }, { endDate: { gt: new Date() } }] },
     orderBy: { createdAt: "desc" }
   });
 
