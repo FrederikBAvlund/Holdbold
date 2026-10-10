@@ -450,7 +450,7 @@ export default function DashboardNav({
   return (
     <>
       {/* Mobil topbar */}
-      <header className="sticky top-0 z-40 -mx-3 flex items-center justify-between gap-3 bg-bg px-3 pb-2 pt-[calc(env(safe-area-inset-top,0px)+1.25rem)] shadow-[0_1px_0_var(--line)] sm:-mx-5 sm:px-5 lg:hidden">
+      <header className="sticky top-0 z-40 -mx-3 flex items-center justify-between gap-3 bg-bg px-3 pb-2 pt-[calc(env(safe-area-inset-top,0px)+1.5rem)] shadow-[0_1px_0_var(--line)] sm:-mx-5 sm:px-5 lg:hidden">
         {teamButton}
         {actions}
       </header>
