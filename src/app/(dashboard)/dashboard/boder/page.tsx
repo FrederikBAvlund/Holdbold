@@ -733,7 +733,7 @@ function MobilePayCard({
 
   return (
     <div className="rounded-[1.375rem] border border-line bg-surface p-4">
-      <p className="text-sm text-ink/60">Spillerne kopierer nummeret, når de betaler.</p>
+      <p className="text-sm text-ink/60">Spillerne kan åbne MobilePay direkte med beløbet udfyldt, hvis du indtaster et 5-6-cifret MobilePay-nummer eller indsætter Box-linket (qr.mobilepay.dk). Ellers kopierer de nummeret.</p>
       {editable ? (
         <div className="mt-3 flex gap-2">
           <input

@@ -10,6 +10,7 @@ import Sheet, { ConfirmSheet } from "@/components/ui/Sheet";
 import { Field, Skeleton, inputClass } from "@/components/ui/primitives";
 import FineRow from "@/components/fines/FineRow";
 import { formatKr, formatRelativePast } from "@/lib/format";
+import { buildMobilePayLink } from "@/lib/mobilePayLink";
 import { categoryOptions } from "../boderConstants";
 import type { FineItem, FineTemplate } from "../boderTypes";
 import { canDeleteFine, canSettleFine, parseIntegerAmountInput, summarizeFines } from "../boderUtils";
@@ -49,6 +50,15 @@ export function PaySheet({
     }
   }
 
+  async function copyAmount() {
+    try {
+      await navigator.clipboard.writeText(String(amount));
+      pushToast(`Beløbet (${amount}) er kopieret – sæt det ind i MobilePay`, "success");
+    } catch {
+      // Kopiering er en bekvemmelighed; linket åbnes alligevel.
+    }
+  }
+
   async function markPaid() {
     setSaving(true);
     try {
@@ -70,7 +80,36 @@ export function PaySheet({
     }
   }
 
-  const steps = [
+  const payLink = buildMobilePayLink(mobilePayBox, amount, "Bøder");
+
+  const steps = payLink
+    ? [
+        {
+          title: "Åbn MobilePay",
+          body: (
+            <>
+              <p className="tabular mt-1 font-display text-4xl font-extrabold text-ink">{formatKr(amount)}</p>
+              <a
+                href={payLink.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={payLink.prefilledAmount ? undefined : copyAmount}
+                className="mt-3 inline-flex w-full items-center justify-center rounded-2xl bg-primary px-4 py-3 font-semibold text-on-primary"
+              >
+                Betal i MobilePay
+              </a>
+              {!payLink.prefilledAmount ? (
+                <p className="mt-2 text-sm text-ink/60">Beløbet kopieres, når du trykker. Sæt det ind i MobilePay.</p>
+              ) : null}
+            </>
+          )
+        },
+        {
+          title: "Bekræft her, når det er gjort",
+          body: <p className="mt-1 text-sm text-ink/60">Bødekasseformanden godkender, og så er du gældfri.</p>
+        }
+      ]
+    : [
     {
       title: "Kopiér MobilePay-nummeret",
       body: mobilePayBox ? (
