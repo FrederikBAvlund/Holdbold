@@ -19,7 +19,7 @@ export function slugify(name: string): string {
     .replace(/å/g, "aa")
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
+    .replace(/[^a-z0-9_]+/g, "-")
+    .replace(/^[-_]+|[-_]+$/g, "")
     .slice(0, 40);
 }
