@@ -1,19 +1,21 @@
 "use client";
 
 import Image from "next/image";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { cn } from "@/lib/utils";
 import { useToast } from "@/components/ToastProvider";
 import {
   AddToHomeIllustration,
   OpenAsWebAppIllustration,
   SafariMoreIllustration,
-  SafariShareIllustration
+  SafariShareIllustration,
+  SafariToolbarShareIllustration
 } from "@/components/SetupGuideIllustrations";
 import Button from "@/components/ui/Button";
 import Icon from "@/components/ui/Icon";
 import Sheet from "@/components/ui/Sheet";
 import { Card, ListRow } from "@/components/ui/primitives";
-import type { GuideKind } from "@/lib/pwaEnv";
+import { guessIosGuideVersion, type GuideKind, type IosGuideVersion } from "@/lib/pwaEnv";
 import { usePwaStatus } from "@/lib/usePwaStatus";
 
 type Step = { title: string; text: ReactNode; visual?: ReactNode };
@@ -50,20 +52,33 @@ function Screenshot({ src, alt }: { src: string; alt: string }) {
   );
 }
 
-function installSteps(inAppBrowser: boolean): Step[] {
+function installSteps(version: IosGuideVersion, inAppBrowser: boolean): Step[] {
+  const open: Step = {
+    title: "Åbn Holdbold i Safari",
+    text: inAppBrowser
+      ? "Du kigger lige nu på siden inde i en anden app (fx Messenger). Åbn Safari og skriv holdbold.dk/login – det kan ikke lade sig gøre herfra."
+      : "Gå til holdbold.dk/login i Safari og log ind. Det virker ikke i Chrome eller inde i Messenger."
+  };
+  const menu: Step[] =
+    version === "new"
+      ? [
+          {
+            title: "Åbn sidemenuen",
+            text: "Tryk på ikonet yderst til venstre i adressefeltet nederst (eller på ‘…’, hvis din Safari har den). Det skal være i Safari – ikke i et link, du har åbnet i Messenger.",
+            visual: <SafariMoreIllustration />
+          },
+          { title: "Tryk ‘Del’", text: "‘Del’ står øverst i menuen.", visual: <SafariShareIllustration /> }
+        ]
+      : [
+          {
+            title: "Tryk på Del-ikonet",
+            text: "Det er firkanten med en pil op i værktøjslinjen nederst i Safari.",
+            visual: <SafariToolbarShareIllustration />
+          }
+        ];
   return [
-    {
-      title: "Åbn Holdbold i Safari",
-      text: inAppBrowser
-        ? "Du kigger lige nu på siden inde i en anden app (fx Messenger). Åbn Safari og skriv holdbold.dk/login – det kan ikke lade sig gøre herfra."
-        : "Gå til holdbold.dk/login i Safari og log ind. Det virker ikke i Chrome eller inde i Messenger."
-    },
-    {
-      title: "Tryk på ‘…’ nederst til højre",
-      text: "Det er i Safari – ikke i et link, du har åbnet i Messenger.",
-      visual: <SafariMoreIllustration />
-    },
-    { title: "Tryk ‘Del’", text: "Vælg ‘Del’ i menuen.", visual: <SafariShareIllustration /> },
+    open,
+    ...menu,
     {
       title: "Tryk ‘Føj til hjemmeskærm’",
       text: "Scroll ned til bunden af listen, og tryk på ‘Føj til hjemmeskærm’.",
@@ -79,6 +94,44 @@ function installSteps(inAppBrowser: boolean): Step[] {
       text: "Find Holdbold-ikonet på hjemmeskærmen, åbn den, og log ind. Kom så tilbage til denne guide for at slå push til."
     }
   ];
+}
+
+const VERSION_TABS: { id: IosGuideVersion; label: string }[] = [
+  { id: "new", label: "iOS 26 og nyere" },
+  { id: "classic", label: "iOS 18 og ældre" }
+];
+
+function InstallSteps({ inAppBrowser }: { inAppBrowser: boolean }) {
+  const [version, setVersion] = useState<IosGuideVersion>("new");
+
+  // Forvalg ud fra enheden. Kun et gæt, så brugeren kan skifte fane selv.
+  useEffect(() => setVersion(guessIosGuideVersion(navigator.userAgent)), []);
+
+  return (
+    <div className="space-y-5">
+      <div role="tablist" aria-label="Din iOS-version" className="grid grid-cols-2 gap-1 rounded-2xl bg-ink/[0.06] p-1">
+        {VERSION_TABS.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            role="tab"
+            aria-selected={version === tab.id}
+            onClick={() => setVersion(tab.id)}
+            className={cn(
+              "min-h-10 rounded-xl px-3 text-sm font-semibold transition",
+              version === tab.id ? "bg-surface text-ink shadow-[var(--shadow-sm)]" : "text-ink/60 hover:text-ink"
+            )}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+      <p className="text-sm text-ink/55">Vælg den fane, der ligner din Safari. Find din version under Indstillinger → Generelt → Om.</p>
+      <div role="tabpanel">
+        <StepList steps={installSteps(version, inAppBrowser)} />
+      </div>
+    </div>
+  );
 }
 
 function PushSteps({ onDone }: { onDone: () => void }) {
@@ -154,7 +207,7 @@ export function SetupGuideSheet({ open, onClose, kind }: { open: boolean; onClos
           : "Få besked på telefonen om nye begivenheder og bøder."
       }
     >
-      {active === "install" ? <StepList steps={installSteps(device.isInAppBrowser)} /> : <PushSteps onDone={onClose} />}
+      {active === "install" ? <InstallSteps inAppBrowser={device.isInAppBrowser} /> : <PushSteps onDone={onClose} />}
       {active === "install" && !device.isIos ? (
         <p className="mt-5 rounded-xl bg-ink/[0.05] p-3 text-sm text-ink/65">
           Guiden gælder iPhone. På Android åbner du browserens menu og vælger ‘Installér app’ eller ‘Føj til
