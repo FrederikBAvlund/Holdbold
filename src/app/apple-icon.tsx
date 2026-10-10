@@ -1,5 +1,5 @@
 import { ImageResponse } from "next/og";
-import { brandIconSvg } from "./brand-icon-svg";
+import { brandIconSvgSquare } from "./brand-icon-svg";
 
 export const size = {
   width: 180,
@@ -9,7 +9,7 @@ export const size = {
 export const contentType = "image/png";
 
 export default function AppleIcon() {
-  const svgDataUri = `data:image/svg+xml;utf8,${encodeURIComponent(brandIconSvg)}`;
+  const svgDataUri = `data:image/svg+xml;utf8,${encodeURIComponent(brandIconSvgSquare)}`;
 
   return new ImageResponse(
     (
